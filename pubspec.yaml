@@ -1,0 +1,59 @@
+name: ideaship
+description: "A Flutter project for ideaship."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+  google_fonts: ^6.2.1
+  cupertino_icons: ^1.0.8
+  connectivity_plus: ^6.0.5
+  local_auth: ^2.3.0
+  shared_preferences: ^2.3.0
+  flutter_otp_text_field: ^1.1.3
+  localstore: ^1.1.0
+  flutter_secure_storage: ^9.0.0
+  http: ^1.1.0
+  flutter_svg: ^2.0.10+1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_launcher_icons: ^0.11.0
+  flutter_lints: ^5.0.0
+
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/black_logo.png
+
+flutter_icons:
+  android: true
+  ios: false
+  image_path: "assets/black_logo.png"
+  background_color: "#ffffff"
+  
+  adaptive_icon_foreground: "assets/black_logo.png"
+  adaptive_icon_background: "#ffffff"
+  remove_alpha_ios: true
+  min_sdk_android: 21
+  web: false
+
+  android_icon_size: 192
+
+
+
+
+
+
+
+
+ 
+
+
