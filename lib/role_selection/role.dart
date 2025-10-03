@@ -1,52 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:ideaship/auth/auth_log_reg.dart';
+import 'package:ideaship/dashboard.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'studentrole.dart';
-// import 'companyrole.dart';
-// import 'startuprole.dart';
-// import 'investorrole.dart';
-// import 'mentorrole.dart';
-// import 'educatorrole.dart';
-// import 'researcherrole.dart';
-// import 'freelancerrole.dart';
-// import 'incubatorrole.dart';
-// import 'communityrole.dart';
-// import 'governmentrole.dart';
-// import 'servicerole.dart';
-// import 'recruiterrole.dart';
-// import 'alumnirole.dart';
+// import other role files as needed
 
 Widget loadRolePage(String route) {
   switch (route) {
     case 'studentrole.dart':
       return const StudentRolePage();
-    // case 'companyrole.dart':
-    //   return const CompanyRolePage();
-    // case 'startuprole.dart':
-    //   return const StartupRolePage();
-    // case 'investorrole.dart':
-    //   return const InvestorRolePage();
-    // case 'mentorrole.dart':
-    //   return const MentorRolePage();
-    // case 'educatorrole.dart':
-    //   return const EducatorRolePage();
-    // case 'researcherrole.dart':
-    //   return const ResearcherRolePage();
-    // case 'freelancerrole.dart':
-    //   return const FreelancerRolePage();
-    // case 'incubatorrole.dart':
-    //   return const IncubatorRolePage();
-    // case 'communityrole.dart':
-    //   return const CommunityRolePage();
-    // case 'governmentrole.dart':
-    //   return const GovernmentRolePage();
-    // case 'servicerole.dart':
-    //   return const ServiceRolePage();
-    // case 'recruiterrole.dart':
-    //   return const RecruiterRolePage();
-    // case 'alumnirole.dart':
-    //   return const AlumniRolePage();
+    // Add cases for other roles
     default:
       return Container(color: Colors.grey[200], child: const Center(child: Text('Unknown Role Form')));
   }
@@ -77,7 +44,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
     {'title': 'Government/Policy Maker', 'subtitle': 'Policy support', 'icon': 'assets/government.svg', 'route': 'governmentrole.dart', 'heroTag': 'government-icon'},
     {'title': 'Service Provider', 'subtitle': 'Legal & Tech support', 'icon': 'assets/service.svg', 'route': 'servicerole.dart', 'heroTag': 'service-icon'},
     {'title': 'Recruiter/Placement', 'subtitle': 'Job assistance', 'icon': 'assets/recruiter.svg', 'route': 'recruiterrole.dart', 'heroTag': 'recruiter-icon'},
-    {'title': 'Alumni/Professional', 'subtitle': 'Networking & stories', 'icon': 'assets/alumni.svg', 'route': 'alumnirole.dart', 'heroTag': 'alumni-icon'},
+    {'title': 'Alumni/Professional', 'subtitle': 'Networking & stories', 'icon': 'assets/alumni.svg', 'route': 'alumnirole.dart', 'heroTag': 'alumni-icon'}
   ];
 
   List<Map<String, String>> filteredRoles = [];
@@ -85,38 +52,90 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
   String? _username;
   String? _email;
   String? _id;
+  String? _role; // Load selected role
 
   @override
   void initState() {
     super.initState();
-    _loadAndSaveUserData();
+    _loadBasicUserData();
     filteredRoles = roles;
     _searchController.addListener(_filterRoles);
   }
 
-  Future<void> _loadAndSaveUserData() async {
+  Future<void> _loadBasicUserData() async {
     final prefs = await SharedPreferences.getInstance();
-    // Load existing data
-    String? username = prefs.getString('username');
-    String? email = prefs.getString('email');
-    String? id = prefs.getString('id');
-    
-    // If no data, you might want to handle redirect to login, but for now, set defaults or load
     setState(() {
-      _username = username ?? 'User';
-      _email = email;
-      _id = id;
+      _username = prefs.getString('username') ?? 'User';
+      _email = prefs.getString('email');
+      _id = prefs.getString('id');
+      _role = prefs.getString('role');
     });
-    
-    // Save if loaded (redundant but ensures consistency)
-    if (username != null) {
-      await prefs.setString('username', username);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkFormStatus());
+  }
+
+  Future<void> _checkFormStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    bool profileCompleted = prefs.getBool('profileCompleted') ?? false;
+
+    if (profileCompleted) {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardPage()),
+        );
+      }
+      return;
     }
-    if (email != null) {
-      await prefs.setString('email', email);
+
+    if (_id != null && _id != '0' && _role != null) {
+      try {
+        final response = await http
+            .post(
+              Uri.parse('https://server.awarcrown.com/roledata/formstatus'),
+              body: {'id': _id},
+              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            )
+            .timeout(const Duration(seconds: 10));
+
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> data = json.decode(response.body);
+          if (data['success'] == true && data['completed'] == true) {
+            await prefs.setBool('profileCompleted', true);
+            if (mounted) {
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(builder: (context) => const DashboardPage()),
+              );
+            }
+            return;
+          }
+        }
+      } catch (e) {
+        print('Error checking form status: $e');
+      }
+
+      // If not completed, redirect to respective form
+      String route = _getRouteForRole(_role!);
+      if (route.isNotEmpty && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => loadRolePage(route)),
+        );
+      }
+      return;
     }
-    if (id != null) {
-      await prefs.setString('id', id);
+
+    // Otherwise, stay on role selection
+  }
+
+  String _getRouteForRole(String role) {
+    switch (role.toLowerCase()) {
+      case 'student':
+      case 'professional':
+        return 'studentrole.dart';
+      // Add cases for other roles as they are implemented
+      default:
+        return '';
     }
   }
 
@@ -155,6 +174,21 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
         backgroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Color(0xFF2C3E50)),
+            onPressed: () async {
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.clear(); // Logout: clear all
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AuthLogReg()),
+                );
+              }
+            },
+          ),
+        ],
       ),
       body: SafeArea(
         child: Padding(

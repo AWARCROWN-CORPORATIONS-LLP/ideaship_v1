@@ -1,10 +1,13 @@
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+// For debugPrint
 import '../role_selection/role.dart';
+import '../dashboard.dart'; // Placeholder
 
 class AuthLogReg extends StatefulWidget {
   const AuthLogReg({super.key});
@@ -86,6 +89,59 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
         _clearAllErrors();
       }
     });
+
+    // Auto-login check after frame is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _autoLoginCheck();
+    });
+  }
+
+  Future<void> _autoLoginCheck() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token'); // This is the access_token
+      final profileCompleted = prefs.getBool('profileCompleted') ?? false;
+
+      if (token != null && token.isNotEmpty) {
+        // Rely on server validation for token expiration in future API calls
+        if (profileCompleted) {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) => const DashboardPage(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                transitionDuration: const Duration(milliseconds: 500),
+              ),
+            );
+          }
+        } else {
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) => const RoleSelectionPage(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                transitionDuration: const Duration(milliseconds: 500),
+              ),
+            );
+          }
+        }
+        return;
+      }
+    } catch (e) {
+      debugPrint("Auto-login check error: $e");
+      _showErrorDialog("Auto-Login Error", "Failed to check stored session: ${e.toString()}. Please log in manually.");
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _checkConnectivity() async {
@@ -149,10 +205,10 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
             children: [
               Icon(Icons.error_outline, color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54),
               const SizedBox(width: 10),
-              Text(title, style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black)),
+              Expanded(child: Text(title, style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black))),
             ],
           ),
-          content: Text(message, style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black87)),
+          content: SingleChildScrollView(child: Text(message, style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black87))),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
@@ -164,7 +220,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
     );
   }
 
-  void _showSuccessDialog(String title, String message, {bool switchToLogin = false}) {
+  void _showSuccessDialog(String title, String message, {bool switchToLogin = false, required bool goToRole}) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -175,16 +231,28 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
             children: [
               Icon(Icons.check_circle_outline, color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54),
               const SizedBox(width: 10),
-              Text(title, style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black)),
+              Expanded(child: Text(title, style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black))),
             ],
           ),
-          content: Text(message, style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black87)),
+          content: SingleChildScrollView(child: Text(message, style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black87))),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
                 if (switchToLogin && mounted) {
                   _tabController.animateTo(0);
+                }
+                if (goToRole && mounted) {
+                  Navigator.pushReplacement(
+                    context,
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) => const RoleSelectionPage(),
+                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(opacity: animation, child: child);
+                      },
+                      transitionDuration: const Duration(milliseconds: 500),
+                    ),
+                  );
                 }
               },
               child: Text("Close", style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black)),
@@ -193,6 +261,67 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
         );
       },
     );
+  }
+
+  Future<bool> _refreshTokens() async {
+    if (!_isConnected) {
+      _showErrorDialog("No Network", "Cannot refresh tokens without a network connection.");
+      return false;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final refreshToken = prefs.getString('refresh_token');
+      if (refreshToken == null || refreshToken.isEmpty) {
+        _showErrorDialog("Token Refresh Failed", "No refresh token available. Please log in again.");
+        return false;
+      }
+
+      final url = Uri.parse("https://server.awarcrown.com/api?action=refresh");
+      final response = await http.post(
+        url,
+        body: json.encode({"refresh_token": refreshToken}),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint("Refresh Response Status: ${response.statusCode}");
+      debugPrint("Refresh Response Body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          final newAccessToken = data['access_token'] as String?;
+          final newRefreshToken = data['refresh_token'] as String?;
+          if (newAccessToken != null) {
+            await prefs.setString('token', newAccessToken);
+          }
+          if (newRefreshToken != null) {
+            await prefs.setString('refresh_token', newRefreshToken);
+          }
+          debugPrint("Tokens refreshed successfully.");
+          return true;
+        } else {
+          final message = data['message'] ?? "Unknown refresh error.";
+          _showErrorDialog("Token Refresh Failed", message);
+          // Clear invalid tokens
+          await prefs.remove('token');
+          await prefs.remove('refresh_token');
+          return false;
+        }
+      } else {
+        final message = response.statusCode == 401
+            ? "Refresh token invalid or expired."
+            : response.statusCode == 400
+                ? "Invalid refresh request."
+                : "Server error during refresh: ${response.statusCode}";
+        _showErrorDialog("Token Refresh Failed", message);
+        return false;
+      }
+    } catch (e) {
+      debugPrint("Refresh Error: $e");
+      _showErrorDialog("Connection Error", "Failed to refresh tokens: ${e.toString()}. Check your internet.");
+      return false;
+    }
   }
 
   void _showForgotPasswordDialog() {
@@ -254,7 +383,9 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
                           setDialogState(() {
                             emailError = emailController.text.trim().isEmpty
                                 ? "Please enter email"
-                                : (!emailController.text.trim().contains('@') ? "Invalid email address" : null);
+                                : (!RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(emailController.text.trim())
+                                    ? "Invalid email address"
+                                    : null);
                           });
                           if (emailError != null) return;
 
@@ -266,11 +397,11 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
 
                           setState(() => _isLoading = true);
                           try {
-                            final url = Uri.parse("https://server.awarcrown.com/api.php?action=forgot-password");
+                            final url = Uri.parse("https://server.awarcrown.com/api?action=forgot-password");
                             final response = await http.post(
                               url,
                               body: json.encode({"email": emailController.text.trim()}),
-                              headers: {'Content-Type': 'application/json'},
+                              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                             ).timeout(const Duration(seconds: 30));
 
                             debugPrint("Forgot Password Response Status: ${response.statusCode}");
@@ -280,27 +411,25 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
                               final data = json.decode(response.body);
                               if (data['success'] == true) {
                                 Navigator.of(context).pop();
-                                _showSuccessDialog("Reset Link Sent", data['message'] ?? "Check your email for the password reset link.");
+                                _showSuccessDialog("Reset Link Sent", data['message'] ?? "Check your email for the password reset link.", goToRole: false);
                               } else {
-                                setDialogState(() {
-                                  emailError = data['message'] ?? "Unable to process reset request.";
-                                });
+                                final message = data['message'] ?? "Unable to process reset request.";
+                                setDialogState(() => emailError = message);
                               }
                             } else if (response.statusCode == 400) {
                               final data = json.decode(response.body);
-                              setDialogState(() {
-                                emailError = data['message'] ?? "Invalid request.";
-                              });
+                              final message = data['message'] ?? "Invalid request.";
+                              setDialogState(() => emailError = message);
+                            } else if (response.statusCode == 404) {
+                              setDialogState(() => emailError = "Email not found in our records.");
+                            } else if (response.statusCode == 500) {
+                              setDialogState(() => emailError = "Server error: Internal server issue. Please try again later.");
                             } else {
-                              setDialogState(() {
-                                emailError = "Server error: ${response.statusCode}";
-                              });
+                              setDialogState(() => emailError = "Server error: ${response.statusCode}. Please try again.");
                             }
                           } catch (e) {
                             debugPrint("Forgot Password Error: $e");
-                            setDialogState(() {
-                              emailError = "Failed to connect to server. Check your internet.";
-                            });
+                            setDialogState(() => emailError = "Failed to connect to server: ${e.toString()}. Check your internet.");
                           } finally {
                             if (mounted) setState(() => _isLoading = false);
                           }
@@ -311,8 +440,13 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isLoading
-                      ? CircularProgressIndicator(
-                          color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+                            strokeWidth: 2,
+                          ),
                         )
                       : const Text("Send"),
                 ),
@@ -358,23 +492,39 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
-          // Access nested user object
-          final userData = data['user'] as Map<String, dynamic>;
-          // Store session data in SharedPreferences
+          final userData = data['user'] as Map<String, dynamic>? ?? {};
+          final accessToken = data['access_token'] as String?;
+          final refreshToken = data['refresh_token'] as String?;
+
+          if (accessToken == null || accessToken.isEmpty) {
+            _showErrorDialog("Login Failed", "Access token missing from server response. Please try again.");
+            return;
+          }
+
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('id', userData['id'].toString());
-          await prefs.setString('username', userData['username'] as String);
-          await prefs.setString('email', userData['email'] as String);
+          await prefs.setString('id', userData['id']?.toString() ?? '');
+          await prefs.setString('username', userData['username'] as String? ?? '');
+          await prefs.setString('email', userData['email'] as String? ?? '');
+          await prefs.setString('token', accessToken); // Store as 'token' for compatibility
+          if (refreshToken != null && refreshToken.isNotEmpty) {
+            await prefs.setString('refresh_token', refreshToken);
+          } else {
+            debugPrint("Warning: No refresh token received.");
+          }
 
           setState(() {
             _loginUserController.clear();
             _loginPassController.clear();
           });
 
+          // Check profile completion
+          final profileCompleted = prefs.getBool('profileCompleted') ?? false;
+          final nextPage = profileCompleted ? const DashboardPage() : const RoleSelectionPage();
+
           Navigator.pushReplacement(
             context,
             PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => RoleSelectionPage(),
+              pageBuilder: (context, animation, secondaryAnimation) => nextPage,
               transitionsBuilder: (context, animation, secondaryAnimation, child) {
                 return FadeTransition(opacity: animation, child: child);
               },
@@ -382,40 +532,42 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
             ),
           );
         } else {
-          setState(() {
-            String message = data['message'] ?? "Invalid credentials.";
-            if (message.contains("username") || message.contains("email")) {
-              _loginUserError = message;
-            } else if (message.contains("password")) {
-              _loginPassError = message;
-            } else {
-              _showErrorDialog("Login Failed", message);
-            }
-          });
-        }
-      } else if (response.statusCode == 400) {
-        final data = json.decode(response.body);
-        setState(() {
-          String message = data['message'] ?? "Invalid request.";
+          final message = data['message'] ?? "Invalid credentials. Please check your username/email and password.";
           if (message.contains("username") || message.contains("email")) {
-            _loginUserError = message;
+            setState(() => _loginUserError = message);
           } else if (message.contains("password")) {
-            _loginPassError = message;
+            setState(() => _loginPassError = message);
           } else {
             _showErrorDialog("Login Failed", message);
           }
-        });
+        }
+      } else if (response.statusCode == 400) {
+        final data = json.decode(response.body);
+        final message = data['message'] ?? "Invalid login request. Please check your input.";
+        if (message.contains("username") || message.contains("email")) {
+          setState(() => _loginUserError = message);
+        } else if (message.contains("password")) {
+          setState(() => _loginPassError = message);
+        } else {
+          _showErrorDialog("Login Failed", message);
+        }
+      } else if (response.statusCode == 401) {
+        final data = json.decode(response.body);
+        final message = data['message'] ?? "Invalid credentials. Please check your username/email and password.";
+        _showErrorDialog("Login Failed", message);
       } else if (response.statusCode == 403) {
         final data = json.decode(response.body);
-        _showErrorDialog("Login Failed", data['message'] ?? "Please verify your email.");
+        final message = data['message'] ?? "Account not verified. Please check your email for verification link.";
+        _showErrorDialog("Login Failed", message);
       } else if (response.statusCode == 500) {
-        _showErrorDialog("Server Error", "Internal server error. Please try again later.");
+        _showErrorDialog("Server Error", "Internal server error (500). Please try again later or contact support.");
       } else {
-        _showErrorDialog("Server Error", "Unexpected error: ${response.statusCode}");
+        _showErrorDialog("Server Error", "Unexpected error (HTTP ${response.statusCode}). Please try again.");
       }
     } catch (e) {
       debugPrint("Login Error: $e");
-      _showErrorDialog("Connection Error", "Failed to connect to server: ${e.toString()}. Check your internet.");
+      final errorMsg = e.toString().contains('TimeoutException') ? "Request timed out. Check your connection." : "Failed to connect to server: ${e.toString()}. Check your internet.";
+      _showErrorDialog("Connection Error", errorMsg);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -433,9 +585,9 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
       _regPassError = _regPassController.text.trim().isEmpty
           ? "Please enter password"
           : (_regPassController.text.length < 6 ? "Password must be at least 6 characters" : null);
-      _regConfirmPassError = _regConfirmPassController.text != _regPassController.text ? "Passwords do not match" : null;
+      _regConfirmPassError = _regConfirmPassController.text.trim() != _regPassController.text.trim() ? "Passwords do not match" : null;
       if (!_agreeToTerms) {
-        _showErrorDialog("Terms Error", "You must agree to the terms and privacy policy.");
+        _showErrorDialog("Terms Error", "You must agree to the Terms of Service and Privacy Policy to register.");
         hasError = true;
       }
       if (_regUserError != null || _regEmailError != null || _regPassError != null || _regConfirmPassError != null) hasError = true;
@@ -460,13 +612,35 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
           "password": _regPassController.text.trim(),
         },
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-      );
+      ).timeout(const Duration(seconds: 30));
       debugPrint("Register Response Status: ${response.statusCode}");
       debugPrint("Register Response Body: ${response.body}");
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
+          final userData = data['user'] as Map<String, dynamic>? ?? {};
+          final accessToken = data['access_token'] as String?;
+          final refreshToken = data['refresh_token'] as String?;
+
+          if (accessToken == null || accessToken.isEmpty) {
+            _showErrorDialog("Registration Failed", "Access token missing from server response. Please try logging in.");
+            return;
+          }
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('id', userData['id']?.toString() ?? '');
+          await prefs.setString('username', userData['username'] as String? ?? _regUserController.text.trim());
+          await prefs.setString('email', userData['email'] as String? ?? _regEmailController.text.trim());
+          await prefs.setString('token', accessToken); // Store as 'token' for compatibility
+          if (refreshToken != null && refreshToken.isNotEmpty) {
+            await prefs.setString('refresh_token', refreshToken);
+          } else {
+            debugPrint("Warning: No refresh token received on register.");
+          }
+          // For register, always go to role selection (first time)
+          await prefs.setBool('profileCompleted', false);
+
           setState(() {
             _regUserController.clear();
             _regEmailController.clear();
@@ -477,43 +651,45 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
           });
           _showSuccessDialog(
             "Registration Successful",
-            data['message'] ?? "Your account has been created! Please check your email to verify your account.",
-            switchToLogin: true,
+            data['message'] ?? "Your account has been created! Please select your role to complete setup.",
+            switchToLogin: false,
+            goToRole: true,
           );
         } else {
-          setState(() {
-            String message = data['message'] ?? "Unable to create account.";
-            if (message.contains("username") || message.contains("email")) {
-              _regUserError = message.contains("username") ? message : null;
-              _regEmailError = message.contains("email") ? message : null;
-            } else if (message.contains("password")) {
-              _regPassError = message;
-            } else {
-              _showErrorDialog("Registration Failed", message);
-            }
-          });
-        }
-      } else if (response.statusCode == 400) {
-        final data = json.decode(response.body);
-        setState(() {
-          String message = data['message'] ?? "Invalid request.";
-          if (message.contains("username") || message.contains("email")) {
-            _regUserError = message.contains("username") ? message : null;
-            _regEmailError = message.contains("email") ? message : null;
+          final message = data['message'] ?? "Unable to create account. Please check your input and try again.";
+          if (message.contains("username")) {
+            setState(() => _regUserError = message);
+          } else if (message.contains("email")) {
+            setState(() => _regEmailError = message);
           } else if (message.contains("password")) {
-            _regPassError = message;
+            setState(() => _regPassError = message);
           } else {
             _showErrorDialog("Registration Failed", message);
           }
-        });
+        }
+      } else if (response.statusCode == 400) {
+        final data = json.decode(response.body);
+        final message = data['message'] ?? "Invalid registration request. Please check your input.";
+        if (message.contains("username")) {
+          setState(() => _regUserError = message);
+        } else if (message.contains("email")) {
+          setState(() => _regEmailError = message);
+        } else if (message.contains("password")) {
+          setState(() => _regPassError = message);
+        } else {
+          _showErrorDialog("Registration Failed", message);
+        }
+      } else if (response.statusCode == 409) {
+        _showErrorDialog("Registration Failed", "Username or email already exists. Please choose different ones.");
       } else if (response.statusCode == 500) {
-        _showErrorDialog("Server Error", "Internal server error. Please try again later.");
+        _showErrorDialog("Server Error", "Internal server error (500). Please try again later or contact support.");
       } else {
-        _showErrorDialog("Server Error", "Unexpected error: ${response.statusCode}");
+        _showErrorDialog("Server Error", "Unexpected error (HTTP ${response.statusCode}). Please try again.");
       }
     } catch (e) {
       debugPrint("Register Error: $e");
-      _showErrorDialog("Connection Error", "Failed to connect to server: ${e.toString()}. Check your internet.");
+      final errorMsg = e.toString().contains('TimeoutException') ? "Request timed out. Check your connection." : "Failed to connect to server: ${e.toString()}. Check your internet.";
+      _showErrorDialog("Connection Error", errorMsg);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -681,8 +857,13 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
                         elevation: 5,
                       ),
                       child: _isLoading
-                          ? CircularProgressIndicator(
-                              color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+                                strokeWidth: 2,
+                              ),
                             )
                           : const Text(
                               "Login",
@@ -786,8 +967,13 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
                         elevation: 5,
                       ),
                       child: _isLoading
-                          ? CircularProgressIndicator(
-                              color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+                          ? SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+                                strokeWidth: 2,
+                              ),
                             )
                           : const Text(
                               "Register",

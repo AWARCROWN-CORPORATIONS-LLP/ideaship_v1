@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // import your auth screen
 import 'auth/auth_log_reg.dart';
+import 'role_selection/role.dart';
+import 'dashboard.dart';
 
 void main() {
   runApp(const MyApp());
@@ -57,22 +60,45 @@ class _SplashScreenState extends State<SplashScreen>
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         Future.delayed(const Duration(seconds: 2), () {
-          setState(() {
-            _showLoader = true;
-          });
+          if (mounted) {
+            setState(() {
+              _showLoader = true;
+            });
 
-          // wait 2 more seconds and go to auth screen
-          Future.delayed(const Duration(seconds: 2), () {
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (_) => const AuthLogReg()),
-              );
-            }
-          });
+            // Immediately check route after loader shows
+            _checkInitialRoute();
+          }
         });
       }
     });
+  }
+
+  Future<void> _checkInitialRoute() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token'); // Assuming JWT token
+    final profileCompleted = prefs.getBool('profileCompleted') ?? false;
+
+    if (mounted) {
+      if (token != null && profileCompleted) {
+        // Token exists and profile complete → Dashboard
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const DashboardPage()),
+        );
+      } else if (token != null) {
+        // Token exists but profile incomplete → Role Selection
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const RoleSelectionPage()),
+        );
+      } else {
+        // No token → Login/Register
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AuthLogReg()),
+        );
+      }
+    }
   }
 
   @override
@@ -104,7 +130,7 @@ class _SplashScreenState extends State<SplashScreen>
                       child: FadeTransition(
                         opacity: _fadeAnimation,
                         child: Image.asset(
-                          "assets/black_logo.png", // your logo path
+                          "assets/black_logo.png", 
                           width: 150,
                           height: 150,
                         ),
@@ -124,6 +150,7 @@ class _SplashScreenState extends State<SplashScreen>
                         fontSize: 14,
                         fontWeight: FontWeight.w400,
                         fontFamily: 'Times New Roman',
+                    
                       ),
                     ),
                     Text(
@@ -133,6 +160,10 @@ class _SplashScreenState extends State<SplashScreen>
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Poppins',
+                     
+
+
+
                       ),
                     ),
                   ],

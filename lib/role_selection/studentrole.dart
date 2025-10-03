@@ -1,7 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert';
+import 'dart:io';
+import '../dashboard.dart'; // Import Dashboard for navigation
 
 class StudentRolePage extends StatefulWidget {
   const StudentRolePage({super.key});
@@ -45,17 +50,13 @@ class _StudentRolePageState extends State<StudentRolePage> {
   final _skillsDevController = TextEditingController();
   final _interestsController = TextEditingController();
   final _govIdController = TextEditingController();
-  final _govIdTypeController = TextEditingController();
   final _referenceController = TextEditingController();
   final _expectedPassoutYearController = TextEditingController();
-  final _educationStatusController = TextEditingController();
-  final _jobStatusController = TextEditingController();
   bool _bgCheckConsent = false;
-  bool _isStudent = true; // Default to student, can be toggled
-  String? _educationStatus; // 'studying' or 'graduated'
-  String? _jobStatus; // 'current' or 'past'
-  String? _govIdType; // 'Aadhar', 'PAN', 'Passport', 'Other'
-
+  bool _isStudent = true;
+  String? _educationStatus;
+  String? _jobStatus;
+  String? _govIdType;
   String _username = '';
   String _email = '';
   String _id = '';
@@ -79,23 +80,232 @@ class _StudentRolePageState extends State<StudentRolePage> {
   void initState() {
     super.initState();
     _loadSessionData();
-    _dobController.text = DateFormat('yyyy-MM-dd').format(DateTime.now().subtract(const Duration(days: 7300))); // Default to 20 years ago
+    _dobController.text = DateFormat('yyyy-MM-dd').format(DateTime.now().subtract(const Duration(days: 7300)));
+    _loadFormData(); // Load saved form data
+    _checkProfileStatus(); // Check if profile already completed
   }
 
   Future<void> _loadSessionData() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _username = prefs.getString('username') ?? 'Unknown';
-      _email = prefs.getString('email') ?? 'Unknown';
-      _id = prefs.getString('id') ?? '0';
-    });
-    _usernameController.text = _username;
-    _emailController.text = _email;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _username = prefs.getString('username') ?? 'Unknown';
+        _email = prefs.getString('email') ?? 'Unknown';
+        _id = prefs.getString('id') ?? '0';
+      });
+      _usernameController.text = _username;
+      _emailController.text = _email;
+    } catch (e) {
+      if (mounted) {
+        _showErrorDialog('Failed to load session data: $e');
+      }
+    }
+  }
+
+  // Check if profile is already completed to prevent duplicate submission
+  Future<void> _checkProfileStatus() async {
+    if (_id == '0' || _id.isEmpty) return;
+
+    try {
+      final url = Uri.parse('https://server.awarcrown.com/roledata/formstatus');
+      final response = await http
+          .post(
+            url,
+            body: {'id': _id},
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        final bool completed = jsonResponse['completed'] == true || (jsonResponse['success'] == true && (jsonResponse['data']?.contains(_id) ?? false));
+        if (completed) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('profileCompleted', true);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Profile already completed! Redirecting to dashboard.')),
+            );
+            Navigator.pushReplacement(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) => const DashboardPage(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                transitionDuration: const Duration(milliseconds: 500),
+              ),
+            );
+          }
+        }
+      }
+    } on SocketException {
+      // Ignore network errors during check; proceed with form
+      print('Network error during profile status check');
+    } on FormatException {
+      print('Invalid response during profile status check');
+    } on TimeoutException {
+      print('Timeout during profile status check');
+    } catch (e) {
+      print('Error checking profile status: $e');
+    }
+  }
+
+  // Load saved form data from SharedPreferences
+  Future<void> _loadFormData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _currentStep = prefs.getInt('currentStep') ?? 0;
+        _isStudent = prefs.getBool('isStudent') ?? true;
+        _fullNameController.text = prefs.getString('fullName') ?? '';
+        _dobController.text = prefs.getString('dob') ?? DateFormat('yyyy-MM-dd').format(DateTime.now().subtract(const Duration(days: 7300)));
+        _phoneController.text = prefs.getString('phone') ?? '';
+        _addressController.text = prefs.getString('address') ?? '';
+        _nationalityController.text = prefs.getString('nationality') ?? '';
+        _institutionController.text = prefs.getString('institution') ?? '';
+        _studentIdController.text = prefs.getString('studentId') ?? '';
+        _employeeIdController.text = prefs.getString('employeeId') ?? '';
+        _jobTitleController.text = prefs.getString('jobTitle') ?? '';
+        _companyController.text = prefs.getString('company') ?? '';
+        _linkedinController.text = prefs.getString('linkedin') ?? '';
+        _academicLevelController.text = prefs.getString('academicLevel') ?? '';
+        _majorController.text = prefs.getString('major') ?? '';
+        _gpaController.text = prefs.getString('gpa') ?? '';
+        _courseworkController.text = prefs.getString('coursework') ?? '';
+        _extracurricularController.text = prefs.getString('extracurricular') ?? '';
+        _workExpController.text = prefs.getString('workExp') ?? '';
+        _skillsController.text = prefs.getString('skills') ?? '';
+        _projectsController.text = prefs.getString('projects') ?? '';
+        _certificationsController.text = prefs.getString('certifications') ?? '';
+        _portfolioController.text = prefs.getString('portfolio') ?? '';
+        _careerGoalsController.text = prefs.getString('careerGoals') ?? '';
+        _industryPrefController.text = prefs.getString('industryPref') ?? '';
+        _jobTypeController.text = prefs.getString('jobType') ?? '';
+        _locationPrefController.text = prefs.getString('locationPref') ?? '';
+        _workEnvController.text = prefs.getString('workEnv') ?? '';
+        _availabilityController.text = prefs.getString('availability') ?? '';
+        _skillsDevController.text = prefs.getString('skillsDev') ?? '';
+        _interestsController.text = prefs.getString('interests') ?? '';
+        _govIdController.text = prefs.getString('govId') ?? '';
+        _govIdType = prefs.getString('govIdType');
+        _referenceController.text = prefs.getString('reference') ?? '';
+        _expectedPassoutYearController.text = prefs.getString('expectedPassoutYear') ?? '';
+        _educationStatus = prefs.getString('educationStatus');
+        _jobStatus = prefs.getString('jobStatus');
+        _bgCheckConsent = prefs.getBool('bgCheckConsent') ?? false;
+      });
+    } catch (e) {
+      print('Error loading form data: $e');
+    }
+  }
+
+  // Save form data to SharedPreferences
+  Future<void> _saveFormData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('currentStep', _currentStep);
+      await prefs.setBool('isStudent', _isStudent);
+      await prefs.setString('fullName', _fullNameController.text);
+      await prefs.setString('dob', _dobController.text);
+      await prefs.setString('phone', _phoneController.text);
+      await prefs.setString('address', _addressController.text);
+      await prefs.setString('nationality', _nationalityController.text);
+      await prefs.setString('institution', _institutionController.text);
+      await prefs.setString('studentId', _studentIdController.text);
+      await prefs.setString('employeeId', _employeeIdController.text);
+      await prefs.setString('jobTitle', _jobTitleController.text);
+      await prefs.setString('company', _companyController.text);
+      await prefs.setString('linkedin', _linkedinController.text);
+      await prefs.setString('academicLevel', _academicLevelController.text);
+      await prefs.setString('major', _majorController.text);
+      await prefs.setString('gpa', _gpaController.text);
+      await prefs.setString('coursework', _courseworkController.text);
+      await prefs.setString('extracurricular', _extracurricularController.text);
+      await prefs.setString('workExp', _workExpController.text);
+      await prefs.setString('skills', _skillsController.text);
+      await prefs.setString('projects', _projectsController.text);
+      await prefs.setString('certifications', _certificationsController.text);
+      await prefs.setString('portfolio', _portfolioController.text);
+      await prefs.setString('careerGoals', _careerGoalsController.text);
+      await prefs.setString('industryPref', _industryPrefController.text);
+      await prefs.setString('jobType', _jobTypeController.text);
+      await prefs.setString('locationPref', _locationPrefController.text);
+      await prefs.setString('workEnv', _workEnvController.text);
+      await prefs.setString('availability', _availabilityController.text);
+      await prefs.setString('skillsDev', _skillsDevController.text);
+      await prefs.setString('interests', _interestsController.text);
+      await prefs.setString('govId', _govIdController.text);
+      if (_govIdType != null) await prefs.setString('govIdType', _govIdType!);
+      await prefs.setString('reference', _referenceController.text);
+      await prefs.setString('expectedPassoutYear', _expectedPassoutYearController.text);
+      if (_educationStatus != null) await prefs.setString('educationStatus', _educationStatus!);
+      if (_jobStatus != null) await prefs.setString('jobStatus', _jobStatus!);
+      await prefs.setBool('bgCheckConsent', _bgCheckConsent);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Progress saved!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save progress: $e')),
+        );
+      }
+    }
+  }
+
+  // Clear saved form data after successful submission
+  Future<void> _clearFormData() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('currentStep');
+      await prefs.remove('isStudent');
+      await prefs.remove('fullName');
+      await prefs.remove('dob');
+      await prefs.remove('phone');
+      await prefs.remove('address');
+      await prefs.remove('nationality');
+      await prefs.remove('institution');
+      await prefs.remove('studentId');
+      await prefs.remove('employeeId');
+      await prefs.remove('jobTitle');
+      await prefs.remove('company');
+      await prefs.remove('linkedin');
+      await prefs.remove('academicLevel');
+      await prefs.remove('major');
+      await prefs.remove('gpa');
+      await prefs.remove('coursework');
+      await prefs.remove('extracurricular');
+      await prefs.remove('workExp');
+      await prefs.remove('skills');
+      await prefs.remove('projects');
+      await prefs.remove('certifications');
+      await prefs.remove('portfolio');
+      await prefs.remove('careerGoals');
+      await prefs.remove('industryPref');
+      await prefs.remove('jobType');
+      await prefs.remove('locationPref');
+      await prefs.remove('workEnv');
+      await prefs.remove('availability');
+      await prefs.remove('skillsDev');
+      await prefs.remove('interests');
+      await prefs.remove('govId');
+      await prefs.remove('govIdType');
+      await prefs.remove('reference');
+      await prefs.remove('expectedPassoutYear');
+      await prefs.remove('educationStatus');
+      await prefs.remove('jobStatus');
+      await prefs.remove('bgCheckConsent');
+    } catch (e) {
+      print('Error clearing form data: $e');
+    }
   }
 
   @override
   void dispose() {
-    // Dispose controllers
     _usernameController.dispose();
     _emailController.dispose();
     _fullNameController.dispose();
@@ -128,26 +338,27 @@ class _StudentRolePageState extends State<StudentRolePage> {
     _skillsDevController.dispose();
     _interestsController.dispose();
     _govIdController.dispose();
-    _govIdTypeController.dispose();
     _referenceController.dispose();
     _expectedPassoutYearController.dispose();
-    _educationStatusController.dispose();
-    _jobStatusController.dispose();
     super.dispose();
   }
 
   void _nextStep() {
     if (_formKey.currentState!.validate()) {
+      _saveFormData(); // Save data before moving to next step
       if (_currentStep < 3) {
         setState(() => _currentStep++);
       } else {
         _submitForm();
       }
+    } else {
+      _showErrorDialog('Please fix the errors in this step.');
     }
   }
 
   void _prevStep() {
     if (_currentStep > 0) {
+      _saveFormData(); // Save data before going back
       setState(() => _currentStep--);
     }
   }
@@ -166,30 +377,99 @@ class _StudentRolePageState extends State<StudentRolePage> {
     }
   }
 
-  void _submitForm() async {
-    if (_formKey.currentState!.validate()) {
-      setState(() => _isLoading = true);
+  Future<void> _submitForm() async {
+    if (!_formKey.currentState!.validate()) {
+      _showErrorDialog('Please fix the errors in this step.');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final response = await _sendDataToBackend();
+
+      String errorMsg = 'Failed to save profile. Status code: ${response.statusCode}';
+      bool isSuccess = false;
+      String successMessage = 'Welcome to the world\'s largest career network! Profile saved successfully!';
+
       try {
-        final response = await _sendDataToBackend();
-        if (response.statusCode == 200) {
+        final Map<String, dynamic> jsonResponse = json.decode(response.body);
+        if (response.statusCode >= 200 && response.statusCode < 300 && jsonResponse['success'] == true) {
+          isSuccess = true;
+          successMessage = jsonResponse['message'] ?? successMessage;
+        } else if (response.statusCode == 409) {
+          errorMsg = jsonResponse['message'] ?? 'Profile already exists for this user';
+          // Handle duplicate: set completed and navigate
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setBool('profileCompleted', true);
+          await prefs.setString('role', _isStudent ? 'student' : 'professional');
+          await _clearFormData();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Welcome to the world\'s largest career network! Profile saved successfully!')),
+              SnackBar(content: Text('$errorMsg Redirecting to dashboard.')),
             );
-            Navigator.pop(context);
+            Navigator.pushReplacement(
+              context,
+              PageRouteBuilder(
+                pageBuilder: (context, animation, secondaryAnimation) => const DashboardPage(),
+                transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
+                transitionDuration: const Duration(milliseconds: 500),
+              ),
+            );
           }
+          return;
         } else {
-          _showErrorDialog('Failed to save profile. Status code: ${response.statusCode}');
+          errorMsg = jsonResponse['message'] ?? errorMsg;
         }
       } catch (e) {
-        _showErrorDialog('Network error: $e. Please check your connection.');
-      } finally {
-        if (mounted) {
-          setState(() => _isLoading = false);
+        // JSON parse failed; use status-based error
+        if (response.statusCode >= 400 && response.statusCode < 500) {
+          errorMsg = 'Validation error. Please check your inputs.';
+        } else if (response.statusCode >= 500) {
+          errorMsg = 'Server error. Please try again later.';
         }
       }
-    } else {
-      _showErrorDialog('Please fix the errors in this step.');
+
+      if (isSuccess) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('role', _isStudent ? 'student' : 'professional');
+        await prefs.setBool('profileCompleted', true);
+        await prefs.setString('fullName', _fullNameController.text);
+        await prefs.setString('phone', _phoneController.text);
+        await _clearFormData(); // Clear saved form data after successful submission
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(successMessage)),
+          );
+          Navigator.pushReplacement(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) => const DashboardPage(),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(opacity: animation, child: child);
+              },
+              transitionDuration: const Duration(milliseconds: 500),
+            ),
+          );
+        }
+      } else {
+        _showErrorDialog(errorMsg);
+      }
+    } on SocketException {
+      _showErrorDialog('Network error. Please check your internet connection and try again.');
+    } on FormatException {
+      _showErrorDialog('Invalid response from server. Please try again.');
+    } on TimeoutException {
+      _showErrorDialog('Request timed out. Please check your connection and try again.');
+    } catch (e) {
+      _showErrorDialog('An unexpected error occurred: $e. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -249,12 +529,18 @@ class _StudentRolePageState extends State<StudentRolePage> {
       'job_status': _jobStatus ?? '',
       'gov_id': _govIdController.text,
       'gov_id_type': _govIdType ?? '',
-      'email_verification': 'verified', // Default verified
+      'email_verification': 'verified',
       'reference': _referenceController.text,
       'bg_check_consent': _bgCheckConsent.toString(),
       'role_type': _isStudent ? 'student' : 'professional',
     };
-    return http.post(url, body: body);
+    return http
+        .post(
+          url,
+          body: body,
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        )
+        .timeout(const Duration(seconds: 30));
   }
 
   Widget _buildStepIndicator() {
@@ -1120,7 +1406,7 @@ class _StudentRolePageState extends State<StudentRolePage> {
                   onChanged: (String? newValue) {
                     setState(() {
                       _govIdType = newValue;
-                      _govIdController.clear(); // Clear when type changes
+                      _govIdController.clear();
                     });
                   },
                   validator: (value) => value == null ? 'Required' : null,
@@ -1202,21 +1488,49 @@ class _StudentRolePageState extends State<StudentRolePage> {
           else
             const SizedBox(width: 0),
           const Spacer(),
-          ElevatedButton(
-            onPressed: _isLoading ? null : _nextStep,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF27AE60),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: _isLoading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
-                  )
-                : Text(_currentStep == 3 ? 'Join Now' : 'Next Step'),
+          Row(
+            children: [
+              if (_currentStep < 3) // Only show Save & Next for steps before the last
+                ElevatedButton(
+                  onPressed: _isLoading ? null : () {
+                    if (_formKey.currentState!.validate()) {
+                      _saveFormData(); // Save without moving to next step
+                    } else {
+                      _showErrorDialog('Please fix the errors in this step.');
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueGrey,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                        )
+                      : const Text('Save'),
+                ),
+              const SizedBox(width: 8),
+              ElevatedButton(
+                onPressed: _isLoading ? null : _nextStep,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF27AE60),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
+                      )
+                    : Text(_currentStep == 3 ? 'Join Now' : 'Save & Next'),
+              ),
+            ],
           ),
         ],
       ),
@@ -1231,7 +1545,6 @@ class _StudentRolePageState extends State<StudentRolePage> {
         children: [
           Column(
             children: [
-              // App Bar with engaging title
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.fromLTRB(screenWidth * 0.04, MediaQuery.of(context).padding.top + 20, screenWidth * 0.04, 20),
