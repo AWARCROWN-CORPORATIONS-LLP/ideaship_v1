@@ -7,22 +7,26 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'studentrole.dart';
+import 'companyrole.dart';
 // import other role files as needed
 
 Widget loadRolePage(String route) {
   switch (route) {
     case 'studentrole.dart':
       return const StudentRolePage();
+    case 'companyrole.dart':
+      return const CompanyRolePage();
     // Add cases for other roles
     default:
-      return Container(color: Colors.grey[200], child: const Center(child: Text('Unknown Role Form')));
+      return Container(
+        color: Colors.grey[200],
+        child: const Center(child: Text('Unknown Role Form')),
+      );
   }
 }
 
 class RoleSelectionPage extends StatefulWidget {
-  const RoleSelectionPage({
-    super.key,
-  });
+  const RoleSelectionPage({super.key});
 
   @override
   State<RoleSelectionPage> createState() => _RoleSelectionPageState();
@@ -31,28 +35,122 @@ class RoleSelectionPage extends StatefulWidget {
 class _RoleSelectionPageState extends State<RoleSelectionPage> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, String>> roles = [
-    {'title': 'Student/Professional', 'subtitle': 'Seeking opportunities', 'icon': 'assets/student.svg', 'route': 'studentrole.dart', 'heroTag': 'student-icon'},
-    {'title': 'Company/HR', 'subtitle': 'Looking to hire talent', 'icon': 'assets/company.svg', 'route': 'companyrole.dart', 'heroTag': 'company-icon'},
-    {'title': 'Startup/Entrepreneur', 'subtitle': 'Building solutions', 'icon': 'assets/startup.svg', 'route': 'startuprole.dart', 'heroTag': 'startup-icon'},
-    {'title': 'Investor', 'subtitle': 'Funding ventures', 'icon': 'assets/investor.svg', 'route': 'investorrole.dart', 'heroTag': 'investor-icon'},
-    {'title': 'Mentor/Advisor', 'subtitle': 'Guiding professionals', 'icon': 'assets/mentor.svg', 'route': 'mentorrole.dart', 'heroTag': 'mentor-icon'},
-    {'title': 'Educator/Trainer', 'subtitle': 'Skill development', 'icon': 'assets/educator.svg', 'route': 'educatorrole.dart', 'heroTag': 'educator-icon'},
-    {'title': 'Researcher/Innovator', 'subtitle': 'Cutting-edge projects', 'icon': 'assets/researcher.svg', 'route': 'researcherrole.dart', 'heroTag': 'researcher-icon'},
-    {'title': 'Freelancer/Consultant', 'subtitle': 'Expertise on-demand', 'icon': 'assets/freelancer.svg', 'route': 'freelancerrole.dart', 'heroTag': 'freelancer-icon'},
-    {'title': 'Incubator/Accelerator', 'subtitle': 'Startup support', 'icon': 'assets/incubator.svg', 'route': 'incubatorrole.dart', 'heroTag': 'incubator-icon'},
-    {'title': 'Community/Non-Profit', 'subtitle': 'Social innovation', 'icon': 'assets/community.svg', 'route': 'communityrole.dart', 'heroTag': 'community-icon'},
-    {'title': 'Government/Policy Maker', 'subtitle': 'Policy support', 'icon': 'assets/government.svg', 'route': 'governmentrole.dart', 'heroTag': 'government-icon'},
-    {'title': 'Service Provider', 'subtitle': 'Legal & Tech support', 'icon': 'assets/service.svg', 'route': 'servicerole.dart', 'heroTag': 'service-icon'},
-    {'title': 'Recruiter/Placement', 'subtitle': 'Job assistance', 'icon': 'assets/recruiter.svg', 'route': 'recruiterrole.dart', 'heroTag': 'recruiter-icon'},
-    {'title': 'Alumni/Professional', 'subtitle': 'Networking & stories', 'icon': 'assets/alumni.svg', 'route': 'alumnirole.dart', 'heroTag': 'alumni-icon'}
+    {
+      'title': 'Student/Professional',
+      'subtitle': 'Seeking opportunities',
+      'icon': 'assets/student.svg',
+      'route': 'studentrole.dart',
+      'heroTag': 'student-icon'
+    },
+    {
+      'title': 'Company/HR',
+      'subtitle': 'Looking to hire talent',
+      'icon': 'assets/company.svg',
+      'route': 'companyrole.dart',
+      'heroTag': 'company-icon'
+    },
+    {
+      'title': 'Startup/Entrepreneur',
+      'subtitle': 'Building solutions',
+      'icon': 'assets/startup.svg',
+      'route': 'startuprole.dart',
+      'heroTag': 'startup-icon'
+    },
+    // {
+    //   'title': 'Investor',
+    //   'subtitle': 'Funding ventures',
+    //   'icon': 'assets/investor.svg',
+    //   'route': 'investorrole.dart',
+    //   'heroTag': 'investor-icon'
+    // },
+    {
+      'title': 'Mentor/Advisor',
+      'subtitle': 'Guiding professionals',
+      'icon': 'assets/mentor.svg',
+      'route': 'mentorrole.dart',
+      'heroTag': 'mentor-icon'
+    },
+    {
+      'title': 'Reporter/Journalist',
+      'subtitle': 'Creating & sharing news',
+      'icon': 'assets/reporter.svg',
+      'route': 'reporterrole.dart',
+      'heroTag': 'reporter-icon'
+
+
+    },
+   {
+     'title': 'Educator/Trainer',
+     'subtitle': 'Skill development',
+     'icon': 'assets/educator.svg',
+     'route': 'educatorrole.dart',
+     'heroTag': 'educator-icon'
+   },
+    {
+      'title': 'Researcher/Innovator',
+      'subtitle': 'Cutting-edge projects',
+      'icon': 'assets/researcher.svg',
+      'route': 'researcherrole.dart',
+      'heroTag': 'researcher-icon'
+    },
+    {
+      'title': 'Freelancer/Consultant',
+      'subtitle': 'Expertise on-demand',
+      'icon': 'assets/freelancer.svg',
+      'route': 'freelancerrole.dart',
+      'heroTag': 'freelancer-icon'
+    },
+    // {
+    //   'title': 'Incubator/Accelerator',
+    //   'subtitle': 'Startup support',
+    //   'icon': 'assets/incubator.svg',
+    //   'route': 'incubatorrole.dart',
+    //   'heroTag': 'incubator-icon'
+    // },
+    {
+      'title': 'Community/Non-Profit',
+      'subtitle': 'Social innovation',
+      'icon': 'assets/community.svg',
+      'route': 'communityrole.dart',
+      'heroTag': 'community-icon'
+    },
+    // {
+    //   'title': 'Government/Policy Maker',
+    //   'subtitle': 'Policy support',
+    //   'icon': 'assets/government.svg',
+    //   'route': 'governmentrole.dart',
+    //   'heroTag': 'government-icon'
+    // },
+    {
+      'title': 'Service Provider',
+      'subtitle': 'Legal & Tech support',
+      'icon': 'assets/service.svg',
+      'route': 'servicerole.dart',
+      'heroTag': 'service-icon'
+    },
+    // {
+    //   'title': 'Recruiter/Placement',
+    //   'subtitle': 'Job assistance',
+    //   'icon': 'assets/recruiter.svg',
+    //   'route': 'recruiterrole.dart',
+    //   'heroTag': 'recruiter-icon'
+    // },
+    // {
+    //   'title': 'Alumni/Professional',
+    //   'subtitle': 'Networking & stories',
+    //   'icon': 'assets/alumni.svg',
+    //   'route': 'alumnirole.dart',
+    //   'heroTag': 'alumni-icon'
+    // }
   ];
 
   List<Map<String, String>> filteredRoles = [];
   Timer? _debounce;
   String? _username;
+  // ignore: unused_field
   String? _email;
   String? _id;
-  String? _role; // Load selected role
+  String? _role;
 
   @override
   void initState() {
@@ -87,45 +185,87 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       return;
     }
 
-    if (_id != null && _id != '0' && _role != null) {
+    if (_id != null && _id != '0') {
       try {
-        final response = await http
-            .post(
-              Uri.parse('https://server.awarcrown.com/roledata/formstatus'),
-              body: {'id': _id},
-              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-            )
-            .timeout(const Duration(seconds: 10));
+        print('Checking form status for ID: $_id');
+
+        http.Response response;
+
+        // Try POST first
+        try {
+          response = await http
+              .post(
+                Uri.parse('https://server.awarcrown.com/roledata/formstatus'),
+                body: {'id': _id},
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+              )
+              .timeout(const Duration(seconds: 10));
+        } catch (e) {
+          print("POST request failed, trying GET... Error: $e");
+
+          // Fallback to GET
+          response = await http
+              .get(
+                Uri.parse(
+                    'https://server.awarcrown.com/roledata/formstatus?id=$_id'),
+              )
+              .timeout(const Duration(seconds: 10));
+        }
 
         if (response.statusCode == 200) {
-          final Map<String, dynamic> data = json.decode(response.body);
-          if (data['success'] == true && data['completed'] == true) {
-            await prefs.setBool('profileCompleted', true);
-            if (mounted) {
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(builder: (context) => const DashboardPage()),
-              );
+          try {
+            final Map<String, dynamic> data = json.decode(response.body);
+
+            if (data['success'] == true && data['completed'] == true) {
+              await prefs.setBool('profileCompleted', true);
+
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                      builder: (context) => const DashboardPage()),
+                );
+              }
+              return;
             }
-            return;
+          } catch (jsonErr) {
+            _showError("Invalid server response. Please try again later.");
+            print("JSON Parse Error: $jsonErr");
           }
+        } else if (response.statusCode == 401) {
+          _showError("Session expired. Please log in again.");
+          await prefs.clear();
+          if (mounted) {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const AuthLogReg()),
+            );
+          }
+          return;
+        } else {
+          _showError(
+              "Server error (${response.statusCode}). Please try again later.");
         }
+      } on TimeoutException {
+        _showError("Request timed out. Check your internet connection.");
       } catch (e) {
+        _showError("Something went wrong. Please try again.");
         print('Error checking form status: $e');
       }
 
-      // If not completed, redirect to respective form
-      String route = _getRouteForRole(_role!);
-      if (route.isNotEmpty && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => loadRolePage(route)),
-        );
+      // Fallback: redirect to role form if role exists
+      if (_role != null) {
+        String route = _getRouteForRole(_role!);
+        if (route.isNotEmpty && mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => loadRolePage(route)),
+          );
+        }
       }
       return;
     }
-
-    // Otherwise, stay on role selection
+    // Stay on role selection by default
   }
 
   String _getRouteForRole(String role) {
@@ -133,7 +273,10 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       case 'student':
       case 'professional':
         return 'studentrole.dart';
-      // Add cases for other roles as they are implemented
+      case 'company':
+      case 'hr':
+        return 'companyrole.dart';
+      // Add cases for other roles
       default:
         return '';
     }
@@ -144,9 +287,25 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
     _debounce = Timer(const Duration(milliseconds: 300), () {
       final query = _searchController.text.toLowerCase();
       setState(() {
-        filteredRoles = roles.where((role) => role['title']!.toLowerCase().contains(query)).toList();
+        filteredRoles = roles
+            .where((role) =>
+                role['title']!.toLowerCase().contains(query) ||
+                role['subtitle']!.toLowerCase().contains(query))
+            .toList();
       });
     });
+  }
+
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   @override
@@ -214,23 +373,27 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                 controller: _searchController,
                 decoration: InputDecoration(
                   hintText: 'Search role...',
-                  prefixIcon: const Icon(Icons.search, color: Color(0xFF27AE60)),
+                  prefixIcon:
+                      const Icon(Icons.search, color: Color(0xFF27AE60)),
                   filled: true,
                   fillColor: Colors.grey[100],
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  contentPadding:
+                      const EdgeInsets.symmetric(vertical: 10),
                 ),
               ),
               const SizedBox(height: 20),
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    int crossAxisCount = (constraints.maxWidth > 360) ? 2 : 1;
+                    int crossAxisCount =
+                        (constraints.maxWidth > 360) ? 2 : 1;
                     return GridView.builder(
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      gridDelegate:
+                          SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: crossAxisCount,
                         crossAxisSpacing: screenWidth * 0.03,
                         mainAxisSpacing: screenHeight * 0.02,
@@ -300,7 +463,8 @@ class _RoleCardState extends State<RoleCard> {
                 child: loadRolePage(widget.route),
               );
             },
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
               return FadeTransition(opacity: animation, child: child);
             },
             transitionDuration: const Duration(milliseconds: 500),
@@ -321,11 +485,14 @@ class _RoleCardState extends State<RoleCard> {
                     offset: const Offset(0, 3),
                   ),
                 ],
-          border: isTapped ? Border.all(color: const Color(0xFF27AE60), width: 2) : null,
+          border: isTapped
+              ? Border.all(color: const Color(0xFF27AE60), width: 2)
+              : null,
         ),
         child: Card(
           elevation: isTapped ? 0 : 6,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           color: Colors.white,
           child: Padding(
             padding: const EdgeInsets.all(12.0),
