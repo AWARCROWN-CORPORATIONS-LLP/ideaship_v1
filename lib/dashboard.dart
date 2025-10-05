@@ -1,4 +1,5 @@
 // dashboard.dart
+// ignore: unused_import
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -6,7 +7,7 @@ import 'package:ideaship/feed/createpost.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ideaship/auth/auth_log_reg.dart';
 import 'feed/posts.dart'; // Import the PostsPage from feed/posts.dart
-import 'feed/createpost.dart'; // Import CreatePostPage
+// Import CreatePostPage
 import 'settings/usersettings.dart'; // Import UserSettingsPage
 import 'jobs/job_drawer.dart'; // Import the updated JobDrawer
 // TODO: Import other pages as needed, e.g.,
@@ -34,6 +35,10 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   String? _role;
   String? _major;
   bool _isLoading = true;
+
+  bool _isNotificationActive = false;
+  bool _isMessageActive = false;
+  bool _isLogoutActive = false;
 
   @override
   void initState() {
@@ -136,7 +141,13 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
           ],
         );
       },
-    );
+    ).then((_) {
+      if (mounted) {
+        setState(() {
+          _isMessageActive = false;
+        });
+      }
+    });
   }
 
   void _showLogoutConfirmation() {
@@ -151,12 +162,18 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
               child: const Text('Cancel'),
               onPressed: () {
                 Navigator.of(context).pop();
+                if (mounted) {
+                  setState(() {
+                    _isLogoutActive = false;
+                  });
+                }
               },
             ),
             TextButton(
               child: const Text('Logout'),
               onPressed: () {
                 Navigator.of(context).pop();
+                _isLogoutActive = false;
                 _performLogout();
               },
             ),
@@ -179,26 +196,64 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     } catch (e) {
       if (mounted) {
         _showErrorBanner('Logout failed: ${e.toString()}');
+        _isLogoutActive = false;
       }
     }
+  }
+
+  void _handleNotificationPress() {
+    if (_isNotificationActive) return;
+    setState(() {
+      _isNotificationActive = true;
+    });
+    _showErrorBanner('Notifications coming soon!');
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) {
+        setState(() {
+          _isNotificationActive = false;
+        });
+      }
+    });
+  }
+
+  void _handleMessagePress() {
+    if (_isMessageActive) return;
+    setState(() {
+      _isMessageActive = true;
+    });
+    _showMessageDialog();
+  }
+
+  void _handleLogoutPress() {
+    if (_isLogoutActive) return;
+    setState(() {
+      _isLogoutActive = true;
+    });
+    _showLogoutConfirmation();
   }
 
   AppBar _buildAppBar() {
     List<Widget> actions = [
       IconButton(
-        onPressed: () {
-          // TODO: Implement notifications
-          _showErrorBanner('Notifications coming soon!'); // Using error banner for consistency, or make separate if needed
-        },
-        icon: const Icon(Icons.notifications_outlined, color: Colors.black87),
+        onPressed: _isNotificationActive ? null : _handleNotificationPress,
+        icon: Icon(
+          Icons.notifications_outlined,
+          color: _isNotificationActive ? Colors.grey : Colors.black87,
+        ),
       ),
       IconButton(
-        onPressed: _showMessageDialog,
-        icon: const Icon(Icons.chat_bubble_outline, color: Colors.black87),
+        onPressed: _isMessageActive ? null : _handleMessagePress,
+        icon: Icon(
+          Icons.chat_bubble_outline,
+          color: _isMessageActive ? Colors.grey : Colors.black87,
+        ),
       ),
       IconButton(
-        icon: const Icon(Icons.logout),
-        onPressed: _showLogoutConfirmation,
+        onPressed: _isLogoutActive ? null : _handleLogoutPress,
+        icon: Icon(
+          Icons.logout,
+          color: _isLogoutActive ? Colors.grey : Colors.black87,
+        ),
       ),
     ];
 

@@ -1,9 +1,164 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-// ignore: unused_import
-import 'package:intl/intl.dart';
+import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
+
+class Skeleton extends StatefulWidget {
+  final double height;
+  final double width;
+  final String type;
+  const Skeleton(
+      {super.key, this.height = 20, this.width = 20, this.type = 'square'});
+
+  @override
+  State<Skeleton> createState() => _SkeletonState();
+}
+
+class _SkeletonState extends State<Skeleton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation gradientPosition;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+        duration: const Duration(milliseconds: 1500), vsync: this);
+    gradientPosition = Tween<double>(
+      begin: -3,
+      end: 10,
+    ).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.linear),
+    )..addListener(() {
+        setState(() {});
+      });
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: widget.width,
+      height: widget.height,
+      decoration: BoxDecoration(
+          borderRadius: widget.type == 'circle'
+              ? BorderRadius.circular(50)
+              : BorderRadius.circular(0),
+          gradient: LinearGradient(
+              begin: Alignment(gradientPosition.value, 0),
+              end: const Alignment(-1, 0),
+              colors: const [Colors.black12, Colors.black26, Colors.black12])),
+    );
+  }
+}
+
+class PostSkeleton extends StatelessWidget {
+  const PostSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    return Card(
+      elevation: 1,
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              children: [
+                const Skeleton(height: 40, width: 40, type: 'circle'),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Skeleton(height: 14, width: 120),
+                      const SizedBox(height: 4),
+                      const Skeleton(height: 12, width: 80),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Caption
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Column(
+              children: [
+                const Skeleton(height: 16, width: double.infinity),
+                const SizedBox(height: 8),
+                Skeleton(height: 16, width: screenWidth * 0.6),
+              ],
+            ),
+          ),
+          // Media
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: const Skeleton(height: 200, width: double.infinity),
+          ),
+          const SizedBox(height: 12),
+          // Actions
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    const Skeleton(height: 20, width: 100),
+                    const Spacer(),
+                    const Skeleton(height: 20, width: 20),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Skeleton(height: 12, width: 60),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CommentSkeleton extends StatelessWidget {
+  const CommentSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 12.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Skeleton(height: 32, width: 32, type: 'circle'),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Skeleton(height: 14, width: double.infinity),
+                const SizedBox(height: 4),
+                const Skeleton(height: 12, width: double.infinity),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class PostsPage extends StatefulWidget {
   const PostsPage({super.key});
@@ -16,59 +171,99 @@ class _PostsPageState extends State<PostsPage> {
   List<dynamic> posts = [];
   bool isLoading = false;
   bool hasMore = true;
+  bool networkError = false;
   int? nextCursorId;
   final ScrollController _scrollController = ScrollController();
 
-  // For comments: map of post_id to list of comments
+  // Comments
   Map<int, List<dynamic>> commentsMap = {};
   Map<int, bool> showCommentsMap = {};
   Map<int, TextEditingController> commentControllers = {};
   Map<int, FocusNode> commentFocusNodes = {};
   Map<int, bool> commentLoadingMap = {};
-  Map<int, bool> hasMoreComments = {};
-  Map<int, int?> nextCommentCursor = {};
-  Map<int, ScrollController> commentScrollControllers = {};
 
-  // Current user ID fetched from SharedPreferences
-  int? currentUserId;
+  // Current user
+  String _username = '';
+  int? _userId;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentUserId();
-    _fetchPosts();
+    _loadUsername().then((_) {
+      _fetchPosts();
+    });
     _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
-    // Dispose controllers and focus nodes
     for (var c in commentControllers.values) {
       c.dispose();
     }
     for (var f in commentFocusNodes.values) {
       f.dispose();
     }
-    for (var sc in commentScrollControllers.values) {
-      sc.dispose();
-    }
     super.dispose();
   }
 
-  Future<void> _loadCurrentUserId() async {
+  // Load username from SharedPreferences
+  Future<void> _loadUsername() async {
     final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        currentUserId = prefs.getInt('user_id') ?? 0;
-      });
-    }
+    setState(() {
+      _username = prefs.getString('username') ?? '';
+      _userId = prefs.getInt('user_id') ?? 0;
+    });
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-      if (hasMore && !isLoading) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      if (hasMore && !isLoading && !networkError) {
         _fetchMorePosts();
+      }
+    }
+  }
+
+  Future<Map<String, dynamic>?> _fetchPostsData({int? cursorId}) async {
+    if (_username.isEmpty) return null;
+    try {
+      final params = {'username': _username};
+      if (cursorId != null) params['cursorId'] = cursorId.toString();
+
+      final queryString = params.entries
+          .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
+          .join('&');
+
+      final url = 'https://server.awarcrown.com/feed/fetch_posts?$queryString';
+      final response = await http.get(Uri.parse(url));
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to fetch posts: ${response.statusCode}')),
+          );
+        }
+        return null;
+      }
+    } catch (e) {
+      if (e is SocketException) {
+        if (mounted) {
+          setState(() => networkError = true);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No internet connection')),
+          );
+        }
+        return null;
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error fetching posts: $e')),
+          );
+        }
+        return null;
       }
     }
   }
@@ -77,934 +272,622 @@ class _PostsPageState extends State<PostsPage> {
     if (isLoading) return;
     setState(() => isLoading = true);
 
-    try {
-      String url = 'https://server.awarcrown.com/feed/fetch_posts.php';
-      if (cursorId != null) {
-        url += '?cursorId=$cursorId';
-      }
-      final response = await http.get(Uri.parse(url));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          if (cursorId == null) {
-            posts = data['posts'] ?? [];
-          } else {
-            posts.addAll(data['posts'] ?? []);
-          }
-          nextCursorId = data['nextCursorId'];
-          hasMore = nextCursorId != null;
-        });
-      } else {
-        // Handle error, e.g., show snackbar
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to fetch posts: ${response.statusCode}')),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching posts: $e')),
-      );
-    } finally {
-      setState(() => isLoading = false);
+    final data = await _fetchPostsData(cursorId: cursorId);
+    if (data != null) {
+      setState(() {
+        networkError = false;
+        if (cursorId == null) {
+          posts = data['posts'] ?? [];
+        } else {
+          posts.addAll(data['posts'] ?? []);
+        }
+        nextCursorId = data['nextCursorId'];
+        hasMore = nextCursorId != null;
+      });
     }
+
+    if (mounted) setState(() => isLoading = false);
   }
 
   Future<void> _fetchMorePosts() async {
-    if (nextCursorId != null) {
-      await _fetchPosts(cursorId: nextCursorId);
+    if (nextCursorId != null) await _fetchPosts(cursorId: nextCursorId);
+  }
+
+  Future<void> _refreshPosts() async {
+    if (_username.isEmpty) return;
+
+    setState(() => networkError = false);
+
+    if (posts.isEmpty) {
+      await _fetchPosts();
+      return;
+    }
+
+    final oldFirstId = posts[0]['post_id'] as int;
+
+    final data = await _fetchPostsData();
+    if (data == null) return;
+
+    setState(() {
+      networkError = false;
+    });
+
+    final newPosts = data['posts'] ?? [];
+    final newOnes = newPosts.where((p) => (p['post_id'] as int) > oldFirstId).toList();
+
+    if (newOnes.isNotEmpty) {
+      setState(() {
+        posts.insertAll(0, newOnes);
+      });
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No new posts found')),
+        );
+      }
     }
   }
 
-  Future<void> _toggleLike(int postId, int currentIndex) async {
+  Future<void> _toggleLike(int postId, int index) async {
+    if (_username.isEmpty) return;
     try {
       final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/like_action'),
+        Uri.parse('https://server.awarcrown.com/feed/like_action'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=$postId',
+        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       );
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['like_count'] != null) {
-          setState(() {
-            posts[currentIndex]['like_count'] = data['like_count'];
-          });
+        if (mounted && data['like_count'] != null) {
+          setState(() => posts[index]['like_count'] = data['like_count']);
         }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to toggle like: ${response.statusCode}')),
-        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error toggling like: $e')),
-      );
+      if (e is SocketException) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No internet connection')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error toggling like: $e')),
+          );
+        }
+      }
     }
   }
 
   Future<void> _toggleCommentVisibility(int postId) async {
     if (showCommentsMap[postId] ?? false) {
-      setState(() => showCommentsMap[postId] = false);
+      if (mounted) setState(() => showCommentsMap[postId] = false);
       return;
     }
 
-    setState(() => showCommentsMap[postId] = true);
+    if (mounted) setState(() => showCommentsMap[postId] = true);
 
     if (!commentsMap.containsKey(postId)) {
       commentsMap[postId] = [];
-      hasMoreComments[postId] = true;
-      nextCommentCursor[postId] = null;
       commentLoadingMap[postId] = true;
-
-      // Create scroll controller if not exists
-      if (!commentScrollControllers.containsKey(postId)) {
-        final sc = ScrollController();
-        sc.addListener(() {
-          if (sc.hasClients &&
-              sc.position.pixels >= sc.position.maxScrollExtent - 200) {
-            if ((hasMoreComments[postId] ?? false) &&
-                !(commentLoadingMap[postId] ?? false)) {
-              _fetchMoreComments(postId);
-            }
-          }
-        });
-        commentScrollControllers[postId] = sc;
-      }
-    }
-
-    await _fetchComments(postId, cursorId: nextCommentCursor[postId]);
-
-    if (mounted) {
-      setState(() => commentLoadingMap[postId] = false);
+      commentControllers[postId] ??= TextEditingController();
+      commentFocusNodes[postId] ??= FocusNode();
+      await _fetchComments(postId);
+      if (mounted) setState(() => commentLoadingMap[postId] = false);
     }
   }
 
-  Future<void> _fetchComments(int postId, {int? cursorId}) async {
+  Future<void> _fetchComments(int postId) async {
+    if (commentLoadingMap[postId] ?? false || _username.isEmpty) return;
     setState(() => commentLoadingMap[postId] = true);
 
     try {
-      String url = 'https://server.awarcrown.com/fetch_comments.php?post_id=$postId';
-      if (cursorId != null) {
-        url += '&cursorId=$cursorId';
-      }
+      final url =
+          'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username)}';
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final newComments = data['comments'] ?? [];
-        setState(() {
-          if (cursorId == null) {
-            commentsMap[postId] = newComments;
-          } else {
-            commentsMap[postId]!.addAll(newComments);
-          }
-          commentsMap[postId]!.sort((a, b) =>
-              DateTime.parse(a['created_at']).compareTo(DateTime.parse(b['created_at'])));
-          nextCommentCursor[postId] = data['nextCursorId'];
-          hasMoreComments[postId] = nextCommentCursor[postId] != null;
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to fetch comments: ${response.statusCode}')),
-        );
+        if (mounted && data['comments'] != null) {
+          setState(() => commentsMap[postId] = data['comments']);
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error fetching comments: $e')),
-      );
+      if (e is SocketException) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No internet connection')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error fetching comments: $e')),
+          );
+        }
+      }
     } finally {
-      if (mounted) {
-        setState(() => commentLoadingMap[postId] = false);
-      }
+      if (mounted) setState(() => commentLoadingMap[postId] = false);
     }
   }
 
-  Future<void> _fetchMoreComments(int postId) async {
-    final cursor = nextCommentCursor[postId];
-    if (cursor != null) {
-      await _fetchComments(postId, cursorId: cursor);
-    }
-  }
-
-  Future<void> _postComment(int postId, String commentText, {int? parentCommentId}) async {
-    if (commentText.trim().isEmpty) return;
-
-    final controller = commentControllers[postId];
-
-    // Note: post_comment.php endpoint not provided in backend files.
-    // Assuming it exists and handles POST with post_id, comment, parent_comment_id.
-    // For now, simulate locally; replace with actual API call when available.
+  Future<void> _postComment(int postId, String text) async {
+    if (text.isEmpty || _username.isEmpty) return;
     try {
-      // Uncomment and adjust when backend is ready:
-      /*
-      final body = {
-        'post_id': postId.toString(),
-        'comment': Uri.encodeComponent(commentText),
-      };
-      if (parentCommentId != null) {
-        body['parent_comment_id'] = parentCommentId.toString();
-      }
       final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/post_comment.php'),
+        Uri.parse('https://server.awarcrown.com/feed/add_comment'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: body.entries.map((e) => '${e.key}=${e.value}').join('&'),
+        body:
+            'post_id=$postId&username=${Uri.encodeComponent(_username)}&comment=${Uri.encodeComponent(text)}',
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['status'] == 'success') {
-          // Refetch comments or add new one
-          await _fetchComments(postId);
-          // Update comment count
+        if (mounted) {
+          if (data['comment'] != null) commentsMap[postId]?.insert(0, data['comment']);
           final postIndex = posts.indexWhere((p) => p['post_id'] == postId);
           if (postIndex != -1) {
-            setState(() {
-              posts[postIndex]['comment_count'] = (posts[postIndex]['comment_count'] ?? 0) + 1;
-            });
+            posts[postIndex]['comment_count'] =
+                (posts[postIndex]['comment_count'] ?? 0) + 1;
           }
-        } else {
-          throw Exception(data['message'] ?? 'Failed to post comment');
+          commentControllers[postId]?.clear();
+        }
+      }
+    } catch (e) {
+      if (e is SocketException) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No internet connection')),
+          );
         }
       } else {
-        throw Exception('Failed to post comment: ${response.statusCode}');
-      }
-      */
-
-      // Temporary simulation
-      if (currentUserId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('User not loaded')),
-        );
-        return;
-      }
-      final newComment = {
-        'comment_id': DateTime.now().millisecondsSinceEpoch, // Temp ID
-        'comment': commentText.trim(),
-        'username': 'Current User', // From session
-        'created_at': DateTime.now().toIso8601String(),
-        'like_count': 0,
-        'current_reaction': null,
-        'user_id': currentUserId,
-        'parent_comment_id': parentCommentId,
-        'updated_at': null,
-        'profile_picture': 'default-profile.png',
-      };
-      setState(() {
-        if (!commentsMap.containsKey(postId)) {
-          commentsMap[postId] = [];
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error posting comment: $e')),
+          );
         }
-        commentsMap[postId]!.add(newComment);
-        commentsMap[postId]!.sort((a, b) =>
-            DateTime.parse(a['created_at']).compareTo(DateTime.parse(b['created_at'])));
-        final postIndex = posts.indexWhere((p) => p['post_id'] == postId);
-        if (postIndex != -1) {
-          posts[postIndex]['comment_count'] = (posts[postIndex]['comment_count'] ?? 0) + 1;
-        }
-        if (parentCommentId == null) {
-          controller?.clear();
-        }
-      });
-      if (parentCommentId == null) {
-        commentFocusNodes[postId]?.unfocus();
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Comment posted (API simulation)')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error posting comment: $e')),
-      );
     }
   }
 
   Future<void> _sharePost(int postId) async {
-    // Note: share_post.php endpoint not provided.
-    // For now, placeholder.
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Post shared (API pending)')),
-    );
-  }
-
-  Future<void> _savePost(int postId) async {
     try {
       final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/saved_post.php'),
+        Uri.parse('https://server.awarcrown.com/feed/share_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=$postId',
+        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       );
 
       if (response.statusCode == 200) {
-        // Assuming success if no error message
-        if (!response.body.contains('already saved') && !response.body.contains('Failed')) {
+        final data = json.decode(response.body);
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Post saved successfully')),
+            SnackBar(content: Text('Post shared! Count: ${data['share_count']}')),
           );
-        } else {
+        }
+      }
+    } catch (e) {
+      if (e is SocketException) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(response.body)),
+            const SnackBar(content: Text('No internet connection')),
           );
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to save post: ${response.statusCode}')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error sharing post: $e')),
+          );
+        }
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error saving post: $e')),
-      );
     }
   }
 
   Future<void> _deletePost(int postId) async {
     try {
       final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/delete_post.php'), // Assuming path based on filename
+        Uri.parse('https://server.awarcrown.com/feed/delete_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=$postId',
+        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       );
-
       if (response.statusCode == 200) {
-        // Remove from list
-        setState(() {
-          posts.removeWhere((p) => p['post_id'] == postId);
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Post deleted successfully')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to delete post: ${response.statusCode}')),
-        );
+        if (mounted) {
+          setState(() => posts.removeWhere((p) => p['post_id'] == postId));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Post deleted successfully')),
+          );
+        }
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting post: $e')),
-      );
+      if (e is SocketException) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No internet connection')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting post: $e')),
+          );
+        }
+      }
     }
   }
 
-  Future<void> _toggleCommentLike(int commentId, int postId) async {
+  Future<void> _savePost(int postId) async {
     try {
       final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/like_comment.php'),
+        Uri.parse('https://server.awarcrown.com/feed/save_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'comment_id=$commentId&action=set&reaction_type=like', // Assuming like reaction
+        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       );
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['status'] == 'success') {
-          // Refetch comments to update count
-          await _fetchComments(postId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data['saved'] ? 'Post saved!' : 'Post unsaved')),
+          );
         }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to toggle comment like: ${response.statusCode}')),
-        );
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error toggling comment like: $e')),
-      );
-    }
-  }
-
-  Future<void> _reportComment(int commentId) async {
-    final reason = 'Inappropriate content'; // Placeholder; in real UI, prompt for reason
-    try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/report_comment.php'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'comment_id=$commentId&reason=${Uri.encodeComponent(reason)}',
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'success') {
+      if (e is SocketException) {
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Comment reported successfully')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(data['message'] ?? 'Failed to report')),
+            const SnackBar(content: Text('No internet connection')),
           );
         }
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to report comment: ${response.statusCode}')),
-        );
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error reporting comment: $e')),
-      );
-    }
-  }
-
-  Future<bool> _checkReportStatus(int commentId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('https://server.awarcrown.com/check_report_status.php?comment_id=$commentId'),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return data['alreadyReported'] ?? false;
-      }
-    } catch (e) {
-      // Ignore error, assume not reported
-    }
-    return false;
-  }
-
-  Future<void> _editComment(int commentId, String newComment, int postId) async {
-    try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/edit_comment.php'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'comment_id=$commentId&comment=${Uri.encodeComponent(newComment)}',
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'success') {
-          // Refetch comments
-          await _fetchComments(postId);
+        if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Comment edited successfully')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(data['message'] ?? 'Failed to edit')),
+            SnackBar(content: Text('Error saving post: $e')),
           );
         }
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to edit comment: ${response.statusCode}')),
-        );
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error editing comment: $e')),
-      );
     }
-  }
-
-  Future<void> _deleteComment(int commentId, int postId) async {
-    // Note: delete_comment.php endpoint not provided in backend files.
-    // Assuming it exists and handles POST with comment_id.
-    // For now, simulate locally; replace with actual API call when available.
-    try {
-      // Uncomment and adjust when backend is ready:
-      /*
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/delete_comment.php'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'comment_id=$commentId',
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['status'] == 'success') {
-          // Refetch comments
-          await _fetchComments(postId);
-          // Update comment count
-          final postIndex = posts.indexWhere((p) => p['post_id'] == postId);
-          if (postIndex != -1) {
-            setState(() {
-              posts[postIndex]['comment_count'] = (posts[postIndex]['comment_count'] ?? 0) - 1;
-            });
-          }
-        } else {
-          throw Exception(data['message'] ?? 'Failed to delete comment');
-        }
-      } else {
-        throw Exception('Failed to delete comment: ${response.statusCode}');
-      }
-      */
-
-      // Temporary simulation
-      setState(() {
-        if (commentsMap.containsKey(postId)) {
-          commentsMap[postId]!.removeWhere((c) => c['comment_id'] == commentId);
-        }
-        final postIndex = posts.indexWhere((p) => p['post_id'] == postId);
-        if (postIndex != -1) {
-          posts[postIndex]['comment_count'] = (posts[postIndex]['comment_count'] ?? 0) - 1;
-        }
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Comment deleted (API simulation)')),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting comment: $e')),
-      );
-    }
-  }
-
-  void _showEditDialog(int commentId, String currentComment, int postId) {
-    final TextEditingController editController = TextEditingController(text: currentComment);
-    String? errorText;
-    final FocusNode focusNode = FocusNode();
-    bool listenerAdded = false;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          if (!listenerAdded) {
-            listenerAdded = true;
-            editController.addListener(() {
-              final text = editController.text.trim();
-              errorText = text.isEmpty ? 'Comment cannot be empty' : (text.length > 500 ? 'Comment too long (max 500 chars)' : null);
-              setDialogState(() {});
-            });
-          }
-          // Initial validation
-          final initialText = editController.text.trim();
-          errorText ??= initialText.isEmpty ? 'Comment cannot be empty' : (initialText.length > 500 ? 'Comment too long (max 500 chars)' : null);
-          return AlertDialog(
-            title: Text('Edit Comment'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: editController,
-                  focusNode: focusNode,
-                  maxLines: null,
-                  maxLength: 500,
-                  decoration: InputDecoration(
-                    hintText: 'Edit your comment...',
-                    border: OutlineInputBorder(),
-                    errorText: errorText,
-                  ),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                },
-                child: Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: errorText != null ? null : () {
-                  final newText = editController.text.trim();
-                  Navigator.pop(context);
-                  _editComment(commentId, newText, postId);
-                },
-                child: Text('Save'),
-              ),
-            ],
-          );
-        },
-      ),
-    ).then((_) {
-      editController.dispose();
-      focusNode.dispose();
-    });
-  }
-
-  void _showReplyDialog(int parentCommentId, String? parentUsername, int postId) {
-    final TextEditingController replyController = TextEditingController();
-    final FocusNode focusNode = FocusNode();
-    String? errorText;
-    bool listenerAdded = false;
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
-          if (!listenerAdded) {
-            listenerAdded = true;
-            replyController.addListener(() {
-              final text = replyController.text.trim();
-              errorText = text.isEmpty ? 'Reply cannot be empty' : (text.length > 500 ? 'Reply too long (max 500 chars)' : null);
-              setDialogState(() {});
-            });
-          }
-          // Initial validation
-          final initialText = replyController.text.trim();
-          if (errorText == null) {
-            errorText = initialText.isEmpty ? 'Reply cannot be empty' : (initialText.length > 500 ? 'Reply too long (max 500 chars)' : null);
-          }
-          return AlertDialog(
-            title: Text('Reply to ${parentUsername ?? 'comment'}'),
-            content: TextField(
-              controller: replyController,
-              focusNode: focusNode,
-              maxLines: null,
-              maxLength: 500,
-              decoration: InputDecoration(
-                hintText: 'Write a reply...',
-                border: OutlineInputBorder(),
-                errorText: errorText,
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: errorText != null
-                    ? null
-                    : () {
-                        Navigator.pop(context);
-                        _postComment(postId, replyController.text.trim(), parentCommentId: parentCommentId);
-                      },
-                child: const Text('Reply'),
-              ),
-            ],
-          );
-        },
-      ),
-    ).then((_) {
-      replyController.dispose();
-      focusNode.dispose();
-    });
-  }
-
-  Widget _buildCommentWidget(dynamic comment, int postId, {required bool isTopLevel}) {
-    final allComments = commentsMap[postId] ?? [];
-    final commentId = comment['comment_id'];
-    final isOwn = currentUserId != null && comment['user_id'] == currentUserId;
-    final double leftPadding = isTopLevel ? 0.0 : 40.0;
-
-    return Padding(
-      padding: EdgeInsets.only(left: leftPadding, bottom: isTopLevel ? 8.0 : 0.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ListTile(
-            dense: true,
-            leading: CircleAvatar(
-              backgroundImage: comment['profile_picture'] != null &&
-                      comment['profile_picture'] != 'default-profile.png'
-                  ? NetworkImage(
-                      'https://server.awarcrown.com/${comment['profile_picture']}')
-                  : null,
-              backgroundColor: Colors.grey[300],
-              child: comment['profile_picture'] == 'default-profile.png'
-                  ? const Icon(Icons.person)
-                  : null,
-            ),
-            title: Text(comment['username'] ?? 'Unknown'),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(comment['comment'] ?? ''),
-                if (comment['updated_at'] != null &&
-                    comment['updated_at'] != comment['created_at'])
-                  const Text('Edited',
-                      style: TextStyle(fontSize: 10, color: Colors.grey)),
-                Text(
-                  _formatTime(comment['created_at']),
-                  style: const TextStyle(fontSize: 10, color: Colors.grey),
-                ),
-              ],
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                GestureDetector(
-                  onTap: () => _toggleCommentLike(commentId, postId),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.thumb_up, size: 16),
-                      const SizedBox(width: 4),
-                      Text('${comment['like_count'] ?? 0}'),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                PopupMenuButton<String>(
-                  onSelected: (value) async {
-                    if (value == 'report') {
-                      final isReported =
-                          await _checkReportStatus(commentId);
-                      if (isReported) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Already reported')),
-                        );
-                      } else {
-                        await _reportComment(commentId);
-                      }
-                    } else if (value == 'edit' && isOwn) {
-                      _showEditDialog(
-                          commentId, comment['comment'], postId);
-                    } else if (value == 'delete' && isOwn) {
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (context) => AlertDialog(
-                          title: const Text('Delete Comment'),
-                          content: const Text(
-                              'Are you sure you want to delete this comment?'),
-                          actions: [
-                            TextButton(
-                              onPressed: () =>
-                                  Navigator.pop(context, false),
-                              child: const Text('Cancel'),
-                            ),
-                            TextButton(
-                              onPressed: () =>
-                                  Navigator.pop(context, true),
-                              child: const Text('Delete'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirm == true) {
-                        await _deleteComment(commentId, postId);
-                      }
-                    } else if (value == 'reply') {
-                      _showReplyDialog(
-                          commentId, comment['username'], postId);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                        value: 'reply', child: Text('Reply')),
-                    if (isOwn)
-                      const PopupMenuItem(
-                          value: 'edit', child: Text('Edit')),
-                    if (isOwn)
-                      const PopupMenuItem(
-                          value: 'delete', child: Text('Delete')),
-                    const PopupMenuItem(
-                        value: 'report', child: Text('Report')),
-                  ],
-                  child: const Icon(Icons.more_vert, size: 16),
-                ),
-              ],
-            ),
-            onLongPress: () => _showReplyDialog(
-                commentId, comment['username'], postId),
-          ),
-          _buildCommentTree(allComments, postId, parentId: commentId),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCommentTree(List<dynamic> comments, int postId, {int? parentId}) {
-    final children =
-        comments.where((c) => c['parent_comment_id'] == parentId).toList();
-
-    if (children.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: children.map((comment) => _buildCommentWidget(comment, postId, isTopLevel: false)).toList(),
-    );
   }
 
   Widget _buildCommentsList(int postId) {
-    final allComments = commentsMap[postId] ?? [];
-    final topLevel = allComments.where((c) => (c['parent_comment_id'] ?? 0) == 0).toList();
-    final bool showLoadMore = (hasMoreComments[postId] ?? false) && !(commentLoadingMap[postId] ?? false);
-    final ScrollController? sc = commentScrollControllers[postId];
-
-    return ListView.builder(
-      controller: sc,
-      padding: EdgeInsets.zero,
-      itemCount: topLevel.length + (showLoadMore ? 1 : 0),
+    final comments = commentsMap[postId] ?? [];
+    return ListView.separated(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: comments.length,
+      separatorBuilder: (context, index) => const Divider(height: 1, indent: 56),
       itemBuilder: (context, index) {
-        if (index == topLevel.length) {
-          return const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        final comment = topLevel[index];
-        return _buildCommentWidget(comment, postId, isTopLevel: true);
+        final comment = comments[index];
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 12.0),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundImage: comment['profile_picture'] != null
+                    ? NetworkImage('https://server.awarcrown.com/${comment['profile_picture']}')
+                    : null,
+                child: comment['profile_picture'] == null ? const Icon(Icons.person, size: 16) : null,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        style: DefaultTextStyle.of(context).style,
+                        children: [
+                          TextSpan(
+                            text: '${comment['username'] ?? 'Unknown'} ',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          TextSpan(
+                            text: _formatTime(comment['created_at']),
+                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      comment['comment'] ?? '',
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
       },
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Posts Feed')),
-      body: ListView.builder(
+  bool _isOwnPost(int postId, int index) {
+    if (_userId == null || _userId == 0) return false;
+    return posts[index]['user_id'] == _userId;
+  }
+
+  Widget _buildList() {
+    if (posts.isEmpty) {
+      if (isLoading) {
+        return ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemCount: 5,
+          itemBuilder: (context, index) => const PostSkeleton(),
+        );
+      } else if (networkError) {
+        return ListView.builder(
+          physics: const AlwaysScrollableScrollPhysics(),
+          itemCount: 10,
+          itemBuilder: (context, index) => const PostSkeleton(),
+        );
+      } else {
+        return const Center(child: Text('No posts available'));
+      }
+    } else {
+      return ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         controller: _scrollController,
-        itemCount: posts.length + (isLoading ? 1 : 0),
+        itemCount: posts.length + (isLoading && hasMore && !networkError ? 1 : 0),
         itemBuilder: (context, index) {
           if (index == posts.length) {
-            return Center(child: CircularProgressIndicator());
+            return const PostSkeleton();
           }
+
           final post = posts[index];
           final postId = post['post_id'];
-          final isOwnPost = currentUserId != null && post['user_id'] == currentUserId;
+
           return Card(
-            margin: EdgeInsets.all(8),
+            elevation: 1,
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header
                 Padding(
-                  padding: EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(12),
                   child: Row(
                     children: [
                       CircleAvatar(
                         radius: 20,
-                        backgroundImage: post['profile_picture'] != null &&
-                                post['profile_picture'] != 'default-profile.png'
-                            ? NetworkImage('https://server.awarcrown.com/${post['profile_picture']}')
+                        backgroundImage: post['profile_picture'] != null
+                            ? NetworkImage('https://server.awarcrown.com/feed/${post['profile_picture']}')
                             : null,
-                        backgroundColor: Colors.grey[300],
-                        child: post['profile_picture'] == 'default-profile.png'
-                            ? Icon(Icons.person)
-                            : null,
+                        child: post['profile_picture'] == null ? const Icon(Icons.person) : null,
                       ),
-                      SizedBox(width: 10),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               post['username'] ?? 'Unknown',
-                              style: TextStyle(fontWeight: FontWeight.w600),
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                             ),
                             Text(
                               _formatTime(post['created_at']),
-                              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                             ),
                           ],
                         ),
                       ),
-                      PopupMenuButton(
-                        onSelected: (value) async {
-                          switch (value) {
-                            case 'edit':
-                              // TODO: Implement edit post UI/API
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Edit post (API pending)')),
-                              );
-                              break;
-                            case 'delete':
-                              await _deletePost(postId);
-                              break;
-                            case 'save':
-                              await _savePost(postId);
-                              break;
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          if (isOwnPost)
-                            PopupMenuItem(value: 'edit', child: Text('Edit')),
-                          if (isOwnPost)
-                            PopupMenuItem(value: 'delete', child: Text('Delete')),
-                          PopupMenuItem(value: 'save', child: Text('Save')),
-                        ],
-                        child: Icon(Icons.more_vert),
-                      ),
+                      if (_isOwnPost(postId, index))
+                        PopupMenuButton<String>(
+                          onSelected: (value) {
+                            if (value == 'delete') {
+                              _deletePost(postId);
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Row(
+                                children: [
+                                  Icon(Icons.delete_outline, size: 20),
+                                  SizedBox(width: 8),
+                                  Text('Delete'),
+                                ],
+                              ),
+                            ),
+                          ],
+                          icon: const Icon(Icons.more_vert, size: 20),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
                     ],
                   ),
                 ),
-                // Content
+                // Caption
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Text(
                     post['content'] ?? '',
-                    style: TextStyle(fontSize: 14),
+                    style: const TextStyle(fontSize: 14, height: 1.4),
                   ),
                 ),
                 // Media
                 if (post['media_url'] != null && post['media_url'].isNotEmpty)
-                  Container(
-                    margin: EdgeInsets.only(top: 10, bottom: 10),
-                    height: 200,
-                    width: double.infinity,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      image: DecorationImage(
-                        image: NetworkImage('https://server.awarcrown.com/feed/Posts/${post['media_url']}'),
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+                    child: AspectRatio(
+                      aspectRatio: 16 / 9, // Auto-adjust based on common ratio; can be dynamic if API provides dimensions
+                      child: Image.network(
+                        'https://server.awarcrown.com${post['media_url']}',
                         fit: BoxFit.cover,
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: Colors.grey[200],
+                            child: const Center(child: CircularProgressIndicator()),
+                          );
+                        },
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            height: 200,
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.error),
+                          );
+                        },
                       ),
                     ),
                   ),
                 // Actions
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+                  child: Column(
                     children: [
-                      GestureDetector(
-                        onTap: () => _toggleLike(postId, index),
-                        child: Row(
-                          children: [
-                            Icon(Icons.favorite_border, size: 20, color: Colors.red),
-                            SizedBox(width: 6),
-                            Text('${post['like_count'] ?? 0} Likes'),
-                          ],
-                        ),
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () => _toggleLike(postId, index),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.favorite_border, size: 24, color: Colors.red),
+                                const SizedBox(width: 4),
+                                Text('${post['like_count'] ?? 0}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                                const SizedBox(width: 16),
+                              ],
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _toggleCommentVisibility(postId),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.mode_comment_outlined, size: 24),
+                                const SizedBox(width: 4),
+                                Text('${post['comment_count'] ?? 0}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                                const SizedBox(width: 16),
+                              ],
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () => _sharePost(postId),
+                            child: const Icon(Icons.share_outlined, size: 24),
+                          ),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () => _savePost(postId),
+                            child: const Icon(Icons.bookmark_border, size: 24),
+                          ),
+                        ],
                       ),
-                      SizedBox(width: 18),
-                      GestureDetector(
-                        onTap: () => _toggleCommentVisibility(postId),
-                        child: Row(
-                          children: [
-                            Icon(Icons.mode_comment_outlined, size: 20),
-                            SizedBox(width: 6),
-                            Text('${post['comment_count'] ?? 0} Comments'),
-                          ],
-                        ),
-                      ),
-                      Spacer(),
-                      GestureDetector(
-                        onTap: () => _sharePost(postId),
-                        child: Icon(Icons.share_outlined, size: 20),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${post['like_count'] ?? 0} likes',
+                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       ),
                     ],
                   ),
                 ),
                 // Comments Section
                 if (showCommentsMap[postId] == true) ...[
-                  Divider(),
+                  const Divider(height: 1),
                   SizedBox(
-                    height: 300.0,
+                    height: 300,
                     child: (commentLoadingMap[postId] ?? false)
-                        ? const Center(child: CircularProgressIndicator())
+                        ? ListView.separated(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: 3,
+                            separatorBuilder: (context, index) => const Divider(height: 1, indent: 56),
+                            itemBuilder: (context, index) => const CommentSkeleton(),
+                          )
                         : ((commentsMap[postId]?.isEmpty ?? true)
-                            ? const Center(child: Text('No comments yet'))
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(16),
+                                  child: Text(
+                                    networkError ? 'Cannot load comments due to network issue.' : 'No comments yet',
+                                    style: const TextStyle(color: Colors.grey),
+                                  ),
+                                ),
+                              )
                             : _buildCommentsList(postId)),
                   ),
-                  // Add Comment Input
                   Padding(
-                    padding: EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(12),
                     child: Row(
                       children: [
                         Expanded(
                           child: TextField(
-                            controller: commentControllers[postId] ??= TextEditingController(),
-                            focusNode: commentFocusNodes[postId] ??= FocusNode(),
+                            controller: commentControllers[postId],
+                            focusNode: commentFocusNodes[postId],
                             decoration: InputDecoration(
                               hintText: 'Add a comment...',
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
-                              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: BorderSide(color: Colors.grey[300]!),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: const BorderSide(color: Colors.blue),
+                              ),
+                              filled: true,
+                              fillColor: Colors.grey[50],
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                             ),
                             onSubmitted: (value) => _postComment(postId, value.trim()),
+                            maxLines: null,
                           ),
                         ),
-                        IconButton(
-                          onPressed: () {
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: () {
                             final text = commentControllers[postId]?.text.trim() ?? '';
-                            _postComment(postId, text);
+                            if (text.isNotEmpty) _postComment(postId, text);
                           },
-                          icon: Icon(Icons.send),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.send, color: Colors.white, size: 18),
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ],
-                SizedBox(height: 8),
               ],
             ),
           );
         },
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: RefreshIndicator(
+        onRefresh: _refreshPosts,
+        child: Column(
+          children: [
+            if (networkError)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                color: Colors.red[50],
+                child: Row(
+                  children: [
+                    const Icon(Icons.warning, color: Colors.red),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'No internet connection. Some features may not work.',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Expanded(child: _buildList()),
+          ],
+        ),
       ),
     );
   }
@@ -1019,7 +902,7 @@ class _PostsPageState extends State<PostsPage> {
       if (diff.inHours > 0) return '${diff.inHours}h ago';
       if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
       return 'Just now';
-    } catch (e) {
+    } catch (_) {
       return timeString;
     }
   }

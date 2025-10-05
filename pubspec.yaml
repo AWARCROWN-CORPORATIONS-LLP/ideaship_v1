@@ -43,13 +43,14 @@ flutter:
   assets:
     - assets/black_logo.png
 
-
 flutter_native_splash:
-  color: "#FFFFFF"
-  image: assets/black_logo.png
+  color: "#FFFFFF"            # White background
+  image: assets/black_logo.png  # Your company logo
+  android_gravity: center
+  ios_content_mode: scaleAspectFit
   android: true
   ios: true
   web: false
-  android_gravity: center
-  ios_content_mode: scaleAspectFill
-  android_disable_fullscreen: true
+  android_12:
+    color: "#FFFFFF"
+    image: assets/black_logo.png

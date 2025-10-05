@@ -7,9 +7,11 @@ import 'auth/auth_log_reg.dart';
 import 'role_selection/role.dart';
 import 'dashboard.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
+
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -159,7 +161,7 @@ class _SplashScreenState extends State<SplashScreen>
                         color: Colors.black,
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
-                        fontFamily: 'Poppins',
+                        fontFamily: 'Lucida Console',
                      
 
 
