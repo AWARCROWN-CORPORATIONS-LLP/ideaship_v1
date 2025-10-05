@@ -24,19 +24,32 @@ dependencies:
   flutter_svg: ^2.0.10+1
   intl: ^0.20.2
   image_picker: ^1.2.0
+  flutter_native_splash: ^2.4.6
   
   path_provider: ^2.0.14
   provider: ^6.0.5
   permission_handler: ^11.3.2
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
  
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/black_logo.png
 
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: assets/black_logo.png
+  android: true
+  ios: true
+  web: false
+  android_gravity: center
+  ios_content_mode: scaleAspectFill
+  android_disable_fullscreen: true

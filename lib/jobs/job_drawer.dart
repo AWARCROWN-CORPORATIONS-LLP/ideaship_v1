@@ -44,24 +44,22 @@ class _JobDrawerState extends State<JobDrawer> {
     });
 
     try {
-      // Replace with your actual API endpoint for jobs
+      // Custom API endpoint for jobs
       final response = await http.get(
-        Uri.parse('https://jsonplaceholder.typicode.com/todos'),  // Placeholder API for testing
+        Uri.parse('https://server.awarcrown.com/post/jobs.php'),
         headers: {'Content-Type': 'application/json'},
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        final fetchedJobs = data
-            .map((item) => {
-                  'id': item['id'],
-                  'title': 'Job for ${item['title'].substring(0, 20)}...',
-                  'location': (item['id'] % 2 == 0) ? 'Remote' : 'Bengaluru',
-                  'type': (item['completed']) ? 'Full-time' : 'Internship',
-                })
-            .toList()
-            .take(10)  // Increased to 10 for demo
-            .toList();
+        final Map<String, dynamic> data = json.decode(response.body);
+        final List<dynamic> rawJobs = data['jobs'] ?? [];  // Assume response has 'jobs' array
+        final fetchedJobs = rawJobs.map((item) => {
+              'id': item['id'],
+              'title': item['title'] ?? 'Untitled Job',
+              'location': item['location'] ?? 'Unknown Location',
+              'type': item['type'] ?? 'Unknown Type',
+              // Add more fields as per your backend response (e.g., 'url', 'company')
+            }).toList();
 
         setState(() {
           allJobs = fetchedJobs;

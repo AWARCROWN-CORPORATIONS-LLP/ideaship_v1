@@ -20,12 +20,14 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
   File? _image;
   final ImagePicker _picker = ImagePicker();
   bool _isLoading = false;
+  String _username = ''; // Store username for display
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
+    _loadUsername(); // Load username on init
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 300),
       vsync: this,
@@ -41,6 +43,14 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
     _animationController.dispose();
     _contentController.dispose();
     super.dispose();
+  }
+
+  // Load username from SharedPreferences
+  Future<void> _loadUsername() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _username = prefs.getString('username') ?? '';
+    });
   }
 
   // Enhanced permission request with rationale and status check
@@ -231,6 +241,10 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
       _showSnackBar('Content too long. Maximum 1000 characters.');
       return;
     }
+    if (_username.isEmpty) {
+      _showSnackBar('Username not found. Please log in again.');
+      return;
+    }
 
     setState(() => _isLoading = true);
     _animationController.reverse();
@@ -238,18 +252,20 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
     try {
       final prefs = await SharedPreferences.getInstance();
       final username = prefs.getString('username') ?? '';
-      if (username.isEmpty) {
+      final email = prefs.getString('email') ?? '';
+      if (username.isEmpty || email.isEmpty) {
         throw Exception('User not logged in');
       }
 
       var request = http.MultipartRequest(
         'POST',
-        Uri.parse('https://server.awarcrown.com/feed/upload_post.php'),
+        Uri.parse('https://server.awarcrown.com/feed/upload_post'),
       );
 
       request.fields['content'] = content;
       request.fields['visibility'] = _visibility;
       request.fields['username'] = username;
+      request.fields['email'] = email;
 
       if (_image != null) {
         request.files.add(await http.MultipartFile.fromPath('image', _image!.path));
@@ -257,9 +273,14 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
 
       final streamedResponse = await request.send();
       final responseBody = await streamedResponse.stream.bytesToString();
+
+      if (streamedResponse.statusCode != 200) {
+        throw Exception('Server error: ${streamedResponse.statusCode} - $responseBody');
+      }
+
       final responseData = json.decode(responseBody);
 
-      if (streamedResponse.statusCode == 200 && responseData['status'] == 'success') {
+      if (responseData['status'] == 'success') {
         _showSnackBar(responseData['message'] ?? 'Post created successfully!');
         if (mounted) Navigator.pop(context, true); // Pass success back if needed
       } else {
@@ -344,6 +365,28 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // Display username
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.account_circle, color: Colors.white70),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Posting as: $_username',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
               TextField(
                 controller: _contentController,
                 maxLines: 6,

@@ -78,7 +78,7 @@ class _PostsPageState extends State<PostsPage> {
     setState(() => isLoading = true);
 
     try {
-      String url = 'https://server.awarcrown.com/feed/fetch_posts';
+      String url = 'https://server.awarcrown.com/feed/fetch_posts.php';
       if (cursorId != null) {
         url += '?cursorId=$cursorId';
       }
@@ -565,9 +565,7 @@ class _PostsPageState extends State<PostsPage> {
           }
           // Initial validation
           final initialText = editController.text.trim();
-          if (errorText == null) {
-            errorText = initialText.isEmpty ? 'Comment cannot be empty' : (initialText.length > 500 ? 'Comment too long (max 500 chars)' : null);
-          }
+          errorText ??= initialText.isEmpty ? 'Comment cannot be empty' : (initialText.length > 500 ? 'Comment too long (max 500 chars)' : null);
           return AlertDialog(
             title: Text('Edit Comment'),
             content: Column(
@@ -924,7 +922,7 @@ class _PostsPageState extends State<PostsPage> {
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
                       image: DecorationImage(
-                        image: NetworkImage('https://server.awarcrown.com${post['media_url']}'),
+                        image: NetworkImage('https://server.awarcrown.com/feed/Posts/${post['media_url']}'),
                         fit: BoxFit.cover,
                       ),
                     ),

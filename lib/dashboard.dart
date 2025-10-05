@@ -1,10 +1,14 @@
 // dashboard.dart
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:ideaship/feed/createpost.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ideaship/auth/auth_log_reg.dart';
 import 'feed/posts.dart'; // Import the PostsPage from feed/posts.dart
 import 'feed/createpost.dart'; // Import CreatePostPage
+import 'settings/usersettings.dart'; // Import UserSettingsPage
+import 'jobs/job_drawer.dart'; // Import the updated JobDrawer
 // TODO: Import other pages as needed, e.g.,
 // import 'feed/startups.dart';
 // import 'feed/investors.dart';
@@ -34,7 +38,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 5, vsync: this); // Updated to 5 tabs
+    _tabController = TabController(length: 2, vsync: this); // Updated to 5 tabs
     _loadUserData();
   }
 
@@ -45,16 +49,65 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   }
 
   Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _username = prefs.getString('username') ?? '';
-        _email = prefs.getString('email') ?? '';
-        _role = prefs.getString('role') ?? '';
-        _major = prefs.getString('major');
-        _isLoading = false;
-      });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _username = prefs.getString('username') ?? '';
+          _email = prefs.getString('email') ?? '';
+          _role = prefs.getString('role') ?? '';
+          _major = prefs.getString('major');
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorBanner('Failed to load user data: ${e.toString()}');
+      }
     }
+  }
+
+  void _showErrorBanner(String message) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: const Color.fromARGB(255, 28, 25, 25),
+        duration: const Duration(seconds: 5),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+        margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).padding.bottom + 80,
+          left: 20,
+          right: 20,
+        ),
+        elevation: 8,
+      ),
+    );
+  }
+
+  // Call this method from other pages (e.g., PostsPage) to show backend errors
+  // You can pass the DashboardPage's state or use a callback/GlobalKey to access this
+  void showBackendError(String errorMessage) {
+    _showErrorBanner(errorMessage);
   }
 
   void _openJobDrawer() {
@@ -86,14 +139,47 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     );
   }
 
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AuthLogReg()),
-      );
+  void _showLogoutConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Logout'),
+              onPressed: () {
+                Navigator.of(context).pop();
+                _performLogout();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _performLogout() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const AuthLogReg()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showErrorBanner('Logout failed: ${e.toString()}');
+      }
     }
   }
 
@@ -102,9 +188,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       IconButton(
         onPressed: () {
           // TODO: Implement notifications
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Notifications coming soon!')),
-          );
+          _showErrorBanner('Notifications coming soon!'); // Using error banner for consistency, or make separate if needed
         },
         icon: const Icon(Icons.notifications_outlined, color: Colors.black87),
       ),
@@ -114,7 +198,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       ),
       IconButton(
         icon: const Icon(Icons.logout),
-        onPressed: _logout,
+        onPressed: _showLogoutConfirmation,
       ),
     ];
 
@@ -125,7 +209,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
         title: const Text("Ideaship",
             style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF1268D1),
+                color: Color.fromARGB(255, 50, 51, 52),
                 fontSize: 25)),
         actions: actions,
         bottom: TabBar(
@@ -173,10 +257,10 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
               controller: _tabController,
               children: const [
                 PostsPage(), // Dynamic feed from feed/posts.dart
-                Center(child: Text("Startups Page")), // TODO: Replace with StartupsPage() from feed/startups.dart
-                Center(child: Text("Investors Page")), // TODO: Replace with InvestorsPage() from feed/investors.dart
-                Center(child: Text("Mentors Page")), // TODO: Replace with MentorsPage() from feed/mentors.dart
-                Center(child: Text("Companies Page")), // TODO: Replace with CompaniesPage() from feed/companies.dart
+                 Center(child: Text("Startups Page")), // TODO: Replace with StartupsPage() from feed/startups.dart
+                // Center(child: Text("Investors Page")), // TODO: Replace with InvestorsPage() from feed/investors.dart
+                // Center(child: Text("Mentors Page")), // TODO: Replace with MentorsPage() from feed/mentors.dart
+                // Center(child: Text("Companies Page")), // TODO: Replace with CompaniesPage() from feed/companies.dart
               ],
             ),
             // Right-side handle
@@ -225,7 +309,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       case 3:
         return const Center(child: Text('Alerts Page'));
       case 4:
-        return const Center(child: Text('Settings Page'));
+        return const SizedBox();
       default:
         return const SizedBox();
     }
@@ -235,40 +319,37 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   Widget build(BuildContext context) {
     return Scaffold(
       key: _scaffoldKey,
-      endDrawer: JobDrawer(),
+      endDrawer: const JobDrawer(),
       endDrawerEnableOpenDragGesture: true,
       appBar: _buildAppBar(),
       body: _buildBody(),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: _selectedIndex == 0
-          ? FloatingActionButton(
-              onPressed: () {
-                // Open post creation page createpost.dart
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const CreatePostPage()),
-                );
-              },
-              backgroundColor: const Color(0xFF1268D1),
-              child: const Icon(Icons.add, size: 28),
-            )
-          : null,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Open post creation page createpost.dart
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const CreatePostPage()),
+          );
+        },
+        backgroundColor: const Color(0xFF1268D1),
+        child: const Icon(Icons.add, size: 28),
+      ),
       bottomNavigationBar: BottomAppBar(
+        color: Colors.white,
+        elevation: 8,
         shape: const CircularNotchedRectangle(),
         notchMargin: 6,
         child: SizedBox(
-          height: 60,
+          height: 70,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              Row(children: [
-                _navButton(Icons.home_rounded, "Home", 0),
-                _navButton(Icons.work_outline, "Roles", 1),
-              ]),
-              Row(children: [
-                _navButton(Icons.notifications_outlined, "Alerts", 3),
-                _navButton(Icons.settings_outlined, "Settings", 4),
-              ]),
+              _navButton(Icons.home_rounded, "Home", 0),
+              _navButton(Icons.work_outline, "Roles", 1),
+              const SizedBox(width: 60), // Space for the notch/FAB
+              _navButton(Icons.notifications_outlined, "Alerts", 3),
+              _navButton(Icons.settings_outlined, "Settings", 4),
             ],
           ),
         ),
@@ -279,74 +360,34 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   Widget _navButton(IconData icon, String label, int index) {
     bool active = _selectedIndex == index;
     return MaterialButton(
-      minWidth: 56,
+      minWidth: 70,
       onPressed: () {
-        setState(() {
-          _selectedIndex = index;
-        });
-        if (index == 0) {
-          _tabController.animateTo(0);
+        if (index == 4) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const SettingsPage()),
+          );
+        } else {
+          setState(() {
+            _selectedIndex = index;
+          });
+          if (index == 0) {
+            _tabController.animateTo(0);
+          }
         }
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: active ? const Color(0xFF1268D1) : Colors.grey[700]),
+          Icon(icon, 
+              size: 26,
+              color: active ? const Color(0xFF1268D1) : Colors.grey[700]),
           Text(label,
-              style: TextStyle(
-                  fontSize: 11,
-                  color: active ? const Color(0xFF1268D1) : Colors.grey[700])),
+              style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF1268D1) // You can adjust this based on active
+              )), // Note: Adjusted color logic if needed
         ],
-      ),
-    );
-  }
-}
-
-class JobDrawer extends StatelessWidget {
-  JobDrawer({super.key});
-
-  final List<Map<String, String>> jobs = List.generate(5, (i) {
-    return {
-      'title': 'Software Intern #$i',
-      'location': i % 2 == 0 ? 'Remote' : 'Bengaluru',
-      'type': i % 2 == 0 ? 'Internship' : 'Full-time',
-    };
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Drawer(
-      child: SafeArea(
-        child: Column(children: [
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(children: [
-              const Text("Jobs",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-              const Spacer(),
-              IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close))
-            ]),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: jobs.length,
-              itemBuilder: (context, i) {
-                final j = jobs[i];
-                return Card(
-                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  child: ListTile(
-                    title: Text(j['title']!),
-                    subtitle: Text("${j['location']} • ${j['type']}"),
-                    trailing:
-                        ElevatedButton(onPressed: () {}, child: const Text("Apply")),
-                  ),
-                );
-              },
-            ),
-          )
-        ]),
       ),
     );
   }

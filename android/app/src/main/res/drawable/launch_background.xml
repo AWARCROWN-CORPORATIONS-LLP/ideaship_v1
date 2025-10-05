@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Background color -->
-    <item android:drawable="@color/white"/>
-    
-    <!-- Centered app logo -->
+
+    <!-- White background -->
+    <item android:drawable="@color/white" />
+
+    <!-- Company logo centered -->
     <item>
         <bitmap
             android:gravity="center"
-            android:src="@drawable/black_logo"/>
-            
-
+            android:src="@drawable/black_logo" />
     </item>
+
 </layer-list>
