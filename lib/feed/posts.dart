@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Skeleton extends StatefulWidget {
@@ -52,8 +53,8 @@ class _SkeletonState extends State<Skeleton>
               ? BorderRadius.circular(50)
               : BorderRadius.circular(0),
           gradient: LinearGradient(
-              begin: Alignment(gradientPosition.value, 0),
-              end: const Alignment(-1, 0),
+              begin: Alignment(gradientPosition.value, 0.0),
+              end: const Alignment(-1.0, 0.0),
               colors: const [Colors.black12, Colors.black26, Colors.black12])),
     );
   }
@@ -164,7 +165,39 @@ class PostsPage extends StatefulWidget {
   const PostsPage({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _PostsPageState createState() => _PostsPageState();
+}
+
+// Add this helper function outside your build method (e.g., in your widget class or as a static method)
+Future<double> getImageAspectRatio(String imageUrl) async {
+  final completer = Completer<ImageInfo>();
+  bool mounted = true; // To avoid setting state after disposal
+
+  final imageProvider = NetworkImage(imageUrl);
+  final stream = imageProvider.resolve(const ImageConfiguration());
+  final listener = ImageStreamListener(
+    (ImageInfo info, bool synchronousCall) {
+      if (mounted && !completer.isCompleted) {
+        completer.complete(info);
+      }
+    },
+    onError: (exception, stackTrace) {
+      if (mounted && !completer.isCompleted) {
+        completer.completeError(exception, stackTrace);
+      }
+    },
+  );
+
+  stream.addListener(listener);
+
+  try {
+    final imageInfo = await completer.future;
+    return imageInfo.image.width / imageInfo.image.height.toDouble();
+  } finally {
+    stream.removeListener(listener);
+    mounted = false;
+  }
 }
 
 class _PostsPageState extends State<PostsPage> {
@@ -631,107 +664,131 @@ class _PostsPageState extends State<PostsPage> {
         controller: _scrollController,
         itemCount: posts.length + (isLoading && hasMore && !networkError ? 1 : 0),
         itemBuilder: (context, index) {
-          if (index == posts.length) {
-            return const PostSkeleton();
-          }
+if (index == posts.length) {
+  return const PostSkeleton();
+}
 
-          final post = posts[index];
-          final postId = post['post_id'];
+final post = posts[index];
+final postId = post['post_id'];
 
-          return Card(
-            elevation: 1,
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 20,
-                        backgroundImage: post['profile_picture'] != null
-                            ? NetworkImage('https://server.awarcrown.com/feed/${post['profile_picture']}')
-                            : null,
-                        child: post['profile_picture'] == null ? const Icon(Icons.person) : null,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              post['username'] ?? 'Unknown',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                            ),
-                            Text(
-                              _formatTime(post['created_at']),
-                              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (_isOwnPost(postId, index))
-                        PopupMenuButton<String>(
-                          onSelected: (value) {
-                            if (value == 'delete') {
-                              _deletePost(postId);
-                            }
-                          },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Row(
-                                children: [
-                                  Icon(Icons.delete_outline, size: 20),
-                                  SizedBox(width: 8),
-                                  Text('Delete'),
-                                ],
-                              ),
-                            ),
-                          ],
-                          icon: const Icon(Icons.more_vert, size: 20),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        ),
-                    ],
+final imageUrl = post['media_url'] != null && post['media_url'].isNotEmpty
+    ? 'https://server.awarcrown.com${post['media_url']}'
+    : null;
+
+return Card(
+  elevation: 1,
+  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      // Header
+      Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundImage: post['profile_picture'] != null
+                  ? NetworkImage('https://server.awarcrown.com/feed/${post['profile_picture']}')
+                  : null,
+              child: post['profile_picture'] == null ? const Icon(Icons.person) : null,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    post['username'] ?? 'Unknown',
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                ),
-                // Caption
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    post['content'] ?? '',
-                    style: const TextStyle(fontSize: 14, height: 1.4),
+                  Text(
+                    _formatTime(post['created_at']),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
-                ),
-                // Media
-                if (post['media_url'] != null && post['media_url'].isNotEmpty)
-                  ClipRRect(
-                    borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9, // Auto-adjust based on common ratio; can be dynamic if API provides dimensions
-                      child: Image.network(
-                        'https://server.awarcrown.com${post['media_url']}',
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: Colors.grey[200],
-                            child: const Center(child: CircularProgressIndicator()),
-                          );
-                        },
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            height: 200,
-                            color: Colors.grey[200],
-                            child: const Icon(Icons.error),
-                          );
-                        },
-                      ),
+                ],
+              ),
+            ),
+            if (_isOwnPost(postId, index))
+              PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    _deletePost(postId);
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline, size: 20),
+                        SizedBox(width: 8),
+                        Text('Delete'),
+                      ],
                     ),
                   ),
+                ],
+                icon: const Icon(Icons.more_vert, size: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+          ],
+        ),
+      ),
+      // Caption
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Text(
+          post['content'] ?? '',
+          style: const TextStyle(fontSize: 14, height: 1.4),
+        ),
+      ),
+      // Media
+      if (imageUrl != null) ...[
+        ClipRRect(
+          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
+          child: FutureBuilder<double>(
+            future: getImageAspectRatio(imageUrl),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Container(
+                  height: 200,
+                  color: Colors.grey[200],
+                  child: const Center(child: CircularProgressIndicator()),
+                );
+              } else if (snapshot.hasError || !snapshot.hasData) {
+                return Container(
+                  height: 200,
+                  color: Colors.grey[200],
+                  child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                );
+              }
+
+              return AspectRatio(
+                aspectRatio: snapshot.data!,
+                child: Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                    );
+                  },
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: Colors.grey[200],
+                      child: const Center(child: CircularProgressIndicator()),
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+
                 // Actions
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),

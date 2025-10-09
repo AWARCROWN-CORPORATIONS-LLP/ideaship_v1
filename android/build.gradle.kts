@@ -13,7 +13,7 @@ subprojects {
     project.layout.buildDirectory.value(newSubprojectBuildDir)
 }
 subprojects {
-    evaluationDependsOn(":app") // This line is often used in multi-project builds to ensure that the ':app' project is evaluated before other subprojects.
+    evaluationDependsOn(":app") 
 }
 
 tasks.register<Delete>("clean") {
