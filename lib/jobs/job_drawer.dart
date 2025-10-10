@@ -148,7 +148,7 @@ class _JobDrawerState extends State<JobDrawer> {
       } else {
         favoriteIds.add(id);
       }
-      _updateFilteredLists();  // Re-filter after toggle
+      _updateFilteredLists();  
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(favoriteIds.contains(id) ? 'Added to favorites' : 'Removed from favorites')),

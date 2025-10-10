@@ -5,7 +5,7 @@ import 'package:ideaship/auth/auth_log_reg.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, required Future<void> Function() onThemeChanged});
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();

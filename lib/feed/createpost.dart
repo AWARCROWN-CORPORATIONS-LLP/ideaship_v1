@@ -2,10 +2,10 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class CreatePostPage extends StatefulWidget {
@@ -54,77 +54,13 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
     });
   }
 
-  // Enhanced permission request with rationale and status check
-  Future<bool> _requestPermission(ImageSource source) async {
-    Permission permission;
-    String permissionName;
-
-    if (source == ImageSource.camera) {
-      permission = Permission.camera;
-      permissionName = 'camera';
-    } else {
-      permissionName = 'photos';
-      if (Platform.isAndroid) {
-        final sdkInt = int.tryParse(Platform.operatingSystemVersion.split(' ')[0].split('.')[0]) ?? 0;
-        permission = sdkInt >= 33 ? Permission.photos : Permission.storage;
-      } else {
-        permission = Permission.photos;
-      }
-    }
-
-    // Check current status first
-    var status = await permission.status;
-    if (!status.isGranted) {
-      bool shouldRequest = true;
-      if (status.isPermanentlyDenied) {
-        // For permanently denied, show rationale and open settings
-        await _showPermissionRationale(permissionName);
-        shouldRequest = false; // Don't request again after opening settings
-      } else if (Platform.isAndroid && status.isDenied) {
-        // For Android denied (e.g., undeclared permission), show settings directly
-        await _showPermissionSettingsDialog(permissionName);
-        shouldRequest = false;
-      }
-
-      if (shouldRequest) {
-        status = await permission.request();
-      }
-    }
-
-    if (!status.isGranted) {
-      // If still not granted, guide to settings
-      await _showPermissionSettingsDialog(permissionName);
-      return false;
-    }
-
-    return true;
-  }
-
-  // Show rationale dialog for permissions
-  Future<void> _showPermissionRationale(String permissionName) async {
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Permission Required'),
-        content: Text('This app needs access to $permissionName to allow selecting images. Without it, you won\'t be able to add photos to your post.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              openAppSettings();
-            },
-            child: const Text('Open Settings'),
-          ),
-        ],
-      ),
+  void _showSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
     );
   }
 
-  // Show dialog to open app settings
+  // Show dialog to guide user to settings
   Future<void> _showPermissionSettingsDialog(String permissionName) async {
     await showDialog(
       context: context,
@@ -134,7 +70,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Access to $permissionName was denied. Please enable it in app settings to continue using this feature.'),
+            Text('Access to $permissionName was denied. Please enable it in app settings to use this feature.'),
             if (Platform.isAndroid && permissionName == 'photos')
               const Padding(
                 padding: EdgeInsets.only(top: 8.0),
@@ -148,31 +84,15 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              openAppSettings();
-            },
-            child: const Text('Open Settings'),
+            child: const Text('OK'),
           ),
         ],
       ),
     );
   }
 
-  void _showSnackBar(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
-
-  // Enhanced image picking without compression
+  // Image picking relying on image_picker's internal permission handling
   Future<void> _pickImage(ImageSource source) async {
-    final hasPermission = await _requestPermission(source);
-    if (!hasPermission) return;
-
     try {
       final XFile? pickedImage = await _picker.pickImage(
         source: source,
@@ -187,9 +107,16 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
         });
         _animationController.forward();
       }
+    } on PlatformException catch (e) {
+      String permissionName = source == ImageSource.camera ? 'camera' : 'photos';
+      if (e.code == 'permission' || e.message?.contains('permission') == true) {
+        await _showPermissionSettingsDialog(permissionName);
+      } else {
+        _showSnackBar('Error picking image: ${e.message}');
+      }
+      debugPrint('Image pick error: $e');
     } catch (e) {
       _showSnackBar('Error picking image: $e');
-      // Log the error for debugging (in production, use a logger)
       debugPrint('Image pick error: $e');
     }
   }

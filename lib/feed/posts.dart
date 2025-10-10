@@ -4,6 +4,8 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'publicprofile.dart';
+
 
 class Skeleton extends StatefulWidget {
   final double height;
@@ -19,7 +21,7 @@ class Skeleton extends StatefulWidget {
 class _SkeletonState extends State<Skeleton>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation gradientPosition;
+  late Animation<double> gradientPosition;
 
   @override
   void initState() {
@@ -32,7 +34,7 @@ class _SkeletonState extends State<Skeleton>
     ).animate(
       CurvedAnimation(parent: _controller, curve: Curves.linear),
     )..addListener(() {
-        setState(() {});
+        if (mounted) setState(() {});
       });
     _controller.repeat();
   }
@@ -45,17 +47,21 @@ class _SkeletonState extends State<Skeleton>
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
     return Container(
       width: widget.width,
       height: widget.height,
       decoration: BoxDecoration(
           borderRadius: widget.type == 'circle'
               ? BorderRadius.circular(50)
-              : BorderRadius.circular(0),
+              : BorderRadius.circular(4),
           gradient: LinearGradient(
               begin: Alignment(gradientPosition.value, 0.0),
               end: const Alignment(-1.0, 0.0),
-              colors: const [Colors.black12, Colors.black26, Colors.black12])),
+              colors: isDark
+                  ? const [Colors.white10, Colors.white24, Colors.white10]
+                  : const [Colors.grey, Colors.grey, Colors.grey])),
     );
   }
 }
@@ -66,16 +72,17 @@ class PostSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
+    final colorScheme = Theme.of(context).colorScheme;
     return Card(
-      elevation: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: colorScheme.surface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 const Skeleton(height: 40, width: 40, type: 'circle'),
@@ -83,47 +90,51 @@ class PostSkeleton extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Skeleton(height: 14, width: 120),
-                      const SizedBox(height: 4),
-                      const Skeleton(height: 12, width: 80),
+                    children: const [
+                      Skeleton(height: 14, width: 120),
+                      SizedBox(height: 4),
+                      Skeleton(height: 12, width: 80),
                     ],
                   ),
                 ),
               ],
             ),
           ),
-          // Caption
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
               children: [
                 const Skeleton(height: 16, width: double.infinity),
                 const SizedBox(height: 8),
-                Skeleton(height: 16, width: screenWidth * 0.6),
+                Skeleton(height: 16, width: double.infinity),
               ],
             ),
           ),
-          // Media
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: const Skeleton(height: 200, width: double.infinity),
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              height: 200,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceVariant,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
-          const SizedBox(height: 12),
-          // Actions
+          const SizedBox(height: 16),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Column(
-              children: [
+              children: const [
                 Row(
                   children: [
-                    const Skeleton(height: 20, width: 100),
-                    const Spacer(),
-                    const Skeleton(height: 20, width: 20),
+                    Skeleton(height: 20, width: 100),
+                    Spacer(),
+                    Skeleton(height: 20, width: 20),
                   ],
                 ),
-                const SizedBox(height: 8),
-                const Skeleton(height: 12, width: 60),
+                SizedBox(height: 8),
+                Skeleton(height: 12, width: 60),
               ],
             ),
           ),
@@ -138,20 +149,1075 @@ class CommentSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 12.0),
+      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 16.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Skeleton(height: 32, width: 32, type: 'circle'),
-          const SizedBox(width: 8),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Skeleton(height: 14, width: double.infinity),
+                Container(
+                  height: 14,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
                 const SizedBox(height: 4),
-                const Skeleton(height: 12, width: double.infinity),
+                Container(
+                  height: 12,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceVariant,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+class ImageAspectRatioCache {
+  static final Map<String, double> _cache = {};
+  
+  static Future<double> getAspectRatio(String imageUrl) async {
+    if (_cache.containsKey(imageUrl)) {
+      return _cache[imageUrl]!;
+    }
+
+    final completer = Completer<ImageInfo>();
+    bool mounted = true;
+
+    final imageProvider = NetworkImage(imageUrl);
+    final stream = imageProvider.resolve(const ImageConfiguration());
+    final listener = ImageStreamListener(
+      (ImageInfo info, bool synchronousCall) {
+        if (mounted && !completer.isCompleted) {
+          completer.complete(info);
+        }
+      },
+      onError: (exception, stackTrace) {
+        if (mounted && !completer.isCompleted) {
+          completer.completeError(exception, stackTrace);
+        }
+      },
+    );
+
+    stream.addListener(listener);
+
+    try {
+      final imageInfo = await completer.future;
+      final aspectRatio = imageInfo.image.width / imageInfo.image.height.toDouble();
+      _cache[imageUrl] = aspectRatio;
+      return aspectRatio;
+    } catch (e) {
+      debugPrint('Error loading image aspect ratio: $e');
+      rethrow;
+    } finally {
+      stream.removeListener(listener);
+      mounted = false;
+    }
+  }
+
+  static void clear() => _cache.clear();
+}
+
+class CommentItem extends StatelessWidget {
+  final dynamic comment;
+  final int depth;
+  final int postId;
+  final Function(int, String) onReply;
+  final Function(int, int) onLike;
+
+  const CommentItem({
+    super.key,
+    required this.comment,
+    required this.depth,
+    required this.postId,
+    required this.onReply,
+    required this.onLike,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isLiked = comment['current_reaction'] != null;
+    final leftPadding = 16.0 + (depth * 24.0);
+
+    return Padding(
+      padding: EdgeInsets.only(left: leftPadding, top: 12.0, bottom: 12.0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(
+            radius: 18,
+            backgroundImage: comment['profile_picture'] != null
+                ? NetworkImage('https://server.awarcrown.com/${comment['profile_picture']}')
+                : null,
+            child: comment['profile_picture'] == null
+                ? Icon(Icons.person, size: 18, color: colorScheme.onSurfaceVariant)
+                : null,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      comment['username'] ?? 'Unknown',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatTimeStatic(comment['created_at']),
+                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  comment['comment'] ?? '',
+                  style: TextStyle(fontSize: 14, height: 1.4, color: colorScheme.onSurface),
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => onLike(comment['comment_id'], postId),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isLiked ? Icons.favorite : Icons.favorite_border,
+                              size: 18,
+                              color: isLiked ? Colors.red : null,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${comment['like_count'] ?? 0}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isLiked ? Colors.red : colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      GestureDetector(
+                        onTap: () => onReply(comment['comment_id'], comment['username'] ?? ''),
+                        child: Text(
+                          'Reply',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _formatTimeStatic(String? timeString) {
+    if (timeString == null) return 'Unknown';
+    try {
+      final date = DateTime.parse(timeString);
+      final now = DateTime.now();
+      final diff = now.difference(date);
+      
+      if (diff.inDays > 365) {
+        return '${(diff.inDays / 365).floor()}y ago';
+      } else if (diff.inDays > 30) {
+        return '${(diff.inDays / 30).floor()}mo ago';
+      } else if (diff.inDays > 0) {
+        return '${diff.inDays}d ago';
+      } else if (diff.inHours > 0) {
+        return '${diff.inHours}h ago';
+      } else if (diff.inMinutes > 0) {
+        return '${diff.inMinutes}m ago';
+      } else {
+        return 'Just now';
+      }
+    } catch (_) {
+      return timeString;
+    }
+  }
+}
+
+class CommentsPage extends StatefulWidget {
+  final dynamic post;
+  final List<dynamic> comments;
+  final String username;
+  final int? userId;
+
+  const CommentsPage({
+    super.key,
+    required this.post,
+    required this.comments,
+    required this.username,
+    required this.userId,
+  });
+
+  @override
+  State<CommentsPage> createState() => _CommentsPageState();
+}
+
+class _CommentsPageState extends State<CommentsPage> {
+  late dynamic post;
+  late String _username;
+  late int? _userId;
+  List<dynamic> comments = [];
+  bool commentLoading = false;
+  bool isLiked = false;
+  int likeCount = 0;
+  final TextEditingController commentController = TextEditingController();
+  final FocusNode focusNode = FocusNode();
+  int? replyToCommentId;
+  String replyToUsername = '';
+  final Map<int, bool> commentIsReacting = {};
+
+  @override
+  void initState() {
+    super.initState();
+    post = widget.post;
+    _username = widget.username;
+    _userId = widget.userId;
+    isLiked = post['is_liked'] ?? false;
+    likeCount = post['like_count'] ?? 0;
+    comments = widget.comments;
+    if (comments.isEmpty) {
+      _fetchComments();
+    }
+  }
+
+  @override
+  void dispose() {
+    commentController.dispose();
+    focusNode.dispose();
+    super.dispose();
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _fetchComments() async {
+    if (commentLoading || _username.isEmpty) return;
+    if (mounted) setState(() => commentLoading = true);
+
+    try {
+      final url = 'https://server.awarcrown.com/feed/fetch_comments?post_id=${post['post_id']}&username=${Uri.encodeComponent(_username)}';
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && mounted) {
+          setState(() => comments = data['comments'] ?? []);
+        }
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        _showError('Failed to load comments');
+      }
+    } finally {
+      if (mounted) setState(() => commentLoading = false);
+    }
+  }
+
+  Future<void> _toggleLike() async {
+    if (_userId == null || _userId == 0 || !mounted) return;
+
+    final oldLiked = isLiked;
+    final oldCount = likeCount;
+    final newLiked = !oldLiked;
+    final newCount = oldCount + (newLiked ? 1 : -1);
+
+    if (mounted) {
+      setState(() {
+        isLiked = newLiked;
+        likeCount = newCount;
+      });
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://server.awarcrown.com/feed/like_action'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'post_id=${post['post_id']}&user_id=$_userId',
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && mounted) {
+          setState(() {
+            if (data['like_count'] != null) {
+              likeCount = data['like_count'];
+            }
+            if (data['is_liked'] != null) {
+              isLiked = data['is_liked'];
+            }
+          });
+        }
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLiked = oldLiked;
+          likeCount = oldCount;
+        });
+        _showError('Failed to ${newLiked ? 'like' : 'unlike'} post');
+      }
+    }
+  }
+
+  Future<void> _toggleCommentReaction(int commentId) async {
+    if (_userId == null || _userId == 0 || !mounted) return;
+    if (commentIsReacting[commentId] ?? false) return;
+
+    final commentIndex = comments.indexWhere((c) => c['comment_id'] == commentId);
+    if (commentIndex == -1) return;
+
+    setState(() => commentIsReacting[commentId] = true);
+
+    final comment = comments[commentIndex];
+    final oldLiked = comment['current_reaction'] != null;
+    final oldCount = comment['like_count'] ?? 0;
+    final newLiked = !oldLiked;
+    final newCount = oldCount + (newLiked ? 1 : -1);
+
+    setState(() {
+      comments[commentIndex]['current_reaction'] = newLiked ? 'like' : null;
+      comments[commentIndex]['like_count'] = newCount;
+    });
+
+    try {
+      final action = newLiked ? 'like' : 'unlike';
+      final response = await http.post(
+        Uri.parse('https://server.awarcrown.com/feed/comment_reaction'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'comment_id=$commentId&user_id=$_userId&action=$action',
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && mounted) {
+          setState(() {
+            if (data['like_count'] != null) {
+              comments[commentIndex]['like_count'] = data['like_count'];
+            }
+            if (data['is_liked'] != null) {
+              comments[commentIndex]['current_reaction'] = data['is_liked'] ? 'like' : null;
+            }
+          });
+        }
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        comments[commentIndex]['current_reaction'] = oldLiked ? 'like' : null;
+        comments[commentIndex]['like_count'] = oldCount;
+      });
+      _showError('Failed to ${newLiked ? 'like' : 'unlike'} comment');
+    } finally {
+      if (mounted) {
+        setState(() => commentIsReacting[commentId] = false);
+      }
+    }
+  }
+
+  Future<void> _postComment(String text, {int? parentCommentId}) async {
+    if (text.isEmpty || _username.isEmpty) return;
+    
+    try {
+      String body = 'post_id=${post['post_id']}&username=${Uri.encodeComponent(_username)}&comment=${Uri.encodeComponent(text)}';
+      if (parentCommentId != null) {
+        body += '&parent_comment_id=$parentCommentId';
+      }
+      final response = await http.post(
+        Uri.parse('https://server.awarcrown.com/feed/add_comment'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: body,
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && mounted) {
+          if (data['comment'] != null) {
+            comments.insert(0, data['comment']);
+          }
+          
+          commentController.clear();
+          setState(() {
+            replyToCommentId = null;
+            replyToUsername = '';
+          });
+          final message = parentCommentId != null ? 'Reply posted' : 'Comment posted';
+          _showSuccess(message);
+        }
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      _showError('Failed to post comment');
+    }
+  }
+
+  Future<void> _sharePost(int postId) async {
+    if (_username.isEmpty) return;
+    
+    try {
+      final response = await http.post(
+        Uri.parse('https://server.awarcrown.com/feed/share_post'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && mounted) {
+          _showSuccess('Post shared successfully!');
+        }
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      _showError('Failed to share post');
+    }
+  }
+
+  Future<void> _deletePost(int postId) async {
+    if (_username.isEmpty) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Post'),
+        content: const Text('Are you sure you want to delete this post?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://server.awarcrown.com/feed/delete_post'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200 && mounted) {
+        Navigator.pop(context);
+        _showSuccess('Post deleted successfully');
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      _showError('Failed to delete post');
+    }
+  }
+
+  Future<void> _savePost(int postId) async {
+    if (_username.isEmpty) return;
+    
+    try {
+      final response = await http.post(
+        Uri.parse('https://server.awarcrown.com/feed/save_post'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && mounted) {
+          _showSuccess(data['saved'] == true ? 'Post saved!' : 'Post unsaved');
+        }
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      _showError('Failed to save post');
+    }
+  }
+
+  void _navigateToProfile(String username, int userId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PublicProfilePage(targetUsername: username),
+      ),
+    );
+  }
+
+  bool _isOwnPost() {
+    if (_userId == null || _userId == 0) return false;
+    return post['user_id'] == _userId;
+  }
+
+  void _addCommentsToFlat(List<dynamic> flat, dynamic comment, int depth) {
+    (comment as Map<String, dynamic>)['_depth'] = depth;
+    flat.add(comment);
+    final children = comments
+        .where((c) => c['parent_comment_id'] == comment['comment_id'])
+        .toList()
+      ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
+    for (var child in children) {
+      _addCommentsToFlat(flat, child, depth + 1);
+    }
+  }
+
+  Widget _buildCommentsList() {
+    final allComments = comments;
+    
+    if (allComments.isEmpty) {
+      return ListView(
+        physics: const BouncingScrollPhysics(),
+        cacheExtent: 1000.0,
+        children: [
+          const SizedBox(height: 200),
+          const Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'No comments yet. Be the first to comment!',
+              style: TextStyle(color: Colors.grey, fontSize: 14),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 200),
+        ],
+      );
+    }
+
+    final flatComments = <dynamic>[];
+    final mainComments = allComments
+        .where((c) => c['parent_comment_id'] == null)
+        .toList()
+      ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
+    for (var main in mainComments) {
+      _addCommentsToFlat(flatComments, main, 0);
+    }
+
+    return ListView.separated(
+      physics: const BouncingScrollPhysics(),
+      shrinkWrap: false,
+      cacheExtent: 1000.0,
+      itemCount: flatComments.length,
+      separatorBuilder: (context, index) {
+        final depth = flatComments[index]['_depth'] as int;
+        return Divider(
+          height: 1,
+          indent: 16.0 + (depth * 24.0),
+          color: Theme.of(context).colorScheme.outline,
+        );
+      },
+      itemBuilder: (context, index) {
+        final comment = flatComments[index];
+        final depth = comment['_depth'] as int;
+        return CommentItem(
+          comment: comment,
+          depth: depth,
+          postId: post['post_id'],
+          onReply: (parentId, username) {
+            setState(() {
+              replyToCommentId = parentId;
+              replyToUsername = username;
+            });
+            focusNode.requestFocus();
+          },
+          onLike: (commentId, postId) => _toggleCommentReaction(commentId),
+        );
+      },
+    );
+  }
+
+  String _formatTime(String? timeString) {
+    if (timeString == null) return 'Unknown';
+    try {
+      final date = DateTime.parse(timeString);
+      final now = DateTime.now();
+      final diff = now.difference(date);
+      
+      if (diff.inDays > 365) {
+        return '${(diff.inDays / 365).floor()}y ago';
+      } else if (diff.inDays > 30) {
+        return '${(diff.inDays / 30).floor()}mo ago';
+      } else if (diff.inDays > 0) {
+        return '${diff.inDays}d ago';
+      } else if (diff.inHours > 0) {
+        return '${diff.inHours}h ago';
+      } else if (diff.inMinutes > 0) {
+        return '${diff.inMinutes}m ago';
+      } else {
+        return 'Just now';
+      }
+    } catch (_) {
+      return timeString;
+    }
+  }
+
+  Widget _buildPostMedia(String imageUrl) {
+    final screenWidth = MediaQuery.of(context).size.width - 32; // Account for padding
+    final colorScheme = Theme.of(context).colorScheme;
+    return FutureBuilder<double>(
+      future: ImageAspectRatioCache.getAspectRatio(imageUrl),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(
+            height: 200,
+            width: double.infinity,
+            child: Skeleton(height: 200, width: double.infinity),
+          );
+        } else if (snapshot.hasError || !snapshot.hasData) {
+          return Container(
+            height: 200,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              Icons.image_not_supported,
+              color: colorScheme.onSurfaceVariant,
+              size: 48,
+            ),
+          );
+        }
+
+        final aspectRatio = snapshot.data!;
+        final desiredHeight = screenWidth / aspectRatio;
+        final maxHeight = MediaQuery.of(context).size.height * 0.4; // 40% of screen height max
+
+        if (desiredHeight <= maxHeight) {
+          // Image fits within max height, use full aspect ratio
+          return AspectRatio(
+            aspectRatio: aspectRatio,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Skeleton(height: 200, width: double.infinity);
+                },
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    height: 200,
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceVariant,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.image_not_supported,
+                      color: colorScheme.onSurfaceVariant,
+                      size: 48,
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        } else {
+          // Image too tall, scale down to maxHeight while maintaining aspect ratio
+          final scale = maxHeight / desiredHeight;
+          final scaledWidth = screenWidth * scale;
+          return SizedBox(
+            width: scaledWidth,
+            height: maxHeight,
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  imageUrl,
+                  width: screenWidth,
+                  height: desiredHeight,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return const Skeleton(height: 200, width: double.infinity);
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      height: maxHeight,
+                      width: scaledWidth,
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.image_not_supported,
+                        color: colorScheme.onSurfaceVariant,
+                        size: 48,
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final postId = post['post_id'];
+    final imageUrl = post['media_url'] != null && post['media_url'].isNotEmpty
+        ? 'https://server.awarcrown.com${post['media_url']}'
+        : null;
+
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: Column(
+        children: [
+          // Header
+          Container(
+            color: colorScheme.surface,
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () => _navigateToProfile(
+                      post['username'] ?? '', post['user_id'] ?? 0),
+                  child: CircleAvatar(
+                    radius: 20,
+                    backgroundImage: post['profile_picture'] != null
+                        ? NetworkImage(
+                            'https://server.awarcrown.com/feed/${post['profile_picture']}')
+                        : null,
+                    child: post['profile_picture'] == null
+                        ? Icon(Icons.person, color: colorScheme.onSurfaceVariant)
+                        : null,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      GestureDetector(
+                        onTap: () => _navigateToProfile(
+                            post['username'] ?? '', post['user_id'] ?? 0),
+                        child: Text(
+                          post['username'] ?? 'Unknown',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        _formatTime(post['created_at']),
+                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_isOwnPost())
+                  PopupMenuButton<String>(
+                    onSelected: (value) {
+                      if (value == 'delete') {
+                        _deletePost(postId);
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                            const SizedBox(width: 8),
+                            const Text('Delete', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                    icon: Icon(Icons.more_vert, size: 20, color: colorScheme.onSurfaceVariant),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+              ],
+            ),
+          ),
+          // Image
+          if (imageUrl != null)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: _buildPostMedia(imageUrl),
+            ),
+          // Actions
+          Container(
+            color: colorScheme.surface,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                // Like button
+                InkWell(
+                  onTap: _toggleLike,
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isLiked ? Icons.favorite : Icons.favorite_border,
+                          size: 24,
+                          color: isLiked ? Colors.red : colorScheme.onSurface,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '$likeCount',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isLiked ? Colors.red : colorScheme.onSurface,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Share button
+                InkWell(
+                  onTap: () => _sharePost(postId),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Icon(
+                      Icons.share_outlined,
+                      size: 24,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+                const Spacer(),
+                // Save button
+                InkWell(
+                  onTap: () => _savePost(postId),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Icon(
+                      Icons.bookmark_border,
+                      size: 24,
+                      color: colorScheme.onSurface,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Caption
+          if (post['content'] != null && post['content'].isNotEmpty)
+            Container(
+              color: colorScheme.surface,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: RichText(
+                text: TextSpan(
+                  style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
+                  children: [
+                    TextSpan(
+                      text: '${post['username']} ',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    TextSpan(text: post['content']),
+                  ],
+                ),
+              ),
+            ),
+          Divider(height: 1, color: colorScheme.outline),
+          // Comments List
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _fetchComments,
+              color: colorScheme.primary,
+              child: commentLoading
+                  ? ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      cacheExtent: 1000.0,
+                      itemCount: 10,
+                      itemBuilder: (context, index) => const CommentSkeleton(),
+                    )
+                  : _buildCommentsList(),
+            ),
+          ),
+          // Input
+          Container(
+            color: colorScheme.surface,
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                if (replyToUsername.isNotEmpty)
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      replyToCommentId = null;
+                      replyToUsername = '';
+                    }),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '@$replyToUsername',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.close,
+                            size: 14,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: TextField(
+                    controller: commentController,
+                    focusNode: focusNode,
+                    style: TextStyle(color: colorScheme.onSurface),
+                    decoration: InputDecoration(
+                      hintText: replyToCommentId != null
+                          ? 'Write a reply...'
+                          : 'Add a comment...',
+                      hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: colorScheme.outline!),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: colorScheme.outline!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(24),
+                        borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                      ),
+                      filled: true,
+                      fillColor: colorScheme.surfaceVariant,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                    ),
+                    onSubmitted: (value) {
+                      final trimmed = value.trim();
+                      if (trimmed.isNotEmpty) {
+                        _postComment(
+                          trimmed,
+                          parentCommentId: replyToCommentId,
+                        );
+                      }
+                    },
+                    maxLines: null,
+                    textInputAction: TextInputAction.send,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: commentController,
+                  builder: (context, value, child) {
+                    final text = value.text.trim();
+                    final isEnabled = text.isNotEmpty;
+                    return Material(
+                      color: isEnabled ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                      borderRadius: BorderRadius.circular(24),
+                      child: InkWell(
+                        onTap: isEnabled
+                            ? () {
+                                _postComment(
+                                  text,
+                                  parentCommentId: replyToCommentId,
+                                );
+                              }
+                            : null,
+                        borderRadius: BorderRadius.circular(24),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          child: Icon(
+                            Icons.send,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
@@ -169,38 +1235,7 @@ class PostsPage extends StatefulWidget {
   _PostsPageState createState() => _PostsPageState();
 }
 
-// Add this helper function outside your build method (e.g., in your widget class or as a static method)
-Future<double> getImageAspectRatio(String imageUrl) async {
-  final completer = Completer<ImageInfo>();
-  bool mounted = true; // To avoid setting state after disposal
-
-  final imageProvider = NetworkImage(imageUrl);
-  final stream = imageProvider.resolve(const ImageConfiguration());
-  final listener = ImageStreamListener(
-    (ImageInfo info, bool synchronousCall) {
-      if (mounted && !completer.isCompleted) {
-        completer.complete(info);
-      }
-    },
-    onError: (exception, stackTrace) {
-      if (mounted && !completer.isCompleted) {
-        completer.completeError(exception, stackTrace);
-      }
-    },
-  );
-
-  stream.addListener(listener);
-
-  try {
-    final imageInfo = await completer.future;
-    return imageInfo.image.width / imageInfo.image.height.toDouble();
-  } finally {
-    stream.removeListener(listener);
-    mounted = false;
-  }
-}
-
-class _PostsPageState extends State<PostsPage> {
+class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   List<dynamic> posts = [];
   bool isLoading = false;
   bool hasMore = true;
@@ -208,58 +1243,147 @@ class _PostsPageState extends State<PostsPage> {
   int? nextCursorId;
   final ScrollController _scrollController = ScrollController();
 
-  // Comments
+  // Comments cache
   Map<int, List<dynamic>> commentsMap = {};
-  Map<int, bool> showCommentsMap = {};
-  Map<int, TextEditingController> commentControllers = {};
-  Map<int, FocusNode> commentFocusNodes = {};
-  Map<int, bool> commentLoadingMap = {};
+
+  // Likes
+  Map<int, bool> isLikingMap = {};
+  Map<int, AnimationController> likeAnimationControllers = {};
+  Map<int, bool> showHeartOverlay = {};
+  Map<int, AnimationController> heartOverlayControllers = {};
 
   // Current user
   String _username = '';
   int? _userId;
 
+  // Debouncing for scroll
+  Timer? _scrollDebounceTimer;
+
   @override
   void initState() {
     super.initState();
-    _loadUsername().then((_) {
-      _fetchPosts();
-    });
+    _initializeData();
     _scrollController.addListener(_onScroll);
+  }
+
+  Future<void> _initializeData() async {
+    await _loadUsername();
+    await _loadPostsFromCache();
+    await _fetchPosts();
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
-    for (var c in commentControllers.values) {
+    _scrollDebounceTimer?.cancel();
+    for (var c in likeAnimationControllers.values) {
       c.dispose();
     }
-    for (var f in commentFocusNodes.values) {
-      f.dispose();
+    for (var c in heartOverlayControllers.values) {
+      c.dispose();
     }
     super.dispose();
   }
 
-  // Load username from SharedPreferences
+  String _getErrorMessage(dynamic e) {
+    if (e is SocketException) {
+      return 'No internet connection. Please check your connection and try again.';
+    } else if (e is TimeoutException) {
+      return 'Request timed out. Please check your connection and try again.';
+    } else if (e is http.ClientException) {
+      return 'Network error occurred. Please try again.';
+    } else {
+      return 'An unexpected error occurred. Please try again.';
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _savePostsToCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('cached_posts', json.encode(posts));
+      await prefs.setInt('cache_timestamp', DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      debugPrint('Error saving posts to cache: $e');
+    }
+  }
+
+  Future<void> _loadPostsFromCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final String? cachedPostsJson = prefs.getString('cached_posts');
+      final int? timestamp = prefs.getInt('cache_timestamp');
+      
+      if (cachedPostsJson != null && timestamp != null) {
+        final cacheAge = DateTime.now().millisecondsSinceEpoch - timestamp;
+        // Cache valid for 1 hour
+        if (cacheAge < 3600000) {
+          final parsedPosts = json.decode(cachedPostsJson);
+          if (parsedPosts is List && mounted) {
+            setState(() {
+              posts = parsedPosts.cast<dynamic>();
+            });
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error loading posts from cache: $e');
+    }
+  }
+
   Future<void> _loadUsername() async {
-    final prefs = await SharedPreferences.getInstance();
-    setState(() {
-      _username = prefs.getString('username') ?? '';
-      _userId = prefs.getInt('user_id') ?? 0;
-    });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (mounted) {
+        setState(() {
+          _username = prefs.getString('username') ?? '';
+          _userId = prefs.getInt('user_id');
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading username: $e');
+    }
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >=
-        _scrollController.position.maxScrollExtent - 200) {
-      if (hasMore && !isLoading && !networkError) {
-        _fetchMorePosts();
+    _scrollDebounceTimer?.cancel();
+    _scrollDebounceTimer = Timer(const Duration(milliseconds: 200), () {
+      if (_scrollController.hasClients &&
+          _scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 300) {
+        if (hasMore && !isLoading && !networkError) {
+          _fetchMorePosts();
+        }
       }
-    }
+    });
   }
 
   Future<Map<String, dynamic>?> _fetchPostsData({int? cursorId}) async {
     if (_username.isEmpty) return null;
+    
     try {
       final params = {'username': _username};
       if (cursorId != null) params['cursorId'] = cursorId.toString();
@@ -269,67 +1393,73 @@ class _PostsPageState extends State<PostsPage> {
           .join('&');
 
       final url = 'https://server.awarcrown.com/feed/fetch_posts?$queryString';
-      final response = await http.get(Uri.parse(url));
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 20));
 
       if (response.statusCode == 200) {
-        return json.decode(response.body);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Failed to fetch posts: ${response.statusCode}')),
-          );
+        final parsed = json.decode(response.body);
+        if (parsed is Map<String, dynamic>) {
+          return parsed;
+        } else {
+          throw Exception('Invalid JSON structure');
         }
-        return null;
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      if (e is SocketException) {
-        if (mounted) {
-          setState(() => networkError = true);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No internet connection')),
-          );
-        }
-        return null;
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error fetching posts: $e')),
-          );
-        }
-        return null;
-      }
+      rethrow;
     }
   }
 
   Future<void> _fetchPosts({int? cursorId}) async {
-    if (isLoading) return;
-    setState(() => isLoading = true);
+    if (isLoading || _username.isEmpty) return;
+    
+    if (mounted) setState(() => isLoading = true);
 
-    final data = await _fetchPostsData(cursorId: cursorId);
-    if (data != null) {
-      setState(() {
-        networkError = false;
-        if (cursorId == null) {
-          posts = data['posts'] ?? [];
-        } else {
-          posts.addAll(data['posts'] ?? []);
-        }
-        nextCursorId = data['nextCursorId'];
-        hasMore = nextCursorId != null;
-      });
+    try {
+      final data = await _fetchPostsData(cursorId: cursorId);
+      if (data != null && mounted) {
+        setState(() {
+          networkError = false;
+          final newPosts = data['posts'] ?? [];
+          
+          if (cursorId == null) {
+            posts = newPosts;
+          } else {
+            final postsToAdd = newPosts.where((newPost) =>
+                !posts.any((existing) => existing['post_id'] == newPost['post_id'])).toList();
+            posts.addAll(postsToAdd);
+          }
+          
+          nextCursorId = data['nextCursorId'];
+          hasMore = nextCursorId != null;
+        });
+        await _savePostsToCache();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => networkError = true);
+        _showError(_getErrorMessage(e));
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
-
-    if (mounted) setState(() => isLoading = false);
   }
 
   Future<void> _fetchMorePosts() async {
-    if (nextCursorId != null) await _fetchPosts(cursorId: nextCursorId);
+    if (nextCursorId != null) {
+      await _fetchPosts(cursorId: nextCursorId);
+    }
   }
 
   Future<void> _refreshPosts() async {
     if (_username.isEmpty) return;
 
-    setState(() => networkError = false);
+    setState(() {
+      networkError = false;
+      nextCursorId = null;
+    });
 
     if (posts.isEmpty) {
       await _fetchPosts();
@@ -338,293 +1468,680 @@ class _PostsPageState extends State<PostsPage> {
 
     final oldFirstId = posts[0]['post_id'] as int;
 
-    final data = await _fetchPostsData();
-    if (data == null) return;
+    try {
+      final data = await _fetchPostsData();
+      if (data == null || !mounted) return;
 
-    setState(() {
-      networkError = false;
-    });
+      setState(() => networkError = false);
 
-    final newPosts = data['posts'] ?? [];
-    final newOnes = newPosts.where((p) => (p['post_id'] as int) > oldFirstId).toList();
+      final newPosts = data['posts'] ?? [];
+      final newOnes = newPosts
+          .where((p) => (p['post_id'] as int) > oldFirstId)
+          .toList();
 
-    if (newOnes.isNotEmpty) {
-      setState(() {
-        posts.insertAll(0, newOnes);
-      });
-    } else {
+      if (newOnes.isNotEmpty && mounted) {
+        setState(() {
+          posts.insertAll(0, newOnes);
+        });
+        await _savePostsToCache();
+        _showSuccess('${newOnes.length} new post${newOnes.length > 1 ? 's' : ''} loaded');
+      }
+    } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No new posts found')),
-        );
+        setState(() => networkError = true);
+        _showError(_getErrorMessage(e));
       }
     }
   }
 
   Future<void> _toggleLike(int postId, int index) async {
-    if (_username.isEmpty) return;
+    if (_userId == null || _userId == 0 || !mounted) return;
+    if (isLikingMap[postId] ?? false) return;
+
+    setState(() => isLikingMap[postId] = true);
+
+    final oldLiked = posts[index]['is_liked'] ?? false;
+    final oldCount = posts[index]['like_count'] ?? 0;
+    final newLiked = !oldLiked;
+    final optimisticCount = oldCount + (newLiked ? 1 : -1);
+
+    if (mounted) {
+      setState(() {
+        posts[index]['is_liked'] = newLiked;
+        posts[index]['like_count'] = optimisticCount;
+      });
+    }
+
+    // Animations for new like
+    if (newLiked && !oldLiked) {
+      final iconController = likeAnimationControllers.putIfAbsent(
+        postId,
+        () => AnimationController(
+          duration: const Duration(milliseconds: 150),
+          vsync: this,
+        ),
+      );
+      iconController.forward().then((_) => iconController.reverse());
+
+      final hasImage = posts[index]['media_url'] != null &&
+          posts[index]['media_url'].isNotEmpty;
+      if (hasImage && mounted) {
+        setState(() => showHeartOverlay[postId] = true);
+        final overlayController = AnimationController(
+          duration: const Duration(milliseconds: 600),
+          vsync: this,
+        );
+        heartOverlayControllers[postId] = overlayController;
+        overlayController.forward().then((_) {
+          if (mounted) {
+            setState(() => showHeartOverlay[postId] = false);
+          }
+          overlayController.dispose();
+          heartOverlayControllers.remove(postId);
+        });
+      }
+    }
+
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/like_action'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
-      );
+        body: 'post_id=$postId&user_id=$_userId',
+      ).timeout(const Duration(seconds: 10));
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (mounted && data['like_count'] != null) {
-          setState(() => posts[index]['like_count'] = data['like_count']);
-        }
-      }
-    } catch (e) {
-      if (e is SocketException) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No internet connection')),
-          );
+        if (data is Map<String, dynamic> && mounted) {
+          setState(() {
+            if (data['like_count'] != null) {
+              posts[index]['like_count'] = data['like_count'];
+            }
+            if (data['is_liked'] != null) {
+              posts[index]['is_liked'] = data['is_liked'];
+            }
+          });
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error toggling like: $e')),
-          );
-        }
+        throw http.ClientException('Server error: ${response.statusCode}');
       }
-    }
-  }
-
-  Future<void> _toggleCommentVisibility(int postId) async {
-    if (showCommentsMap[postId] ?? false) {
-      if (mounted) setState(() => showCommentsMap[postId] = false);
-      return;
-    }
-
-    if (mounted) setState(() => showCommentsMap[postId] = true);
-
-    if (!commentsMap.containsKey(postId)) {
-      commentsMap[postId] = [];
-      commentLoadingMap[postId] = true;
-      commentControllers[postId] ??= TextEditingController();
-      commentFocusNodes[postId] ??= FocusNode();
-      await _fetchComments(postId);
-      if (mounted) setState(() => commentLoadingMap[postId] = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          posts[index]['is_liked'] = oldLiked;
+          posts[index]['like_count'] = oldCount;
+        });
+        _showError('Failed to ${newLiked ? 'like' : 'unlike'} post');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isLikingMap[postId] = false);
+      }
     }
   }
 
   Future<void> _fetchComments(int postId) async {
-    if (commentLoadingMap[postId] ?? false || _username.isEmpty) return;
-    setState(() => commentLoadingMap[postId] = true);
-
+    if (_username.isEmpty) return;
+    
     try {
-      final url =
-          'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username)}';
-      final response = await http.get(Uri.parse(url));
+      final url = 'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username)}';
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (mounted && data['comments'] != null) {
-          setState(() => commentsMap[postId] = data['comments']);
-        }
-      }
-    } catch (e) {
-      if (e is SocketException) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No internet connection')),
-          );
+        if (data is Map<String, dynamic> && mounted) {
+          commentsMap[postId] = data['comments'] ?? [];
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error fetching comments: $e')),
-          );
-        }
-      }
-    } finally {
-      if (mounted) setState(() => commentLoadingMap[postId] = false);
-    }
-  }
-
-  Future<void> _postComment(int postId, String text) async {
-    if (text.isEmpty || _username.isEmpty) return;
-    try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/add_comment'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body:
-            'post_id=$postId&username=${Uri.encodeComponent(_username)}&comment=${Uri.encodeComponent(text)}',
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (mounted) {
-          if (data['comment'] != null) commentsMap[postId]?.insert(0, data['comment']);
-          final postIndex = posts.indexWhere((p) => p['post_id'] == postId);
-          if (postIndex != -1) {
-            posts[postIndex]['comment_count'] =
-                (posts[postIndex]['comment_count'] ?? 0) + 1;
-          }
-          commentControllers[postId]?.clear();
-        }
+        throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      if (e is SocketException) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No internet connection')),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error posting comment: $e')),
-          );
-        }
+      if (mounted) {
+        _showError(_getErrorMessage(e));
       }
     }
   }
 
   Future<void> _sharePost(int postId) async {
+    if (_username.isEmpty) return;
+    
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/share_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
-      );
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Post shared! Count: ${data['share_count']}')),
-          );
-        }
-      }
-    } catch (e) {
-      if (e is SocketException) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No internet connection')),
-          );
+        if (data is Map<String, dynamic> && mounted) {
+          _showSuccess('Post shared successfully!');
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error sharing post: $e')),
-          );
-        }
+        throw http.ClientException('Server error: ${response.statusCode}');
       }
+    } catch (e) {
+      _showError(_getErrorMessage(e));
     }
   }
 
   Future<void> _deletePost(int postId) async {
+    if (_username.isEmpty) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Post'),
+        content: const Text('Are you sure you want to delete this post?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/delete_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
-      );
-      if (response.statusCode == 200) {
-        if (mounted) {
-          setState(() => posts.removeWhere((p) => p['post_id'] == postId));
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Post deleted successfully')),
-          );
-        }
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200 && mounted) {
+        setState(() => posts.removeWhere((p) => p['post_id'] == postId));
+        await _savePostsToCache();
+        _showSuccess('Post deleted successfully');
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      if (e is SocketException) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No internet connection')),
-          );
-        }
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting post: $e')),
-          );
-        }
-      }
+      _showError(_getErrorMessage(e));
     }
   }
 
   Future<void> _savePost(int postId) async {
+    if (_username.isEmpty) return;
+    
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/save_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
-      );
+      ).timeout(const Duration(seconds: 10));
+      
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(data['saved'] ? 'Post saved!' : 'Post unsaved')),
-          );
-        }
-      }
-    } catch (e) {
-      if (e is SocketException) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No internet connection')),
-          );
+        if (data is Map<String, dynamic> && mounted) {
+          _showSuccess(data['saved'] == true ? 'Post saved!' : 'Post unsaved');
         }
       } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error saving post: $e')),
-          );
-        }
+        throw http.ClientException('Server error: ${response.statusCode}');
       }
+    } catch (e) {
+      _showError(_getErrorMessage(e));
     }
   }
 
-  Widget _buildCommentsList(int postId) {
-    final comments = commentsMap[postId] ?? [];
-    return ListView.separated(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: comments.length,
-      separatorBuilder: (context, index) => const Divider(height: 1, indent: 56),
+  void _navigateToProfile(String username, int userId) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PublicProfilePage(targetUsername: username),
+      ),
+    );
+  }
+
+  bool _isOwnPost(int postId, int index) {
+    if (_userId == null || _userId == 0) return false;
+    return posts[index]['user_id'] == _userId;
+  }
+
+  Widget _buildEmptyState() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.feed_outlined, size: 80, color: colorScheme.onSurfaceVariant),
+            const SizedBox(height: 16),
+            Text(
+              'No posts yet',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w500,
+                color: colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Follow users to see their posts here',
+              style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 80, color: colorScheme.onSurfaceVariant),
+            const SizedBox(height: 16),
+            const Text(
+              'Failed to load posts',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Check your connection and try again',
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: _fetchPosts,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildList() {
+    if (posts.isEmpty) {
+      if (isLoading) {
+        return ListView.builder(
+          physics: const BouncingScrollPhysics(),
+          cacheExtent: 1000.0,
+          itemCount: 5,
+          itemBuilder: (context, index) => const PostSkeleton(),
+        );
+      } else if (networkError) {
+        return _buildErrorState();
+      } else {
+        return _buildEmptyState();
+      }
+    }
+
+    return ListView.builder(
+      physics: const BouncingScrollPhysics(),
+      controller: _scrollController,
+      cacheExtent: 1000.0,
+      itemCount: posts.length + (isLoading && hasMore ? 1 : 0),
       itemBuilder: (context, index) {
-        final comment = comments[index];
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 12.0),
-          child: Row(
+        if (index == posts.length) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: PostSkeleton(),
+          );
+        }
+
+        final post = posts[index];
+        final postId = post['post_id'];
+        final colorScheme = Theme.of(context).colorScheme;
+
+        final imageUrl = post['media_url'] != null && post['media_url'].isNotEmpty
+            ? 'https://server.awarcrown.com${post['media_url']}'
+            : null;
+
+        final isLiked = post['is_liked'] ?? false;
+        final isLiking = isLikingMap[postId] ?? false;
+
+        final iconAnimation = likeAnimationControllers[postId] ?? 
+            const AlwaysStoppedAnimation(1.0);
+        final overlayAnimation = heartOverlayControllers[postId] ?? 
+            const AlwaysStoppedAnimation(0.0);
+
+        return Card(
+          elevation: 2,
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          color: colorScheme.surface,
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundImage: comment['profile_picture'] != null
-                    ? NetworkImage('https://server.awarcrown.com/${comment['profile_picture']}')
-                    : null,
-                child: comment['profile_picture'] == null ? const Icon(Icons.person, size: 16) : null,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              // Header
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
                   children: [
-                    RichText(
-                      text: TextSpan(
-                        style: DefaultTextStyle.of(context).style,
+                    GestureDetector(
+                      onTap: () => _navigateToProfile(
+                          post['username'] ?? '', post['user_id'] ?? 0),
+                      child: CircleAvatar(
+                        radius: 20,
+                        backgroundImage: post['profile_picture'] != null
+                            ? NetworkImage(
+                                'https://server.awarcrown.com/feed/${post['profile_picture']}')
+                            : null,
+                        child: post['profile_picture'] == null
+                            ? Icon(Icons.person, color: colorScheme.onSurfaceVariant)
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          TextSpan(
-                            text: '${comment['username'] ?? 'Unknown'} ',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          GestureDetector(
+                            onTap: () => _navigateToProfile(
+                                post['username'] ?? '', post['user_id'] ?? 0),
+                            child: Text(
+                              post['username'] ?? 'Unknown',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                              ),
+                            ),
                           ),
-                          TextSpan(
-                            text: _formatTime(comment['created_at']),
-                            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                          Text(
+                            _formatTime(post['created_at']),
+                            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      comment['comment'] ?? '',
-                      style: const TextStyle(fontSize: 14),
+                    if (_isOwnPost(postId, index))
+                      PopupMenuButton<String>(
+                        onSelected: (value) {
+                          if (value == 'delete') {
+                            _deletePost(postId);
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          PopupMenuItem(
+                            value: 'delete',
+                            child: Row(
+                              children: [
+                                Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                                const SizedBox(width: 8),
+                                const Text('Delete', style: TextStyle(color: Colors.red)),
+                              ],
+                            ),
+                          ),
+                        ],
+                        icon: Icon(Icons.more_vert, size: 20, color: colorScheme.onSurfaceVariant),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8)),
+                      ),
+                  ],
+                ),
+              ),
+              
+              // Double-tap area: Caption and Media
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onDoubleTap: () => _toggleLike(postId, index),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Caption
+                    if (post['content'] != null && post['content'].isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Text(
+                          post['content'],
+                          style: TextStyle(fontSize: 14, height: 1.4, color: colorScheme.onSurface),
+                        ),
+                      ),
+                    
+                    // Media
+                    if (imageUrl != null)
+                      Stack(
+                        children: [
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 16),
+                            child: FutureBuilder<double>(
+                              future: ImageAspectRatioCache.getAspectRatio(imageUrl),
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return const SizedBox(
+                                    height: 200,
+                                    width: double.infinity,
+                                    child: Skeleton(height: 200, width: double.infinity),
+                                  );
+                                } else if (snapshot.hasError || !snapshot.hasData) {
+                                  return Container(
+                                    height: 200,
+                                    width: double.infinity,
+                                    decoration: BoxDecoration(
+                                      color: colorScheme.surfaceVariant,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Icon(
+                                      Icons.image_not_supported,
+                                      color: colorScheme.onSurfaceVariant,
+                                      size: 48,
+                                    ),
+                                  );
+                                }
+                                return ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: AspectRatio(
+                                    aspectRatio: snapshot.data!,
+                                    child: Image.network(
+                                      imageUrl,
+                                      fit: BoxFit.cover,
+                                      loadingBuilder: (context, child, loadingProgress) {
+                                        if (loadingProgress == null) return child;
+                                        return const Skeleton(height: 200, width: double.infinity);
+                                      },
+                                      errorBuilder: (context, error, stackTrace) {
+                                        return Container(
+                                          height: 200,
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.surfaceVariant,
+                                            borderRadius: BorderRadius.circular(12),
+                                          ),
+                                          child: Icon(
+                                            Icons.image_not_supported,
+                                            color: colorScheme.onSurfaceVariant,
+                                            size: 48,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                          
+                          // Heart overlay animation
+                          if (showHeartOverlay[postId] ?? false)
+                            Positioned.fill(
+                              child: AnimatedBuilder(
+                                animation: overlayAnimation,
+                                builder: (context, child) {
+                                  final scale = Curves.easeOut.transform(
+                                      overlayAnimation.value) * 1.5;
+                                  final opacity = 1.0 - (overlayAnimation.value * 0.8);
+                                  return Transform.scale(
+                                    scale: scale,
+                                    alignment: Alignment.center,
+                                    child: Opacity(
+                                      opacity: opacity,
+                                      child: const Icon(
+                                        Icons.favorite,
+                                        size: 100,
+                                        color: Colors.red,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Actions
+              Container(
+                color: colorScheme.surface,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        // Like button
+                        InkWell(
+                          onTap: () => _toggleLike(postId, index),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                isLiking
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                              Colors.red),
+                                        ),
+                                      )
+                                    : AnimatedBuilder(
+                                        animation: iconAnimation,
+                                        builder: (context, child) {
+                                          final scale = 1.0 + (0.4 * iconAnimation.value);
+                                          return Transform.scale(
+                                            scale: scale,
+                                            child: Icon(
+                                              isLiked
+                                                  ? Icons.favorite
+                                                  : Icons.favorite_border,
+                                              size: 24,
+                                              color: isLiked ? Colors.red : colorScheme.onSurface,
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${post['like_count'] ?? 0}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: isLiked ? Colors.red : colorScheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(width: 12),
+                        
+                        // Comment button
+                        InkWell(
+                          onTap: () async {
+                            await _fetchComments(postId);
+                            if (mounted) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => CommentsPage(
+                                    post: post,
+                                    comments: commentsMap[postId] ?? [],
+                                    username: _username,
+                                    userId: _userId,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.mode_comment_outlined,
+                                  size: 24,
+                                  color: colorScheme.onSurface,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  '${post['comment_count'] ?? 0}',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        
+                        const SizedBox(width: 12),
+                        
+                        // Share button
+                        InkWell(
+                          onTap: () => _sharePost(postId),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Icon(
+                              Icons.share_outlined,
+                              size: 24,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                        
+                        const Spacer(),
+                        
+                        // Save button
+                        InkWell(
+                          onTap: () => _savePost(postId),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Icon(
+                              Icons.bookmark_border,
+                              size: 24,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -636,310 +2153,44 @@ class _PostsPageState extends State<PostsPage> {
     );
   }
 
-  bool _isOwnPost(int postId, int index) {
-    if (_userId == null || _userId == 0) return false;
-    return posts[index]['user_id'] == _userId;
-  }
-
-  Widget _buildList() {
-    if (posts.isEmpty) {
-      if (isLoading) {
-        return ListView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          itemCount: 5,
-          itemBuilder: (context, index) => const PostSkeleton(),
-        );
-      } else if (networkError) {
-        return ListView.builder(
-          physics: const AlwaysScrollableScrollPhysics(),
-          itemCount: 10,
-          itemBuilder: (context, index) => const PostSkeleton(),
-        );
-      } else {
-        return const Center(child: Text('No posts available'));
-      }
-    } else {
-      return ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(),
-        controller: _scrollController,
-        itemCount: posts.length + (isLoading && hasMore && !networkError ? 1 : 0),
-        itemBuilder: (context, index) {
-if (index == posts.length) {
-  return const PostSkeleton();
-}
-
-final post = posts[index];
-final postId = post['post_id'];
-
-final imageUrl = post['media_url'] != null && post['media_url'].isNotEmpty
-    ? 'https://server.awarcrown.com${post['media_url']}'
-    : null;
-
-return Card(
-  elevation: 1,
-  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      // Header
-      Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: RefreshIndicator(
+        onRefresh: _refreshPosts,
+        color: colorScheme.primary,
+        child: Column(
           children: [
-            CircleAvatar(
-              radius: 20,
-              backgroundImage: post['profile_picture'] != null
-                  ? NetworkImage('https://server.awarcrown.com/feed/${post['profile_picture']}')
-                  : null,
-              child: post['profile_picture'] == null ? const Icon(Icons.person) : null,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    post['username'] ?? 'Unknown',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                  Text(
-                    _formatTime(post['created_at']),
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            ),
-            if (_isOwnPost(postId, index))
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  if (value == 'delete') {
-                    _deletePost(postId);
-                  }
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete_outline, size: 20),
-                        SizedBox(width: 8),
-                        Text('Delete'),
-                      ],
+            if (networkError && posts.isNotEmpty)
+              Material(
+                elevation: 2,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: colorScheme.errorContainer,
+                    border: Border(
+                      bottom: BorderSide(color: colorScheme.error, width: 1),
                     ),
                   ),
-                ],
-                icon: const Icon(Icons.more_vert, size: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-          ],
-        ),
-      ),
-      // Caption
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Text(
-          post['content'] ?? '',
-          style: const TextStyle(fontSize: 14, height: 1.4),
-        ),
-      ),
-      // Media
-      if (imageUrl != null) ...[
-        ClipRRect(
-          borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
-          child: FutureBuilder<double>(
-            future: getImageAspectRatio(imageUrl),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return Container(
-                  height: 200,
-                  color: Colors.grey[200],
-                  child: const Center(child: CircularProgressIndicator()),
-                );
-              } else if (snapshot.hasError || !snapshot.hasData) {
-                return Container(
-                  height: 200,
-                  color: Colors.grey[200],
-                  child: const Icon(Icons.image_not_supported, color: Colors.grey),
-                );
-              }
-
-              return AspectRatio(
-                aspectRatio: snapshot.data!,
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[200],
-                      child: const Icon(Icons.image_not_supported, color: Colors.grey),
-                    );
-                  },
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return Container(
-                      color: Colors.grey[200],
-                      child: const Center(child: CircularProgressIndicator()),
-                    );
-                  },
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-
-                // Actions
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-                  child: Column(
+                  child: Row(
                     children: [
-                      Row(
-                        children: [
-                          GestureDetector(
-                            onTap: () => _toggleLike(postId, index),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.favorite_border, size: 24, color: Colors.red),
-                                const SizedBox(width: 4),
-                                Text('${post['like_count'] ?? 0}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                                const SizedBox(width: 16),
-                              ],
-                            ),
+                      Icon(Icons.cloud_off, color: colorScheme.error, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Showing cached posts. Pull to refresh.',
+                          style: TextStyle(
+                            color: colorScheme.onErrorContainer,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
                           ),
-                          GestureDetector(
-                            onTap: () => _toggleCommentVisibility(postId),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.mode_comment_outlined, size: 24),
-                                const SizedBox(width: 4),
-                                Text('${post['comment_count'] ?? 0}', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                                const SizedBox(width: 16),
-                              ],
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => _sharePost(postId),
-                            child: const Icon(Icons.share_outlined, size: 24),
-                          ),
-                          const Spacer(),
-                          GestureDetector(
-                            onTap: () => _savePost(postId),
-                            child: const Icon(Icons.bookmark_border, size: 24),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${post['like_count'] ?? 0} likes',
-                        style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                // Comments Section
-                if (showCommentsMap[postId] == true) ...[
-                  const Divider(height: 1),
-                  SizedBox(
-                    height: 300,
-                    child: (commentLoadingMap[postId] ?? false)
-                        ? ListView.separated(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: 3,
-                            separatorBuilder: (context, index) => const Divider(height: 1, indent: 56),
-                            itemBuilder: (context, index) => const CommentSkeleton(),
-                          )
-                        : ((commentsMap[postId]?.isEmpty ?? true)
-                            ? Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(16),
-                                  child: Text(
-                                    networkError ? 'Cannot load comments due to network issue.' : 'No comments yet',
-                                    style: const TextStyle(color: Colors.grey),
-                                  ),
-                                ),
-                              )
-                            : _buildCommentsList(postId)),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: commentControllers[postId],
-                            focusNode: commentFocusNodes[postId],
-                            decoration: InputDecoration(
-                              hintText: 'Add a comment...',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(20),
-                                borderSide: const BorderSide(color: Colors.blue),
-                              ),
-                              filled: true,
-                              fillColor: Colors.grey[50],
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            ),
-                            onSubmitted: (value) => _postComment(postId, value.trim()),
-                            maxLines: null,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        GestureDetector(
-                          onTap: () {
-                            final text = commentControllers[postId]?.text.trim() ?? '';
-                            if (text.isNotEmpty) _postComment(postId, text);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.blue,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(Icons.send, color: Colors.white, size: 18),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          );
-        },
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _refreshPosts,
-        child: Column(
-          children: [
-            if (networkError)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                color: Colors.red[50],
-                child: Row(
-                  children: [
-                    const Icon(Icons.warning, color: Colors.red),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'No internet connection. Some features may not work.',
-                        style: TextStyle(color: Colors.red),
-                      ),
-                    ),
-                  ],
                 ),
               ),
             Expanded(child: _buildList()),
@@ -955,10 +2206,20 @@ return Card(
       final date = DateTime.parse(timeString);
       final now = DateTime.now();
       final diff = now.difference(date);
-      if (diff.inDays > 0) return '${diff.inDays}d ago';
-      if (diff.inHours > 0) return '${diff.inHours}h ago';
-      if (diff.inMinutes > 0) return '${diff.inMinutes}m ago';
-      return 'Just now';
+      
+      if (diff.inDays > 365) {
+        return '${(diff.inDays / 365).floor()}y ago';
+      } else if (diff.inDays > 30) {
+        return '${(diff.inDays / 30).floor()}mo ago';
+      } else if (diff.inDays > 0) {
+        return '${diff.inDays}d ago';
+      } else if (diff.inHours > 0) {
+        return '${diff.inHours}h ago';
+      } else if (diff.inMinutes > 0) {
+        return '${diff.inMinutes}m ago';
+      } else {
+        return 'Just now';
+      }
     } catch (_) {
       return timeString;
     }
