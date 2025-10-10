@@ -9,8 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ideaship/auth/auth_log_reg.dart';
 import 'feed/posts.dart'; // Import the PostsPage from feed/posts.dart
 // Import CreatePostPage
-import 'settings/usersettings.dart'; // Import UserSettingsPage
-import 'jobs/job_drawer.dart'; // Import the updated JobDrawer
+import 'settings/usersettings.dart'; // Import SettingsPage
+import 'jobs/job_drawer.dart'; // Import the updated JobDrawer 
+import 'user/userprofile.dart'; // Import UserProfile
 // TODO: Import other pages as needed, e.g.,
 // import 'feed/startups.dart';
 // import 'feed/investors.dart';
@@ -45,7 +46,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this); // Updated to 5 tabs
+    _tabController = TabController(length: 2, vsync: this); 
     _loadUserData();
     _loadThemePreference();
   }
@@ -139,8 +140,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     );
   }
 
-  // Call this method from other pages (e.g., PostsPage) to show backend errors
-  // You can pass the DashboardPage's state or use a callback/GlobalKey to access this
+ 
   void showBackendError(String errorMessage) {
     _showErrorBanner(errorMessage);
   }
@@ -150,8 +150,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   }
 
   void _showMessageDialog() {
-    // TODO: Navigate to chat/message.dart instead of dialog
-    // Navigator.push(context, MaterialPageRoute(builder: (context) => MessagePage()));
+   
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -204,6 +203,13 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     _showMessageDialog();
   }
 
+  void _handleSearchPress() {
+    showSearch(
+      context: context,
+      delegate: PostSearchDelegate(),
+    );
+  }
+
   ColorScheme _buildColorScheme() {
     final primaryColor = const Color(0xFF1268D1);
     if (_isDarkMode) {
@@ -212,9 +218,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
         onPrimary: Colors.white,
         surface: const Color(0xFF121212),
         onSurface: Colors.white,
-        background: const Color(0xFF121212),
-        onBackground: Colors.white,
-        surfaceVariant: const Color(0xFF1E1E1E),
+        surfaceContainerHighest: const Color(0xFF1E1E1E),
         onSurfaceVariant: Colors.grey[400]!,
         outline: Colors.grey[700]!,
         error: Colors.red,
@@ -228,9 +232,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
         onPrimary: Colors.white,
         surface: Colors.white,
         onSurface: Colors.black87,
-        background: Colors.white,
-        onBackground: Colors.black87,
-        surfaceVariant: Colors.grey[100]!,
+        surfaceContainerHighest: Colors.grey[100]!,
         onSurfaceVariant: Colors.black54,
         outline: Colors.grey[400]!,
         error: Colors.red,
@@ -243,6 +245,13 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
 
   AppBar _buildAppBar(ColorScheme colorScheme) {
     List<Widget> actions = [
+      IconButton(
+        onPressed: _handleSearchPress,
+        icon: const Icon(
+          Icons.search,
+          color: Colors.black87,
+        ),
+      ),
       IconButton(
         onPressed: _isNotificationActive ? null : _handleNotificationPress,
         icon: Icon(
@@ -258,9 +267,14 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
         ),
       ),
       IconButton(
-        onPressed: _toggleTheme,
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const UserProfile()),
+          );
+        },
         icon: Icon(
-          _isDarkMode ? Icons.light_mode : Icons.dark_mode,
+          Icons.account_circle,
           color: colorScheme.onSurface,
         ),
       ),
@@ -391,7 +405,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     final themeData = ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: colorScheme.background,
+      scaffoldBackgroundColor: colorScheme.surface,
     );
 
     return Theme(
@@ -475,6 +489,57 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
               )),
         ],
       ),
+    );
+  }
+}
+
+class PostSearchDelegate extends SearchDelegate {
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, null);
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    // TODO: Implement actual search results based on query
+    // For example, filter posts or search API
+    return ListView(
+      children: [
+        ListTile(
+          title: Text('Search results for "$query"'),
+          subtitle: const Text('TODO: Implement search functionality'),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    // TODO: Implement suggestions based on query
+    return ListView(
+      children: [
+        ListTile(
+          title: Text('Suggestions for "$query"'),
+          subtitle: const Text('TODO: Implement suggestions'),
+        ),
+      ],
     );
   }
 }

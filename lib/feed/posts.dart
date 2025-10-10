@@ -116,7 +116,7 @@ class PostSkeleton extends StatelessWidget {
               height: 200,
               width: double.infinity,
               decoration: BoxDecoration(
-                color: colorScheme.surfaceVariant,
+                color: colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
@@ -165,7 +165,7 @@ class CommentSkeleton extends StatelessWidget {
                   height: 14,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceVariant,
+                    color: colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -174,7 +174,7 @@ class CommentSkeleton extends StatelessWidget {
                   height: 12,
                   width: double.infinity,
                   decoration: BoxDecoration(
-                    color: colorScheme.surfaceVariant,
+                    color: colorScheme.surfaceContainerHighest,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
@@ -586,17 +586,15 @@ class _CommentsPageState extends State<CommentsPage> {
         body += '&parent_comment_id=$parentCommentId';
       }
       final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/add_comment'),
+        Uri.parse('https://server.awarcrown.com/feed/submit_comment'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: body,
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data is Map<String, dynamic> && mounted) {
-          if (data['comment'] != null) {
-            comments.insert(0, data['comment']);
-          }
+        if (data is Map<String, dynamic> && data['status'] == 'success' && mounted) {
+          comments.insert(0, data);
           
           commentController.clear();
           setState(() {
@@ -605,6 +603,10 @@ class _CommentsPageState extends State<CommentsPage> {
           });
           final message = parentCommentId != null ? 'Reply posted' : 'Comment posted';
           _showSuccess(message);
+        } else if (data is Map<String, dynamic> && data['status'] == 'error') {
+          _showError(data['message'] ?? 'Failed to post comment');
+        } else {
+          _showError('Failed to post comment');
         }
       } else {
         throw http.ClientException('Server error: ${response.statusCode}');
@@ -834,7 +836,7 @@ class _CommentsPageState extends State<CommentsPage> {
             height: 200,
             width: double.infinity,
             decoration: BoxDecoration(
-              color: colorScheme.surfaceVariant,
+              color: colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -866,7 +868,7 @@ class _CommentsPageState extends State<CommentsPage> {
                   return Container(
                     height: 200,
                     decoration: BoxDecoration(
-                      color: colorScheme.surfaceVariant,
+                      color: colorScheme.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
@@ -904,7 +906,7 @@ class _CommentsPageState extends State<CommentsPage> {
                       height: maxHeight,
                       width: scaledWidth,
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceVariant,
+                        color: colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Icon(
@@ -1124,7 +1126,7 @@ class _CommentsPageState extends State<CommentsPage> {
                       margin: const EdgeInsets.only(right: 8),
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceVariant,
+                        color: colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
@@ -1159,18 +1161,18 @@ class _CommentsPageState extends State<CommentsPage> {
                       hintStyle: TextStyle(color: colorScheme.onSurfaceVariant),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: colorScheme.outline!),
+                        borderSide: BorderSide(color: colorScheme.outline),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: colorScheme.outline!),
+                        borderSide: BorderSide(color: colorScheme.outline),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
                         borderSide: BorderSide(color: colorScheme.primary, width: 2),
                       ),
                       filled: true,
-                      fillColor: colorScheme.surfaceVariant,
+                      fillColor: colorScheme.surfaceContainerHighest,
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 12),
                     ),
@@ -1931,7 +1933,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                                     height: 200,
                                     width: double.infinity,
                                     decoration: BoxDecoration(
-                                      color: colorScheme.surfaceVariant,
+                                      color: colorScheme.surfaceContainerHighest,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: Icon(
@@ -1956,7 +1958,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                                         return Container(
                                           height: 200,
                                           decoration: BoxDecoration(
-                                            color: colorScheme.surfaceVariant,
+                                            color: colorScheme.surfaceContainerHighest,
                                             borderRadius: BorderRadius.circular(12),
                                           ),
                                           child: Icon(
