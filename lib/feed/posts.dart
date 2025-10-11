@@ -71,7 +71,6 @@ class PostSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
     final colorScheme = Theme.of(context).colorScheme;
     return Card(
       elevation: 2,
@@ -950,7 +949,7 @@ class _CommentsPageState extends State<CommentsPage> {
                     radius: 20,
                     backgroundImage: post['profile_picture'] != null
                         ? NetworkImage(
-                            'https://server.awarcrown.com/feed/${post['profile_picture']}')
+                            'https://server.awarcrown.com/accessprofile/uploads/${post['profile_picture']}')
                         : null,
                     child: post['profile_picture'] == null
                         ? Icon(Icons.person, color: colorScheme.onSurfaceVariant)
@@ -1839,7 +1838,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                         radius: 20,
                         backgroundImage: post['profile_picture'] != null
                             ? NetworkImage(
-                                'https://server.awarcrown.com/feed/${post['profile_picture']}')
+                                'https://server.awarcrown.com/accessprofile/uploads/${post['profile_picture']}')
                             : null,
                         child: post['profile_picture'] == null
                             ? Icon(Icons.person, color: colorScheme.onSurfaceVariant)
