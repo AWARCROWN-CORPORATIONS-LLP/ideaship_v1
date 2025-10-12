@@ -3,6 +3,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:ideaship/feed/createpost.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 // ignore: unused_import
@@ -285,10 +286,19 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
         elevation: 0.4,
         backgroundColor: colorScheme.surface,
         title: Text("Ideaship",
-            style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurface,
-                fontSize: 25)),
+            style: GoogleFonts.playfairDisplay(
+              fontWeight: FontWeight.w700,
+              fontStyle: FontStyle.italic,
+              color: colorScheme.primary,
+              fontSize: 30,
+              shadows: [
+                Shadow(
+                  offset: const Offset(1, 1),
+                  blurRadius: 5,
+                  color: colorScheme.primary.withOpacity(0.5),
+                ),
+              ],
+            )),
         actions: actions,
         bottom: TabBar(
           controller: _tabController,

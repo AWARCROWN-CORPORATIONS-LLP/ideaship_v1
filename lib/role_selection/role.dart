@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'studentrole.dart';
 import 'companyrole.dart';
+import 'startuprole.dart';
 // import other role files as needed
 
 Widget loadRolePage(String route) {
@@ -16,7 +17,9 @@ Widget loadRolePage(String route) {
       return const StudentRolePage();
     case 'companyrole.dart':
       return const CompanyRolePage();
-    // Add cases for other roles
+    case 'startuprole.dart':
+      return const StartupRolePage();
+    
     default:
       return Container(
         color: Colors.grey[200],
@@ -42,56 +45,13 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       'route': 'studentrole.dart',
       'heroTag': 'student-icon'
     },
-    {
-      'title': 'Company/HR',
-      'subtitle': 'Looking to hire talent',
-      'icon': 'assets/company.svg',
-      'route': 'companyrole.dart',
-      'heroTag': 'company-icon'
-    },
+  
     {
       'title': 'Startup/Entrepreneur',
       'subtitle': 'Building solutions',
       'icon': 'assets/startup.svg',
       'route': 'startuprole.dart',
       'heroTag': 'startup-icon'
-    },
-    // {
-    //   'title': 'Investor',
-    //   'subtitle': 'Funding ventures',
-    //   'icon': 'assets/investor.svg',
-    //   'route': 'investorrole.dart',
-    //   'heroTag': 'investor-icon'
-    // },
-    {
-      'title': 'Mentor/Advisor',
-      'subtitle': 'Guiding professionals',
-      'icon': 'assets/mentor.svg',
-      'route': 'mentorrole.dart',
-      'heroTag': 'mentor-icon'
-    },
-    {
-      'title': 'Reporter/Journalist',
-      'subtitle': 'Creating & sharing news',
-      'icon': 'assets/reporter.svg',
-      'route': 'reporterrole.dart',
-      'heroTag': 'reporter-icon'
-
-
-    },
-   {
-     'title': 'Educator/Trainer',
-     'subtitle': 'Skill development',
-     'icon': 'assets/educator.svg',
-     'route': 'educatorrole.dart',
-     'heroTag': 'educator-icon'
-   },
-    {
-      'title': 'Researcher/Innovator',
-      'subtitle': 'Cutting-edge projects',
-      'icon': 'assets/researcher.svg',
-      'route': 'researcherrole.dart',
-      'heroTag': 'researcher-icon'
     },
     {
       'title': 'Freelancer/Consultant',
@@ -100,27 +60,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       'route': 'freelancerrole.dart',
       'heroTag': 'freelancer-icon'
     },
-    // {
-    //   'title': 'Incubator/Accelerator',
-    //   'subtitle': 'Startup support',
-    //   'icon': 'assets/incubator.svg',
-    //   'route': 'incubatorrole.dart',
-    //   'heroTag': 'incubator-icon'
-    // },
-    {
-      'title': 'Community/Non-Profit',
-      'subtitle': 'Social innovation',
-      'icon': 'assets/community.svg',
-      'route': 'communityrole.dart',
-      'heroTag': 'community-icon'
-    },
-    // {
-    //   'title': 'Government/Policy Maker',
-    //   'subtitle': 'Policy support',
-    //   'icon': 'assets/government.svg',
-    //   'route': 'governmentrole.dart',
-    //   'heroTag': 'government-icon'
-    // },
+    
     {
       'title': 'Service Provider',
       'subtitle': 'Legal & Tech support',
@@ -128,20 +68,8 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       'route': 'servicerole.dart',
       'heroTag': 'service-icon'
     },
-    // {
-    //   'title': 'Recruiter/Placement',
-    //   'subtitle': 'Job assistance',
-    //   'icon': 'assets/recruiter.svg',
-    //   'route': 'recruiterrole.dart',
-    //   'heroTag': 'recruiter-icon'
-    // },
-    // {
-    //   'title': 'Alumni/Professional',
-    //   'subtitle': 'Networking & stories',
-    //   'icon': 'assets/alumni.svg',
-    //   'route': 'alumnirole.dart',
-    //   'heroTag': 'alumni-icon'
-    // }
+    
+   
   ];
 
   List<Map<String, String>> filteredRoles = [];
@@ -253,7 +181,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
         print('Error checking form status: $e');
       }
 
-      // Fallback: redirect to role form if role exists
+      
       if (_role != null) {
         String route = _getRouteForRole(_role!);
         if (route.isNotEmpty && mounted) {
@@ -273,10 +201,16 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       case 'student':
       case 'professional':
         return 'studentrole.dart';
-      case 'company':
-      case 'hr':
-        return 'companyrole.dart';
-      // Add cases for other roles
+      
+      case 'startup':
+      case 'entrepreneur':
+        return 'startuprole.dart';
+      case 'freelancer':
+      case 'consultant':
+        return 'freelancerrole.dart';
+      case 'service provider':
+        return 'servicerole.dart';  
+
       default:
         return '';
     }
