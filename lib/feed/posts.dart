@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:io';
 import 'dart:async';
+import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'publicprofile.dart';
+
 class Skeleton extends StatefulWidget {
   final double height;
   final double width;
@@ -14,10 +16,11 @@ class Skeleton extends StatefulWidget {
   @override
   State<Skeleton> createState() => _SkeletonState();
 }
-class _SkeletonState extends State<Skeleton>
-    with SingleTickerProviderStateMixin {
+
+class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> gradientPosition;
+
   @override
   void initState() {
     super.initState();
@@ -33,11 +36,13 @@ class _SkeletonState extends State<Skeleton>
       });
     _controller.repeat();
   }
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
@@ -58,8 +63,10 @@ class _SkeletonState extends State<Skeleton>
     );
   }
 }
+
 class PostSkeleton extends StatelessWidget {
   const PostSkeleton({super.key});
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -133,8 +140,10 @@ class PostSkeleton extends StatelessWidget {
     );
   }
 }
+
 class CommentSkeleton extends StatelessWidget {
   const CommentSkeleton({super.key});
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -174,45 +183,7 @@ class CommentSkeleton extends StatelessWidget {
     );
   }
 }
-class ImageAspectRatioCache {
-  static final Map<String, double> _cache = {};
- 
-  static Future<double> getAspectRatio(String imageUrl) async {
-    if (_cache.containsKey(imageUrl)) {
-      return _cache[imageUrl]!;
-    }
-    final completer = Completer<ImageInfo>();
-    bool mounted = true;
-    final imageProvider = NetworkImage(imageUrl);
-    final stream = imageProvider.resolve(const ImageConfiguration());
-    final listener = ImageStreamListener(
-      (ImageInfo info, bool synchronousCall) {
-        if (mounted && !completer.isCompleted) {
-          completer.complete(info);
-        }
-      },
-      onError: (exception, stackTrace) {
-        if (mounted && !completer.isCompleted) {
-          completer.completeError(exception, stackTrace);
-        }
-      },
-    );
-    stream.addListener(listener);
-    try {
-      final imageInfo = await completer.future;
-      final aspectRatio = imageInfo.image.width / imageInfo.image.height.toDouble();
-      _cache[imageUrl] = aspectRatio;
-      return aspectRatio;
-    } catch (e) {
-      debugPrint('Error loading image aspect ratio: $e');
-      rethrow;
-    } finally {
-      stream.removeListener(listener);
-      mounted = false;
-    }
-  }
-  static void clear() => _cache.clear();
-}
+
 class CommentItem extends StatelessWidget {
   final dynamic comment;
   final int depth;
@@ -227,6 +198,7 @@ class CommentItem extends StatelessWidget {
     required this.onReply,
     required this.onLike,
   });
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -240,7 +212,7 @@ class CommentItem extends StatelessWidget {
           CircleAvatar(
             radius: 18,
             backgroundImage: comment['profile_picture'] != null
-                ? NetworkImage('https://server.awarcrown.com/${comment['profile_picture']}')
+                ? NetworkImage('https://server.awarcrown.com/accessprofile/uploads/${comment['profile_picture']}')
                 : null,
             child: comment['profile_picture'] == null
                 ? Icon(Icons.person, size: 18, color: colorScheme.onSurfaceVariant)
@@ -319,13 +291,14 @@ class CommentItem extends StatelessWidget {
       ),
     );
   }
+
   static String _formatTimeStatic(String? timeString) {
     if (timeString == null) return 'Unknown';
     try {
       final date = DateTime.parse(timeString);
       final now = DateTime.now();
       final diff = now.difference(date);
-     
+
       if (diff.inDays > 365) {
         return '${(diff.inDays / 365).floor()}y ago';
       } else if (diff.inDays > 30) {
@@ -344,6 +317,7 @@ class CommentItem extends StatelessWidget {
     }
   }
 }
+
 class CommentsPage extends StatefulWidget {
   final dynamic post;
   final List<dynamic> comments;
@@ -356,9 +330,11 @@ class CommentsPage extends StatefulWidget {
     required this.username,
     required this.userId,
   });
+
   @override
   State<CommentsPage> createState() => _CommentsPageState();
 }
+
 class _CommentsPageState extends State<CommentsPage> {
   late dynamic post;
   late String _username;
@@ -372,6 +348,7 @@ class _CommentsPageState extends State<CommentsPage> {
   int? replyToCommentId;
   String replyToUsername = '';
   final Map<int, bool> commentIsReacting = {};
+
   @override
   void initState() {
     super.initState();
@@ -387,11 +364,13 @@ class _CommentsPageState extends State<CommentsPage> {
       _fetchComments();
     }
   }
+
   Future<void> _initializeUserId() async {
     if (_userId == null || _userId == 0) {
       await _fetchUserId();
     }
   }
+
   Future<void> _fetchUserId() async {
     if (_username.isEmpty) return;
     try {
@@ -415,12 +394,14 @@ class _CommentsPageState extends State<CommentsPage> {
       _showError(_getErrorMessage(e));
     }
   }
+
   @override
   void dispose() {
     commentController.dispose();
     focusNode.dispose();
     super.dispose();
   }
+
   Future<void> _queueLikeAction(Map<String, dynamic> actionMap) async {
     final prefs = await SharedPreferences.getInstance();
     List<dynamic> queue = [];
@@ -431,6 +412,7 @@ class _CommentsPageState extends State<CommentsPage> {
     queue.add(actionMap);
     await prefs.setString('like_queue', json.encode(queue));
   }
+
   Future<void> _processLikeQueue() async {
     if (_userId == null || _userId == 0) return;
     final prefs = await SharedPreferences.getInstance();
@@ -445,7 +427,7 @@ class _CommentsPageState extends State<CommentsPage> {
       return;
     }
     bool allSuccess = true;
-    for (var item in List.from(queue)) { // Copy to avoid modification during iteration
+    for (var item in List.from(queue)) {
       try {
         String endpoint;
         String body;
@@ -475,7 +457,7 @@ class _CommentsPageState extends State<CommentsPage> {
       await prefs.remove('like_queue');
       if (mounted) {
         _showSuccess('Synced offline actions');
-        _fetchComments(); // Refetch to update comment likes
+        _fetchComments();
         setState(() {
           isLiked = post['is_liked'] ?? false;
           likeCount = post['like_count'] ?? 0;
@@ -483,6 +465,7 @@ class _CommentsPageState extends State<CommentsPage> {
       }
     }
   }
+
   String _getErrorMessage(dynamic e) {
     if (e is SocketException) {
       return 'No internet connection. Please check your connection and try again.';
@@ -494,6 +477,7 @@ class _CommentsPageState extends State<CommentsPage> {
       return 'An unexpected error occurred. Please try again.';
     }
   }
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -505,6 +489,7 @@ class _CommentsPageState extends State<CommentsPage> {
       ),
     );
   }
+
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -516,6 +501,7 @@ class _CommentsPageState extends State<CommentsPage> {
       ),
     );
   }
+
   Future<void> _fetchComments() async {
     await _processLikeQueue();
     if (commentLoading || _username.isEmpty) return;
@@ -541,6 +527,7 @@ class _CommentsPageState extends State<CommentsPage> {
       if (mounted) setState(() => commentLoading = false);
     }
   }
+
   Future<void> _toggleLike() async {
     if (_userId == null || _userId == 0 || !mounted) {
       _showError('User not authenticated. Please log in again.');
@@ -593,6 +580,7 @@ class _CommentsPageState extends State<CommentsPage> {
       }
     }
   }
+
   Future<void> _toggleCommentReaction(int commentId) async {
     if (_userId == null || _userId == 0 || !mounted) {
       _showError('User not authenticated. Please log in again.');
@@ -651,9 +639,10 @@ class _CommentsPageState extends State<CommentsPage> {
       }
     }
   }
+
   Future<void> _postComment(String text, {int? parentCommentId}) async {
     if (text.isEmpty || _username.isEmpty) return;
-   
+
     try {
       String body = 'post_id=${post['post_id']}&username=${Uri.encodeComponent(_username)}&comment=${Uri.encodeComponent(text)}';
       if (parentCommentId != null) {
@@ -668,7 +657,7 @@ class _CommentsPageState extends State<CommentsPage> {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && data['status'] == 'success' && mounted) {
           comments.insert(0, data);
-         
+
           commentController.clear();
           setState(() {
             replyToCommentId = null;
@@ -688,9 +677,10 @@ class _CommentsPageState extends State<CommentsPage> {
       _showError('Failed to post comment: ${_getErrorMessage(e)}');
     }
   }
+
   Future<void> _sharePost(int postId) async {
     if (_username.isEmpty) return;
-   
+
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/share_post'),
@@ -709,9 +699,10 @@ class _CommentsPageState extends State<CommentsPage> {
       _showError('Failed to share post: ${_getErrorMessage(e)}');
     }
   }
+
   Future<void> _deletePost(int postId) async {
     if (_username.isEmpty) return;
-   
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -737,7 +728,7 @@ class _CommentsPageState extends State<CommentsPage> {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       ).timeout(const Duration(seconds: 10));
-     
+
       if (response.statusCode == 200 && mounted) {
         Navigator.pop(context);
         _showSuccess('Post deleted successfully');
@@ -748,16 +739,17 @@ class _CommentsPageState extends State<CommentsPage> {
       _showError('Failed to delete post: ${_getErrorMessage(e)}');
     }
   }
+
   Future<void> _savePost(int postId) async {
     if (_username.isEmpty) return;
-   
+
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/save_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       ).timeout(const Duration(seconds: 10));
-     
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -770,6 +762,7 @@ class _CommentsPageState extends State<CommentsPage> {
       _showError('Failed to save post: ${_getErrorMessage(e)}');
     }
   }
+
   void _navigateToProfile(String username, int userId) {
     Navigator.push(
       context,
@@ -778,10 +771,12 @@ class _CommentsPageState extends State<CommentsPage> {
       ),
     );
   }
+
   bool _isOwnPost() {
     if (_userId == null || _userId == 0) return false;
     return post['user_id'] == _userId;
   }
+
   void _addCommentsToFlat(List<dynamic> flat, dynamic comment, int depth) {
     (comment as Map<String, dynamic>)['_depth'] = depth;
     flat.add(comment);
@@ -793,9 +788,10 @@ class _CommentsPageState extends State<CommentsPage> {
       _addCommentsToFlat(flat, child, depth + 1);
     }
   }
+
   Widget _buildCommentsList() {
     final allComments = comments;
-   
+
     if (allComments.isEmpty) {
       return ListView(
         physics: const BouncingScrollPhysics(),
@@ -854,13 +850,14 @@ class _CommentsPageState extends State<CommentsPage> {
       },
     );
   }
+
   String _formatTime(String? timeString) {
     if (timeString == null) return 'Unknown';
     try {
       final date = DateTime.parse(timeString);
       final now = DateTime.now();
       final diff = now.difference(date);
-     
+
       if (diff.inDays > 365) {
         return '${(diff.inDays / 365).floor()}y ago';
       } else if (diff.inDays > 30) {
@@ -878,109 +875,46 @@ class _CommentsPageState extends State<CommentsPage> {
       return timeString;
     }
   }
+
   Widget _buildPostMedia(String imageUrl) {
+    const double aspectRatio = 16 / 9; // Fixed 16:9 aspect ratio like Instagram
     final screenWidth = MediaQuery.of(context).size.width - 32; // Account for padding
-    final colorScheme = Theme.of(context).colorScheme;
-    return FutureBuilder<double>(
-      future: ImageAspectRatioCache.getAspectRatio(imageUrl),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            height: 200,
+    final imageHeight = screenWidth / aspectRatio;
+
+    return SizedBox(
+      width: screenWidth,
+      height: imageHeight,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: CachedNetworkImage(
+          imageUrl: imageUrl,
+          fit: BoxFit.cover,
+          memCacheWidth: (screenWidth * MediaQuery.of(context).devicePixelRatio).round(),
+          memCacheHeight: (imageHeight * MediaQuery.of(context).devicePixelRatio).round(),
+          maxWidthDiskCache: (screenWidth * MediaQuery.of(context).devicePixelRatio).round(),
+          maxHeightDiskCache: (imageHeight * MediaQuery.of(context).devicePixelRatio).round(),
+          fadeInDuration: const Duration(milliseconds: 200),
+          fadeOutDuration: const Duration(milliseconds: 200),
+          placeholder: (context, url) => const Skeleton(
+            height: double.infinity,
             width: double.infinity,
-            child: Skeleton(height: 200, width: double.infinity),
-          );
-        } else if (snapshot.hasError || !snapshot.hasData) {
-          return Container(
-            height: 200,
-            width: double.infinity,
+          ),
+          errorWidget: (context, url, error) => Container(
             decoration: BoxDecoration(
-              color: colorScheme.surfaceContainerHighest,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
               Icons.image_not_supported,
-              color: colorScheme.onSurfaceVariant,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               size: 48,
             ),
-          );
-        }
-        final aspectRatio = snapshot.data!;
-        final desiredHeight = screenWidth / aspectRatio;
-        final maxHeight = MediaQuery.of(context).size.height * 0.4; // 40% of screen height max
-        if (desiredHeight <= maxHeight) {
-          // Image fits within max height, use full aspect ratio
-          return AspectRatio(
-            aspectRatio: aspectRatio,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return const Skeleton(height: 200, width: double.infinity);
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    height: 200,
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      Icons.image_not_supported,
-                      color: colorScheme.onSurfaceVariant,
-                      size: 48,
-                    ),
-                  );
-                },
-              ),
-            ),
-          );
-        } else {
-          // Image too tall, scale down to maxHeight while maintaining aspect ratio
-          final scale = maxHeight / desiredHeight;
-          final scaledWidth = screenWidth * scale;
-          return SizedBox(
-            width: scaledWidth,
-            height: maxHeight,
-            child: FittedBox(
-              fit: BoxFit.cover,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  imageUrl,
-                  width: screenWidth,
-                  height: desiredHeight,
-                  fit: BoxFit.cover,
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Skeleton(height: 200, width: double.infinity);
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      height: maxHeight,
-                      width: scaledWidth,
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(
-                        Icons.image_not_supported,
-                        color: colorScheme.onSurfaceVariant,
-                        size: 48,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-          );
-        }
-      },
+          ),
+        ),
+      ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -992,7 +926,6 @@ class _CommentsPageState extends State<CommentsPage> {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
-          // Header
           Container(
             color: colorScheme.surface,
             padding: const EdgeInsets.all(16),
@@ -1061,19 +994,16 @@ class _CommentsPageState extends State<CommentsPage> {
               ],
             ),
           ),
-          // Image
           if (imageUrl != null)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: _buildPostMedia(imageUrl),
             ),
-          // Actions
           Container(
             color: colorScheme.surface,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: [
-                // Like button
                 InkWell(
                   onTap: _toggleLike,
                   borderRadius: BorderRadius.circular(20),
@@ -1101,7 +1031,6 @@ class _CommentsPageState extends State<CommentsPage> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Share button
                 InkWell(
                   onTap: () => _sharePost(postId),
                   borderRadius: BorderRadius.circular(20),
@@ -1115,7 +1044,6 @@ class _CommentsPageState extends State<CommentsPage> {
                   ),
                 ),
                 const Spacer(),
-                // Save button
                 InkWell(
                   onTap: () => _savePost(postId),
                   borderRadius: BorderRadius.circular(20),
@@ -1131,7 +1059,6 @@ class _CommentsPageState extends State<CommentsPage> {
               ],
             ),
           ),
-          // Caption
           if (post['content'] != null && post['content'].isNotEmpty)
             Container(
               color: colorScheme.surface,
@@ -1150,7 +1077,6 @@ class _CommentsPageState extends State<CommentsPage> {
               ),
             ),
           Divider(height: 1, color: colorScheme.outline),
-          // Comments List
           Expanded(
             child: RefreshIndicator(
               onRefresh: _fetchComments,
@@ -1165,7 +1091,6 @@ class _CommentsPageState extends State<CommentsPage> {
                   : _buildCommentsList(),
             ),
           ),
-          // Input
           Container(
             color: colorScheme.surface,
             padding: const EdgeInsets.all(16),
@@ -1283,12 +1208,15 @@ class _CommentsPageState extends State<CommentsPage> {
     );
   }
 }
+
 class PostsPage extends StatefulWidget {
   const PostsPage({super.key});
+
   @override
   // ignore: library_private_types_in_public_api
   _PostsPageState createState() => _PostsPageState();
 }
+
 class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   List<dynamic> posts = [];
   bool isLoading = false;
@@ -1296,30 +1224,29 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   bool networkError = false;
   int? nextCursorId;
   final ScrollController _scrollController = ScrollController();
-  // Comments cache
   Map<int, List<dynamic>> commentsMap = {};
-  // Likes
   Map<int, bool> isLikingMap = {};
   Map<int, AnimationController> likeAnimationControllers = {};
   Map<int, bool> showHeartOverlay = {};
   Map<int, AnimationController> heartOverlayControllers = {};
-  // Current user
   String _username = '';
   int? _userId;
-  // Debouncing for scroll
   Timer? _scrollDebounceTimer;
+
   @override
   void initState() {
     super.initState();
     _initializeData();
     _scrollController.addListener(_onScroll);
   }
+
   Future<void> _initializeData() async {
     await _loadUsername();
     await _processLikeQueue();
     await _loadPostsFromCache();
     await _fetchPosts();
   }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -1332,6 +1259,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     }
     super.dispose();
   }
+
   Future<void> _queueLikeAction(Map<String, dynamic> actionMap) async {
     final prefs = await SharedPreferences.getInstance();
     List<dynamic> queue = [];
@@ -1342,6 +1270,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     queue.add(actionMap);
     await prefs.setString('like_queue', json.encode(queue));
   }
+
   Future<void> _processLikeQueue() async {
     if (_userId == null || _userId == 0) return;
     final prefs = await SharedPreferences.getInstance();
@@ -1356,7 +1285,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       return;
     }
     bool allSuccess = true;
-    for (var item in List.from(queue)) { // Copy to avoid modification during iteration
+    for (var item in List.from(queue)) {
       try {
         String endpoint;
         String body;
@@ -1386,10 +1315,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       await prefs.remove('like_queue');
       if (mounted) {
         _showSuccess('Synced offline actions');
-        await _refreshPosts(); // Refetch to ensure consistency
+        await _refreshPosts();
       }
     }
   }
+
   String _getErrorMessage(dynamic e) {
     if (e is SocketException) {
       return 'No internet connection. Please check your connection and try again.';
@@ -1401,6 +1331,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       return 'An unexpected error occurred. Please try again.';
     }
   }
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1412,6 +1343,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1423,6 +1355,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   Future<void> _savePostsToCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1432,15 +1365,15 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       debugPrint('Error saving posts to cache: $e');
     }
   }
+
   Future<void> _loadPostsFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? cachedPostsJson = prefs.getString('cached_posts');
       final int? timestamp = prefs.getInt('cache_timestamp');
-     
+
       if (cachedPostsJson != null && timestamp != null) {
         final cacheAge = DateTime.now().millisecondsSinceEpoch - timestamp;
-        // Cache valid for 1 hour
         if (cacheAge < 3600000) {
           final parsedPosts = json.decode(cachedPostsJson);
           if (parsedPosts is List && mounted) {
@@ -1454,6 +1387,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       debugPrint('Error loading posts from cache: $e');
     }
   }
+
   Future<void> _loadUsername() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1470,6 +1404,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       debugPrint('Error loading username: $e');
     }
   }
+
   Future<void> _fetchUserId() async {
     if (_username.isEmpty) return;
     try {
@@ -1493,6 +1428,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       _showError(_getErrorMessage(e));
     }
   }
+
   void _onScroll() {
     _scrollDebounceTimer?.cancel();
     _scrollDebounceTimer = Timer(const Duration(milliseconds: 200), () {
@@ -1505,9 +1441,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     });
   }
+
   Future<Map<String, dynamic>?> _fetchPostsData({int? cursorId}) async {
     if (_username.isEmpty) return null;
-   
+
     try {
       final params = {'username': _username};
       if (cursorId != null) params['cursorId'] = cursorId.toString();
@@ -1532,10 +1469,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       rethrow;
     }
   }
+
   Future<void> _fetchPosts({int? cursorId}) async {
     await _processLikeQueue();
     if (isLoading || _username.isEmpty) return;
-   
+
     if (mounted) setState(() => isLoading = true);
     try {
       final data = await _fetchPostsData(cursorId: cursorId);
@@ -1543,7 +1481,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         setState(() {
           networkError = false;
           final newPosts = data['posts'] ?? [];
-         
+
           if (cursorId == null) {
             posts = newPosts;
           } else {
@@ -1551,7 +1489,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                 !posts.any((existing) => existing['post_id'] == newPost['post_id'])).toList();
             posts.addAll(postsToAdd);
           }
-         
+
           nextCursorId = data['nextCursorId'];
           hasMore = nextCursorId != null;
         });
@@ -1566,11 +1504,13 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       if (mounted) setState(() => isLoading = false);
     }
   }
+
   Future<void> _fetchMorePosts() async {
     if (nextCursorId != null) {
       await _fetchPosts(cursorId: nextCursorId);
     }
   }
+
   Future<void> _refreshPosts() async {
     await _processLikeQueue();
     if (_username.isEmpty) return;
@@ -1605,6 +1545,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
+
   Future<void> _toggleLike(int postId, int index) async {
     if (_userId == null || _userId == 0 || !mounted) {
       _showError('User not authenticated. Please log in again.');
@@ -1622,7 +1563,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         posts[index]['like_count'] = optimisticCount;
       });
     }
-    // Animations for new like
     if (newLiked && !oldLiked) {
       final iconController = likeAnimationControllers.putIfAbsent(
         postId,
@@ -1691,9 +1631,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
+
   Future<void> _fetchComments(int postId) async {
     if (_username.isEmpty) return;
-   
+
     try {
       final url = 'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username)}';
       final response = await http
@@ -1713,9 +1654,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
+
   Future<void> _sharePost(int postId) async {
     if (_username.isEmpty) return;
-   
+
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/share_post'),
@@ -1734,9 +1676,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       _showError(_getErrorMessage(e));
     }
   }
+
   Future<void> _deletePost(int postId) async {
     if (_username.isEmpty) return;
-   
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1762,7 +1705,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       ).timeout(const Duration(seconds: 10));
-     
+
       if (response.statusCode == 200 && mounted) {
         setState(() => posts.removeWhere((p) => p['post_id'] == postId));
         await _savePostsToCache();
@@ -1774,16 +1717,17 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       _showError(_getErrorMessage(e));
     }
   }
+
   Future<void> _savePost(int postId) async {
     if (_username.isEmpty) return;
-   
+
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/save_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       ).timeout(const Duration(seconds: 10));
-     
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -1796,6 +1740,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       _showError(_getErrorMessage(e));
     }
   }
+
   void _navigateToProfile(String username, int userId) {
     Navigator.push(
       context,
@@ -1804,10 +1749,12 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   bool _isOwnPost(int postId, int index) {
     if (_userId == null || _userId == 0) return false;
     return posts[index]['user_id'] == _userId;
   }
+
   Widget _buildEmptyState() {
     final colorScheme = Theme.of(context).colorScheme;
     return Center(
@@ -1837,6 +1784,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   Widget _buildErrorState() {
     final colorScheme = Theme.of(context).colorScheme;
     return Center(
@@ -1872,6 +1820,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   Widget _buildList() {
     if (posts.isEmpty) {
       if (isLoading) {
@@ -1919,7 +1868,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Padding(
                 padding: const EdgeInsets.all(16),
                 child: Row(
@@ -1987,15 +1935,12 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-             
-              // Double-tap area: Caption and Media
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onDoubleTap: () => _toggleLike(postId, index),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Caption
                     if (post['content'] != null && post['content'].isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -2004,26 +1949,30 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                           style: TextStyle(fontSize: 14, height: 1.4, color: colorScheme.onSurface),
                         ),
                       ),
-                   
-                    // Media
                     if (imageUrl != null)
                       Stack(
                         children: [
                           Container(
                             margin: const EdgeInsets.symmetric(horizontal: 16),
-                            child: FutureBuilder<double>(
-                              future: ImageAspectRatioCache.getAspectRatio(imageUrl),
-                              builder: (context, snapshot) {
-                                if (snapshot.connectionState == ConnectionState.waiting) {
-                                  return const SizedBox(
-                                    height: 200,
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: (MediaQuery.of(context).size.width - 32) / (16 / 9),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: CachedNetworkImage(
+                                  imageUrl: imageUrl,
+                                  fit: BoxFit.cover,
+                                  memCacheWidth: ((MediaQuery.of(context).size.width - 32) * MediaQuery.of(context).devicePixelRatio).round(),
+                                  memCacheHeight: (((MediaQuery.of(context).size.width - 32) / (16 / 9)) * MediaQuery.of(context).devicePixelRatio).round(),
+                                  maxWidthDiskCache: ((MediaQuery.of(context).size.width - 32) * MediaQuery.of(context).devicePixelRatio).round(),
+                                  maxHeightDiskCache: (((MediaQuery.of(context).size.width - 32) / (16 / 9)) * MediaQuery.of(context).devicePixelRatio).round(),
+                                  fadeInDuration: const Duration(milliseconds: 200),
+                                  fadeOutDuration: const Duration(milliseconds: 200),
+                                  placeholder: (context, url) => const Skeleton(
+                                    height: double.infinity,
                                     width: double.infinity,
-                                    child: Skeleton(height: 200, width: double.infinity),
-                                  );
-                                } else if (snapshot.hasError || !snapshot.hasData) {
-                                  return Container(
-                                    height: 200,
-                                    width: double.infinity,
+                                  ),
+                                  errorWidget: (context, url, error) => Container(
                                     decoration: BoxDecoration(
                                       color: colorScheme.surfaceContainerHighest,
                                       borderRadius: BorderRadius.circular(12),
@@ -2033,41 +1982,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                                       color: colorScheme.onSurfaceVariant,
                                       size: 48,
                                     ),
-                                  );
-                                }
-                                return ClipRRect(
-                                  borderRadius: BorderRadius.circular(12),
-                                  child: AspectRatio(
-                                    aspectRatio: snapshot.data!,
-                                    child: Image.network(
-                                      imageUrl,
-                                      fit: BoxFit.cover,
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        return const Skeleton(height: 200, width: double.infinity);
-                                      },
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Container(
-                                          height: 200,
-                                          decoration: BoxDecoration(
-                                            color: colorScheme.surfaceContainerHighest,
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Icon(
-                                            Icons.image_not_supported,
-                                            color: colorScheme.onSurfaceVariant,
-                                            size: 48,
-                                          ),
-                                        );
-                                      },
-                                    ),
                                   ),
-                                );
-                              },
+                                ),
+                              ),
                             ),
                           ),
-                         
-                          // Heart overlay animation
                           if (showHeartOverlay[postId] ?? false)
                             Positioned.fill(
                               child: AnimatedBuilder(
@@ -2096,10 +2015,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-             
               const SizedBox(height: 12),
-             
-              // Actions
               Container(
                 color: colorScheme.surface,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -2108,7 +2024,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                   children: [
                     Row(
                       children: [
-                        // Like button
                         InkWell(
                           onTap: () => _toggleLike(postId, index),
                           borderRadius: BorderRadius.circular(20),
@@ -2157,10 +2072,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
-                       
                         const SizedBox(width: 12),
-                       
-                        // Comment button
                         InkWell(
                           onTap: () async {
                             await _fetchComments(postId);
@@ -2203,10 +2115,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
-                       
                         const SizedBox(width: 12),
-                       
-                        // Share button
                         InkWell(
                           onTap: () => _sharePost(postId),
                           borderRadius: BorderRadius.circular(20),
@@ -2219,10 +2128,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
-                       
                         const Spacer(),
-                       
-                        // Save button
                         InkWell(
                           onTap: () => _savePost(postId),
                           borderRadius: BorderRadius.circular(20),
@@ -2246,6 +2152,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       },
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -2292,13 +2199,14 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   String _formatTime(String? timeString) {
     if (timeString == null) return 'Unknown';
     try {
       final date = DateTime.parse(timeString);
       final now = DateTime.now();
       final diff = now.difference(date);
-     
+
       if (diff.inDays > 365) {
         return '${(diff.inDays / 365).floor()}y ago';
       } else if (diff.inDays > 30) {
