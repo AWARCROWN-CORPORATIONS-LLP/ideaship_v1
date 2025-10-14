@@ -13,11 +13,9 @@ import 'feed/posts.dart'; // Import the PostsPage from feed/posts.dart
 import 'settings/usersettings.dart'; // Import SettingsPage
 import 'jobs/job_drawer.dart'; // Import the updated JobDrawer 
 import 'user/userprofile.dart'; // Import UserProfile
-// TODO: Import other pages as needed, e.g.,
+
 // import 'feed/startups.dart';
-// import 'feed/investors.dart';
-// import 'feed/mentors.dart';
-// import 'feed/companies.dart';
+
 // import 'chat/message.dart';
 
 class DashboardPage extends StatefulWidget {

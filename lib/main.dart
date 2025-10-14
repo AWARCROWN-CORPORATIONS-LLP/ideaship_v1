@@ -77,7 +77,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _checkInitialRoute() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token'); // Assuming JWT token
+    final token = prefs.getString('token'); 
     final profileCompleted = prefs.getBool('profileCompleted') ?? false;
 
     if (mounted) {
@@ -138,7 +138,7 @@ class _SplashScreenState extends State<SplashScreen>
                         ),
                       ),
                     ),
-              // ✅ Footer
+              
               Padding(
                 padding: const EdgeInsets.only(bottom: 24.0),
                 child: Column(
@@ -162,9 +162,6 @@ class _SplashScreenState extends State<SplashScreen>
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
                         fontFamily: 'Lucida Console',
-                     
-
-
 
                       ),
                     ),

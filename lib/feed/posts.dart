@@ -5,24 +5,19 @@ import 'dart:io';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'publicprofile.dart';
-
-
 class Skeleton extends StatefulWidget {
   final double height;
   final double width;
   final String type;
   const Skeleton(
       {super.key, this.height = 20, this.width = 20, this.type = 'square'});
-
   @override
   State<Skeleton> createState() => _SkeletonState();
 }
-
 class _SkeletonState extends State<Skeleton>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> gradientPosition;
-
   @override
   void initState() {
     super.initState();
@@ -38,13 +33,11 @@ class _SkeletonState extends State<Skeleton>
       });
     _controller.repeat();
   }
-
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
-
   @override
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
@@ -65,10 +58,8 @@ class _SkeletonState extends State<Skeleton>
     );
   }
 }
-
 class PostSkeleton extends StatelessWidget {
   const PostSkeleton({super.key});
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -142,10 +133,8 @@ class PostSkeleton extends StatelessWidget {
     );
   }
 }
-
 class CommentSkeleton extends StatelessWidget {
   const CommentSkeleton({super.key});
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -185,19 +174,15 @@ class CommentSkeleton extends StatelessWidget {
     );
   }
 }
-
-
 class ImageAspectRatioCache {
   static final Map<String, double> _cache = {};
-  
+ 
   static Future<double> getAspectRatio(String imageUrl) async {
     if (_cache.containsKey(imageUrl)) {
       return _cache[imageUrl]!;
     }
-
     final completer = Completer<ImageInfo>();
     bool mounted = true;
-
     final imageProvider = NetworkImage(imageUrl);
     final stream = imageProvider.resolve(const ImageConfiguration());
     final listener = ImageStreamListener(
@@ -212,9 +197,7 @@ class ImageAspectRatioCache {
         }
       },
     );
-
     stream.addListener(listener);
-
     try {
       final imageInfo = await completer.future;
       final aspectRatio = imageInfo.image.width / imageInfo.image.height.toDouble();
@@ -228,17 +211,14 @@ class ImageAspectRatioCache {
       mounted = false;
     }
   }
-
   static void clear() => _cache.clear();
 }
-
 class CommentItem extends StatelessWidget {
   final dynamic comment;
   final int depth;
   final int postId;
   final Function(int, String) onReply;
   final Function(int, int) onLike;
-
   const CommentItem({
     super.key,
     required this.comment,
@@ -247,13 +227,11 @@ class CommentItem extends StatelessWidget {
     required this.onReply,
     required this.onLike,
   });
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isLiked = comment['current_reaction'] != null;
     final leftPadding = 16.0 + (depth * 24.0);
-
     return Padding(
       padding: EdgeInsets.only(left: leftPadding, top: 12.0, bottom: 12.0),
       child: Row(
@@ -341,14 +319,13 @@ class CommentItem extends StatelessWidget {
       ),
     );
   }
-
   static String _formatTimeStatic(String? timeString) {
     if (timeString == null) return 'Unknown';
     try {
       final date = DateTime.parse(timeString);
       final now = DateTime.now();
       final diff = now.difference(date);
-      
+     
       if (diff.inDays > 365) {
         return '${(diff.inDays / 365).floor()}y ago';
       } else if (diff.inDays > 30) {
@@ -367,13 +344,11 @@ class CommentItem extends StatelessWidget {
     }
   }
 }
-
 class CommentsPage extends StatefulWidget {
   final dynamic post;
   final List<dynamic> comments;
   final String username;
   final int? userId;
-
   const CommentsPage({
     super.key,
     required this.post,
@@ -381,11 +356,9 @@ class CommentsPage extends StatefulWidget {
     required this.username,
     required this.userId,
   });
-
   @override
   State<CommentsPage> createState() => _CommentsPageState();
 }
-
 class _CommentsPageState extends State<CommentsPage> {
   late dynamic post;
   late String _username;
@@ -399,7 +372,6 @@ class _CommentsPageState extends State<CommentsPage> {
   int? replyToCommentId;
   String replyToUsername = '';
   final Map<int, bool> commentIsReacting = {};
-
   @override
   void initState() {
     super.initState();
@@ -409,18 +381,119 @@ class _CommentsPageState extends State<CommentsPage> {
     isLiked = post['is_liked'] ?? false;
     likeCount = post['like_count'] ?? 0;
     comments = widget.comments;
+    _initializeUserId();
+    _processLikeQueue();
     if (comments.isEmpty) {
       _fetchComments();
     }
   }
-
+  Future<void> _initializeUserId() async {
+    if (_userId == null || _userId == 0) {
+      await _fetchUserId();
+    }
+  }
+  Future<void> _fetchUserId() async {
+    if (_username.isEmpty) return;
+    try {
+      final response = await http.get(
+        Uri.parse('https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(_username)}'),
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && data['error'] == null && data['user_id'] != null) {
+          _userId = data['user_id'];
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('user_id', _userId!);
+          if (mounted) setState(() {});
+        } else {
+          _showError(data['error'] ?? 'Failed to fetch user ID');
+        }
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      _showError(_getErrorMessage(e));
+    }
+  }
   @override
   void dispose() {
     commentController.dispose();
     focusNode.dispose();
     super.dispose();
   }
-
+  Future<void> _queueLikeAction(Map<String, dynamic> actionMap) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<dynamic> queue = [];
+    final queueStr = prefs.getString('like_queue');
+    if (queueStr != null) {
+      queue = json.decode(queueStr);
+    }
+    queue.add(actionMap);
+    await prefs.setString('like_queue', json.encode(queue));
+  }
+  Future<void> _processLikeQueue() async {
+    if (_userId == null || _userId == 0) return;
+    final prefs = await SharedPreferences.getInstance();
+    final queueStr = prefs.getString('like_queue');
+    if (queueStr == null || queueStr.isEmpty) {
+      await prefs.remove('like_queue');
+      return;
+    }
+    List<dynamic> queue = json.decode(queueStr);
+    if (queue.isEmpty) {
+      await prefs.remove('like_queue');
+      return;
+    }
+    bool allSuccess = true;
+    for (var item in List.from(queue)) { // Copy to avoid modification during iteration
+      try {
+        String endpoint;
+        String body;
+        if (item['type'] == 'post') {
+          endpoint = 'https://server.awarcrown.com/feed/like_action';
+          body = 'post_id=${item['id']}&user_id=$_userId';
+        } else if (item['type'] == 'comment') {
+          endpoint = 'https://server.awarcrown.com/feed/comment_reaction';
+          body = 'comment_id=${item['id']}&user_id=$_userId&action=${item['action']}';
+        } else {
+          continue;
+        }
+        final response = await http.post(
+          Uri.parse(endpoint),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: body,
+        ).timeout(const Duration(seconds: 10));
+        if (response.statusCode != 200) {
+          throw http.ClientException('Server error: ${response.statusCode}');
+        }
+      } catch (e) {
+        allSuccess = false;
+        break;
+      }
+    }
+    if (allSuccess) {
+      await prefs.remove('like_queue');
+      if (mounted) {
+        _showSuccess('Synced offline actions');
+        _fetchComments(); // Refetch to update comment likes
+        setState(() {
+          isLiked = post['is_liked'] ?? false;
+          likeCount = post['like_count'] ?? 0;
+        });
+      }
+    }
+  }
+  String _getErrorMessage(dynamic e) {
+    if (e is SocketException) {
+      return 'No internet connection. Please check your connection and try again.';
+    } else if (e is TimeoutException) {
+      return 'Request timed out. Please check your connection and try again.';
+    } else if (e is http.ClientException) {
+      return 'Network error occurred. Please try again.';
+    } else {
+      return 'An unexpected error occurred. Please try again.';
+    }
+  }
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -432,7 +505,6 @@ class _CommentsPageState extends State<CommentsPage> {
       ),
     );
   }
-
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -444,17 +516,15 @@ class _CommentsPageState extends State<CommentsPage> {
       ),
     );
   }
-
   Future<void> _fetchComments() async {
+    await _processLikeQueue();
     if (commentLoading || _username.isEmpty) return;
     if (mounted) setState(() => commentLoading = true);
-
     try {
       final url = 'https://server.awarcrown.com/feed/fetch_comments?post_id=${post['post_id']}&username=${Uri.encodeComponent(_username)}';
       final response = await http
           .get(Uri.parse(url))
           .timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -465,35 +535,33 @@ class _CommentsPageState extends State<CommentsPage> {
       }
     } catch (e) {
       if (mounted) {
-        _showError('Failed to load comments');
+        _showError(_getErrorMessage(e));
       }
     } finally {
       if (mounted) setState(() => commentLoading = false);
     }
   }
-
   Future<void> _toggleLike() async {
-    if (_userId == null || _userId == 0 || !mounted) return;
-
+    if (_userId == null || _userId == 0 || !mounted) {
+      _showError('User not authenticated. Please log in again.');
+      return;
+    }
     final oldLiked = isLiked;
     final oldCount = likeCount;
     final newLiked = !oldLiked;
     final newCount = oldCount + (newLiked ? 1 : -1);
-
     if (mounted) {
       setState(() {
         isLiked = newLiked;
         likeCount = newCount;
       });
     }
-
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/like_action'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=${post['post_id']}&user_id=$_userId',
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -510,44 +578,46 @@ class _CommentsPageState extends State<CommentsPage> {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          isLiked = oldLiked;
-          likeCount = oldCount;
-        });
-        _showError('Failed to ${newLiked ? 'like' : 'unlike'} post');
+      final isOfflineError = e is SocketException || e is TimeoutException;
+      if (isOfflineError) {
+        await _queueLikeAction({'type': 'post', 'id': post['post_id']});
+        _showSuccess('Like action queued offline');
+      } else {
+        if (mounted) {
+          setState(() {
+            isLiked = oldLiked;
+            likeCount = oldCount;
+          });
+          _showError('Failed to ${newLiked ? 'like' : 'unlike'} post: ${_getErrorMessage(e)}');
+        }
       }
     }
   }
-
   Future<void> _toggleCommentReaction(int commentId) async {
-    if (_userId == null || _userId == 0 || !mounted) return;
+    if (_userId == null || _userId == 0 || !mounted) {
+      _showError('User not authenticated. Please log in again.');
+      return;
+    }
     if (commentIsReacting[commentId] ?? false) return;
-
     final commentIndex = comments.indexWhere((c) => c['comment_id'] == commentId);
     if (commentIndex == -1) return;
-
     setState(() => commentIsReacting[commentId] = true);
-
     final comment = comments[commentIndex];
     final oldLiked = comment['current_reaction'] != null;
     final oldCount = comment['like_count'] ?? 0;
     final newLiked = !oldLiked;
     final newCount = oldCount + (newLiked ? 1 : -1);
-
     setState(() {
       comments[commentIndex]['current_reaction'] = newLiked ? 'like' : null;
       comments[commentIndex]['like_count'] = newCount;
     });
-
+    final action = newLiked ? 'like' : 'unlike';
     try {
-      final action = newLiked ? 'like' : 'unlike';
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/comment_reaction'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'comment_id=$commentId&user_id=$_userId&action=$action',
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -564,21 +634,26 @@ class _CommentsPageState extends State<CommentsPage> {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      setState(() {
-        comments[commentIndex]['current_reaction'] = oldLiked ? 'like' : null;
-        comments[commentIndex]['like_count'] = oldCount;
-      });
-      _showError('Failed to ${newLiked ? 'like' : 'unlike'} comment');
+      final isOfflineError = e is SocketException || e is TimeoutException;
+      if (isOfflineError) {
+        await _queueLikeAction({'type': 'comment', 'id': commentId, 'action': action});
+        _showSuccess('Like action queued offline');
+      } else {
+        setState(() {
+          comments[commentIndex]['current_reaction'] = oldLiked ? 'like' : null;
+          comments[commentIndex]['like_count'] = oldCount;
+        });
+        _showError('Failed to ${newLiked ? 'like' : 'unlike'} comment: ${_getErrorMessage(e)}');
+      }
     } finally {
       if (mounted) {
         setState(() => commentIsReacting[commentId] = false);
       }
     }
   }
-
   Future<void> _postComment(String text, {int? parentCommentId}) async {
     if (text.isEmpty || _username.isEmpty) return;
-    
+   
     try {
       String body = 'post_id=${post['post_id']}&username=${Uri.encodeComponent(_username)}&comment=${Uri.encodeComponent(text)}';
       if (parentCommentId != null) {
@@ -589,12 +664,11 @@ class _CommentsPageState extends State<CommentsPage> {
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: body,
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && data['status'] == 'success' && mounted) {
           comments.insert(0, data);
-          
+         
           commentController.clear();
           setState(() {
             replyToCommentId = null;
@@ -611,20 +685,18 @@ class _CommentsPageState extends State<CommentsPage> {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      _showError('Failed to post comment');
+      _showError('Failed to post comment: ${_getErrorMessage(e)}');
     }
   }
-
   Future<void> _sharePost(int postId) async {
     if (_username.isEmpty) return;
-    
+   
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/share_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -634,13 +706,12 @@ class _CommentsPageState extends State<CommentsPage> {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      _showError('Failed to share post');
+      _showError('Failed to share post: ${_getErrorMessage(e)}');
     }
   }
-
   Future<void> _deletePost(int postId) async {
     if (_username.isEmpty) return;
-    
+   
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -659,16 +730,14 @@ class _CommentsPageState extends State<CommentsPage> {
         ],
       ),
     );
-
     if (confirmed != true) return;
-
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/delete_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       ).timeout(const Duration(seconds: 10));
-      
+     
       if (response.statusCode == 200 && mounted) {
         Navigator.pop(context);
         _showSuccess('Post deleted successfully');
@@ -676,20 +745,19 @@ class _CommentsPageState extends State<CommentsPage> {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      _showError('Failed to delete post');
+      _showError('Failed to delete post: ${_getErrorMessage(e)}');
     }
   }
-
   Future<void> _savePost(int postId) async {
     if (_username.isEmpty) return;
-    
+   
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/save_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       ).timeout(const Duration(seconds: 10));
-      
+     
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -699,10 +767,9 @@ class _CommentsPageState extends State<CommentsPage> {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      _showError('Failed to save post');
+      _showError('Failed to save post: ${_getErrorMessage(e)}');
     }
   }
-
   void _navigateToProfile(String username, int userId) {
     Navigator.push(
       context,
@@ -711,12 +778,10 @@ class _CommentsPageState extends State<CommentsPage> {
       ),
     );
   }
-
   bool _isOwnPost() {
     if (_userId == null || _userId == 0) return false;
     return post['user_id'] == _userId;
   }
-
   void _addCommentsToFlat(List<dynamic> flat, dynamic comment, int depth) {
     (comment as Map<String, dynamic>)['_depth'] = depth;
     flat.add(comment);
@@ -728,10 +793,9 @@ class _CommentsPageState extends State<CommentsPage> {
       _addCommentsToFlat(flat, child, depth + 1);
     }
   }
-
   Widget _buildCommentsList() {
     final allComments = comments;
-    
+   
     if (allComments.isEmpty) {
       return ListView(
         physics: const BouncingScrollPhysics(),
@@ -750,7 +814,6 @@ class _CommentsPageState extends State<CommentsPage> {
         ],
       );
     }
-
     final flatComments = <dynamic>[];
     final mainComments = allComments
         .where((c) => c['parent_comment_id'] == null)
@@ -759,7 +822,6 @@ class _CommentsPageState extends State<CommentsPage> {
     for (var main in mainComments) {
       _addCommentsToFlat(flatComments, main, 0);
     }
-
     return ListView.separated(
       physics: const BouncingScrollPhysics(),
       shrinkWrap: false,
@@ -792,14 +854,13 @@ class _CommentsPageState extends State<CommentsPage> {
       },
     );
   }
-
   String _formatTime(String? timeString) {
     if (timeString == null) return 'Unknown';
     try {
       final date = DateTime.parse(timeString);
       final now = DateTime.now();
       final diff = now.difference(date);
-      
+     
       if (diff.inDays > 365) {
         return '${(diff.inDays / 365).floor()}y ago';
       } else if (diff.inDays > 30) {
@@ -817,7 +878,6 @@ class _CommentsPageState extends State<CommentsPage> {
       return timeString;
     }
   }
-
   Widget _buildPostMedia(String imageUrl) {
     final screenWidth = MediaQuery.of(context).size.width - 32; // Account for padding
     final colorScheme = Theme.of(context).colorScheme;
@@ -845,11 +905,9 @@ class _CommentsPageState extends State<CommentsPage> {
             ),
           );
         }
-
         final aspectRatio = snapshot.data!;
         final desiredHeight = screenWidth / aspectRatio;
         final maxHeight = MediaQuery.of(context).size.height * 0.4; // 40% of screen height max
-
         if (desiredHeight <= maxHeight) {
           // Image fits within max height, use full aspect ratio
           return AspectRatio(
@@ -923,7 +981,6 @@ class _CommentsPageState extends State<CommentsPage> {
       },
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -931,7 +988,6 @@ class _CommentsPageState extends State<CommentsPage> {
     final imageUrl = post['media_url'] != null && post['media_url'].isNotEmpty
         ? 'https://server.awarcrown.com${post['media_url']}'
         : null;
-
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
@@ -1227,15 +1283,12 @@ class _CommentsPageState extends State<CommentsPage> {
     );
   }
 }
-
 class PostsPage extends StatefulWidget {
   const PostsPage({super.key});
-
   @override
   // ignore: library_private_types_in_public_api
   _PostsPageState createState() => _PostsPageState();
 }
-
 class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   List<dynamic> posts = [];
   bool isLoading = false;
@@ -1243,36 +1296,30 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   bool networkError = false;
   int? nextCursorId;
   final ScrollController _scrollController = ScrollController();
-
   // Comments cache
   Map<int, List<dynamic>> commentsMap = {};
-
   // Likes
   Map<int, bool> isLikingMap = {};
   Map<int, AnimationController> likeAnimationControllers = {};
   Map<int, bool> showHeartOverlay = {};
   Map<int, AnimationController> heartOverlayControllers = {};
-
   // Current user
   String _username = '';
   int? _userId;
-
   // Debouncing for scroll
   Timer? _scrollDebounceTimer;
-
   @override
   void initState() {
     super.initState();
     _initializeData();
     _scrollController.addListener(_onScroll);
   }
-
   Future<void> _initializeData() async {
     await _loadUsername();
+    await _processLikeQueue();
     await _loadPostsFromCache();
     await _fetchPosts();
   }
-
   @override
   void dispose() {
     _scrollController.dispose();
@@ -1285,7 +1332,64 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     }
     super.dispose();
   }
-
+  Future<void> _queueLikeAction(Map<String, dynamic> actionMap) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<dynamic> queue = [];
+    final queueStr = prefs.getString('like_queue');
+    if (queueStr != null) {
+      queue = json.decode(queueStr);
+    }
+    queue.add(actionMap);
+    await prefs.setString('like_queue', json.encode(queue));
+  }
+  Future<void> _processLikeQueue() async {
+    if (_userId == null || _userId == 0) return;
+    final prefs = await SharedPreferences.getInstance();
+    final queueStr = prefs.getString('like_queue');
+    if (queueStr == null || queueStr.isEmpty) {
+      await prefs.remove('like_queue');
+      return;
+    }
+    List<dynamic> queue = json.decode(queueStr);
+    if (queue.isEmpty) {
+      await prefs.remove('like_queue');
+      return;
+    }
+    bool allSuccess = true;
+    for (var item in List.from(queue)) { // Copy to avoid modification during iteration
+      try {
+        String endpoint;
+        String body;
+        if (item['type'] == 'post') {
+          endpoint = 'https://server.awarcrown.com/feed/like_action';
+          body = 'post_id=${item['id']}&user_id=$_userId';
+        } else if (item['type'] == 'comment') {
+          endpoint = 'https://server.awarcrown.com/feed/comment_reaction';
+          body = 'comment_id=${item['id']}&user_id=$_userId&action=${item['action']}';
+        } else {
+          continue;
+        }
+        final response = await http.post(
+          Uri.parse(endpoint),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: body,
+        ).timeout(const Duration(seconds: 10));
+        if (response.statusCode != 200) {
+          throw http.ClientException('Server error: ${response.statusCode}');
+        }
+      } catch (e) {
+        allSuccess = false;
+        break;
+      }
+    }
+    if (allSuccess) {
+      await prefs.remove('like_queue');
+      if (mounted) {
+        _showSuccess('Synced offline actions');
+        await _refreshPosts(); // Refetch to ensure consistency
+      }
+    }
+  }
   String _getErrorMessage(dynamic e) {
     if (e is SocketException) {
       return 'No internet connection. Please check your connection and try again.';
@@ -1297,7 +1401,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       return 'An unexpected error occurred. Please try again.';
     }
   }
-
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1309,7 +1412,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
-
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1321,7 +1423,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
-
   Future<void> _savePostsToCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1331,13 +1432,12 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       debugPrint('Error saving posts to cache: $e');
     }
   }
-
   Future<void> _loadPostsFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final String? cachedPostsJson = prefs.getString('cached_posts');
       final int? timestamp = prefs.getInt('cache_timestamp');
-      
+     
       if (cachedPostsJson != null && timestamp != null) {
         final cacheAge = DateTime.now().millisecondsSinceEpoch - timestamp;
         // Cache valid for 1 hour
@@ -1354,7 +1454,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       debugPrint('Error loading posts from cache: $e');
     }
   }
-
   Future<void> _loadUsername() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1364,11 +1463,36 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
           _userId = prefs.getInt('user_id');
         });
       }
+      if (_userId == null || _userId == 0) {
+        await _fetchUserId();
+      }
     } catch (e) {
       debugPrint('Error loading username: $e');
     }
   }
-
+  Future<void> _fetchUserId() async {
+    if (_username.isEmpty) return;
+    try {
+      final response = await http.get(
+        Uri.parse('https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(_username)}'),
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && data['error'] == null && data['user_id'] != null) {
+          _userId = data['user_id'];
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('user_id', _userId!);
+          if (mounted) setState(() {});
+        } else {
+          _showError(data['error'] ?? 'Failed to fetch user ID');
+        }
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      _showError(_getErrorMessage(e));
+    }
+  }
   void _onScroll() {
     _scrollDebounceTimer?.cancel();
     _scrollDebounceTimer = Timer(const Duration(milliseconds: 200), () {
@@ -1381,23 +1505,19 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     });
   }
-
   Future<Map<String, dynamic>?> _fetchPostsData({int? cursorId}) async {
     if (_username.isEmpty) return null;
-    
+   
     try {
       final params = {'username': _username};
       if (cursorId != null) params['cursorId'] = cursorId.toString();
-
       final queryString = params.entries
           .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
           .join('&');
-
       final url = 'https://server.awarcrown.com/feed/fetch_posts?$queryString';
       final response = await http
           .get(Uri.parse(url))
           .timeout(const Duration(seconds: 20));
-
       if (response.statusCode == 200) {
         final parsed = json.decode(response.body);
         if (parsed is Map<String, dynamic>) {
@@ -1412,19 +1532,18 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       rethrow;
     }
   }
-
   Future<void> _fetchPosts({int? cursorId}) async {
+    await _processLikeQueue();
     if (isLoading || _username.isEmpty) return;
-    
+   
     if (mounted) setState(() => isLoading = true);
-
     try {
       final data = await _fetchPostsData(cursorId: cursorId);
       if (data != null && mounted) {
         setState(() {
           networkError = false;
           final newPosts = data['posts'] ?? [];
-          
+         
           if (cursorId == null) {
             posts = newPosts;
           } else {
@@ -1432,7 +1551,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                 !posts.any((existing) => existing['post_id'] == newPost['post_id'])).toList();
             posts.addAll(postsToAdd);
           }
-          
+         
           nextCursorId = data['nextCursorId'];
           hasMore = nextCursorId != null;
         });
@@ -1447,39 +1566,31 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       if (mounted) setState(() => isLoading = false);
     }
   }
-
   Future<void> _fetchMorePosts() async {
     if (nextCursorId != null) {
       await _fetchPosts(cursorId: nextCursorId);
     }
   }
-
   Future<void> _refreshPosts() async {
+    await _processLikeQueue();
     if (_username.isEmpty) return;
-
     setState(() {
       networkError = false;
       nextCursorId = null;
     });
-
     if (posts.isEmpty) {
       await _fetchPosts();
       return;
     }
-
     final oldFirstId = posts[0]['post_id'] as int;
-
     try {
       final data = await _fetchPostsData();
       if (data == null || !mounted) return;
-
       setState(() => networkError = false);
-
       final newPosts = data['posts'] ?? [];
       final newOnes = newPosts
           .where((p) => (p['post_id'] as int) > oldFirstId)
           .toList();
-
       if (newOnes.isNotEmpty && mounted) {
         setState(() {
           posts.insertAll(0, newOnes);
@@ -1494,25 +1605,23 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
-
   Future<void> _toggleLike(int postId, int index) async {
-    if (_userId == null || _userId == 0 || !mounted) return;
+    if (_userId == null || _userId == 0 || !mounted) {
+      _showError('User not authenticated. Please log in again.');
+      return;
+    }
     if (isLikingMap[postId] ?? false) return;
-
     setState(() => isLikingMap[postId] = true);
-
     final oldLiked = posts[index]['is_liked'] ?? false;
     final oldCount = posts[index]['like_count'] ?? 0;
     final newLiked = !oldLiked;
     final optimisticCount = oldCount + (newLiked ? 1 : -1);
-
     if (mounted) {
       setState(() {
         posts[index]['is_liked'] = newLiked;
         posts[index]['like_count'] = optimisticCount;
       });
     }
-
     // Animations for new like
     if (newLiked && !oldLiked) {
       final iconController = likeAnimationControllers.putIfAbsent(
@@ -1523,7 +1632,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         ),
       );
       iconController.forward().then((_) => iconController.reverse());
-
       final hasImage = posts[index]['media_url'] != null &&
           posts[index]['media_url'].isNotEmpty;
       if (hasImage && mounted) {
@@ -1542,14 +1650,12 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         });
       }
     }
-
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/like_action'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&user_id=$_userId',
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -1566,12 +1672,18 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          posts[index]['is_liked'] = oldLiked;
-          posts[index]['like_count'] = oldCount;
-        });
-        _showError('Failed to ${newLiked ? 'like' : 'unlike'} post');
+      final isOfflineError = e is SocketException || e is TimeoutException;
+      if (isOfflineError) {
+        await _queueLikeAction({'type': 'post', 'id': postId});
+        _showSuccess('Like action queued offline');
+      } else {
+        if (mounted) {
+          setState(() {
+            posts[index]['is_liked'] = oldLiked;
+            posts[index]['like_count'] = oldCount;
+          });
+          _showError('Failed to ${newLiked ? 'like' : 'unlike'} post: ${_getErrorMessage(e)}');
+        }
       }
     } finally {
       if (mounted) {
@@ -1579,16 +1691,14 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
-
   Future<void> _fetchComments(int postId) async {
     if (_username.isEmpty) return;
-    
+   
     try {
       final url = 'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username)}';
       final response = await http
           .get(Uri.parse(url))
           .timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -1603,17 +1713,15 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
-
   Future<void> _sharePost(int postId) async {
     if (_username.isEmpty) return;
-    
+   
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/share_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -1626,10 +1734,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       _showError(_getErrorMessage(e));
     }
   }
-
   Future<void> _deletePost(int postId) async {
     if (_username.isEmpty) return;
-    
+   
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1648,16 +1755,14 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         ],
       ),
     );
-
     if (confirmed != true) return;
-
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/delete_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       ).timeout(const Duration(seconds: 10));
-      
+     
       if (response.statusCode == 200 && mounted) {
         setState(() => posts.removeWhere((p) => p['post_id'] == postId));
         await _savePostsToCache();
@@ -1669,17 +1774,16 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       _showError(_getErrorMessage(e));
     }
   }
-
   Future<void> _savePost(int postId) async {
     if (_username.isEmpty) return;
-    
+   
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/save_post'),
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       ).timeout(const Duration(seconds: 10));
-      
+     
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -1692,7 +1796,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       _showError(_getErrorMessage(e));
     }
   }
-
   void _navigateToProfile(String username, int userId) {
     Navigator.push(
       context,
@@ -1701,12 +1804,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
-
   bool _isOwnPost(int postId, int index) {
     if (_userId == null || _userId == 0) return false;
     return posts[index]['user_id'] == _userId;
   }
-
   Widget _buildEmptyState() {
     final colorScheme = Theme.of(context).colorScheme;
     return Center(
@@ -1736,7 +1837,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
-
   Widget _buildErrorState() {
     final colorScheme = Theme.of(context).colorScheme;
     return Center(
@@ -1772,7 +1872,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
-
   Widget _buildList() {
     if (posts.isEmpty) {
       if (isLoading) {
@@ -1788,7 +1887,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         return _buildEmptyState();
       }
     }
-
     return ListView.builder(
       physics: const BouncingScrollPhysics(),
       controller: _scrollController,
@@ -1801,23 +1899,18 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
             child: PostSkeleton(),
           );
         }
-
         final post = posts[index];
         final postId = post['post_id'];
         final colorScheme = Theme.of(context).colorScheme;
-
         final imageUrl = post['media_url'] != null && post['media_url'].isNotEmpty
             ? 'https://server.awarcrown.com${post['media_url']}'
             : null;
-
         final isLiked = post['is_liked'] ?? false;
         final isLiking = isLikingMap[postId] ?? false;
-
-        final iconAnimation = likeAnimationControllers[postId] ?? 
+        final iconAnimation = likeAnimationControllers[postId] ??
             const AlwaysStoppedAnimation(1.0);
-        final overlayAnimation = heartOverlayControllers[postId] ?? 
+        final overlayAnimation = heartOverlayControllers[postId] ??
             const AlwaysStoppedAnimation(0.0);
-
         return Card(
           elevation: 2,
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1894,7 +1987,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-              
+             
               // Double-tap area: Caption and Media
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
@@ -1911,7 +2004,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                           style: TextStyle(fontSize: 14, height: 1.4, color: colorScheme.onSurface),
                         ),
                       ),
-                    
+                   
                     // Media
                     if (imageUrl != null)
                       Stack(
@@ -1973,7 +2066,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                               },
                             ),
                           ),
-                          
+                         
                           // Heart overlay animation
                           if (showHeartOverlay[postId] ?? false)
                             Positioned.fill(
@@ -2003,9 +2096,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                   ],
                 ),
               ),
-              
+             
               const SizedBox(height: 12),
-              
+             
               // Actions
               Container(
                 color: colorScheme.surface,
@@ -2064,9 +2157,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
-                        
+                       
                         const SizedBox(width: 12),
-                        
+                       
                         // Comment button
                         InkWell(
                           onTap: () async {
@@ -2110,9 +2203,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
-                        
+                       
                         const SizedBox(width: 12),
-                        
+                       
                         // Share button
                         InkWell(
                           onTap: () => _sharePost(postId),
@@ -2126,9 +2219,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                             ),
                           ),
                         ),
-                        
+                       
                         const Spacer(),
-                        
+                       
                         // Save button
                         InkWell(
                           onTap: () => _savePost(postId),
@@ -2153,7 +2246,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       },
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -2200,14 +2292,13 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
-
   String _formatTime(String? timeString) {
     if (timeString == null) return 'Unknown';
     try {
       final date = DateTime.parse(timeString);
       final now = DateTime.now();
       final diff = now.difference(date);
-      
+     
       if (diff.inDays > 365) {
         return '${(diff.inDays / 365).floor()}y ago';
       } else if (diff.inDays > 30) {

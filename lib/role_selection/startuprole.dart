@@ -1,3 +1,5 @@
+// ignore_for_file: unused_field
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -44,7 +46,7 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
   final _founderIdController = TextEditingController();
   final _referenceController = TextEditingController();
   final _supportingDocsController = TextEditingController();
-  List<Map<String, dynamic>> _teamMembers = [];
+  final List<Map<String, dynamic>> _teamMembers = [];
   String? _logoPath;
   String? _govIdType;
   String? _businessRegType; // New field for business registration type
@@ -1169,6 +1171,7 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
                         if (value == null || value.isEmpty) return 'Required';
                         if (value.contains('@')) {
                           if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) return 'Invalid email';
+                        // ignore: curly_braces_in_flow_control_structures
                         } else if (!RegExp(r'^\+?[\d\s\-\(\)]{10,}$').hasMatch(value)) return 'Invalid phone';
                         return null;
                       },
