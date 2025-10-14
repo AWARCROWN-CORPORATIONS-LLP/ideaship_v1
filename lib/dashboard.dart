@@ -1,22 +1,12 @@
-// dashboard.dart
-// ignore: unused_import
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ideaship/feed/createpost.dart';
+import 'package:ideaship/feed/posts.dart';
+import 'package:ideaship/feed/startups.dart';
+import 'package:ideaship/jobs/job_drawer.dart';
+import 'package:ideaship/settings/usersettings.dart';
+import 'package:ideaship/user/userprofile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-// ignore: unused_import
-import 'package:ideaship/auth/auth_log_reg.dart';
-import 'feed/posts.dart'; // Import the PostsPage from feed/posts.dart
-// Import CreatePostPage
-import 'settings/usersettings.dart'; // Import SettingsPage
-import 'jobs/job_drawer.dart'; // Import the updated JobDrawer 
-import 'user/userprofile.dart'; // Import UserProfile
-
-// import 'feed/startups.dart';
-
-// import 'chat/message.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -28,32 +18,36 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> with TickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int _selectedIndex = 0;
-
   late TabController _tabController;
-
   String? _username;
   String? _email;
   String? _role;
   String? _major;
   bool _isLoading = true;
-
   bool _isNotificationActive = false;
   bool _isMessageActive = false;
-
   bool _isDarkMode = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this); 
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(_handleTabChange);
     _loadUserData();
     _loadThemePreference();
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
     super.dispose();
+  }
+
+  void _handleTabChange() {
+    if (_selectedIndex == 0) {
+      setState(() {});
+    }
   }
 
   Future<void> _loadThemePreference() async {
@@ -103,8 +97,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   void _showErrorBanner(String message) {
     if (!mounted) return;
     final colorScheme = _buildColorScheme();
-
-    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Row(
@@ -139,17 +131,11 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     );
   }
 
- 
-  void showBackendError(String errorMessage) {
-    _showErrorBanner(errorMessage);
-  }
-
   void _openJobDrawer() {
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
   void _showMessageDialog() {
-   
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -210,46 +196,41 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   }
 
   ColorScheme _buildColorScheme() {
-    final primaryColor = const Color(0xFF1268D1);
-    if (_isDarkMode) {
-      return ColorScheme.dark(
-        primary: primaryColor,
-        onPrimary: Colors.white,
-        surface: const Color(0xFF121212),
-        onSurface: Colors.white,
-        surfaceContainerHighest: const Color(0xFF1E1E1E),
-        onSurfaceVariant: Colors.grey[400]!,
-        outline: Colors.grey[700]!,
-        error: Colors.red,
-        onError: Colors.white,
-        secondary: Colors.grey[600]!,
-        onSecondary: Colors.white,
-      );
-    } else {
-      return ColorScheme.light(
-        primary: primaryColor,
-        onPrimary: Colors.white,
-        surface: Colors.white,
-        onSurface: Colors.black87,
-        surfaceContainerHighest: Colors.grey[100]!,
-        onSurfaceVariant: Colors.black54,
-        outline: Colors.grey[400]!,
-        error: Colors.red,
-        onError: Colors.white,
-        secondary: Colors.grey[600]!,
-        onSecondary: Colors.white,
-      );
-    }
+    const primaryColor = Color(0xFF1268D1);
+    return _isDarkMode
+        ? ColorScheme.dark(
+            primary: primaryColor,
+            onPrimary: Colors.white,
+            surface: const Color(0xFF121212),
+            onSurface: Colors.white,
+            surfaceContainerHighest: const Color(0xFF1E1E1E),
+            onSurfaceVariant: Colors.grey[400]!,
+            outline: Colors.grey[700]!,
+            error: Colors.red,
+            onError: Colors.white,
+            secondary: Colors.grey[600]!,
+            onSecondary: Colors.white,
+          )
+        : ColorScheme.light(
+            primary: primaryColor,
+            onPrimary: Colors.white,
+            surface: Colors.white,
+            onSurface: Colors.black87,
+            surfaceContainerHighest: Colors.grey[100]!,
+            onSurfaceVariant: Colors.black54,
+            outline: Colors.grey[400]!,
+            error: Colors.red,
+            onError: Colors.white,
+            secondary: Colors.grey[600]!,
+            onSecondary: Colors.white,
+          );
   }
 
   AppBar _buildAppBar(ColorScheme colorScheme) {
     List<Widget> actions = [
       IconButton(
         onPressed: _handleSearchPress,
-        icon: const Icon(
-          Icons.search,
-          color: Colors.black87,
-        ),
+        icon: const Icon(Icons.search, color: Colors.black87),
       ),
       IconButton(
         onPressed: _isNotificationActive ? null : _handleNotificationPress,
@@ -272,10 +253,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
             MaterialPageRoute(builder: (context) => const UserProfile()),
           );
         },
-        icon: Icon(
-          Icons.account_circle,
-          color: colorScheme.onSurface,
-        ),
+        icon: Icon(Icons.account_circle, color: colorScheme.onSurface),
       ),
     ];
 
@@ -283,20 +261,22 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       return AppBar(
         elevation: 0.4,
         backgroundColor: colorScheme.surface,
-        title: Text("Ideaship",
-            style: GoogleFonts.playfairDisplay(
-              fontWeight: FontWeight.w700,
-              fontStyle: FontStyle.italic,
-              color: colorScheme.primary,
-              fontSize: 30,
-              shadows: [
-                Shadow(
-                  offset: const Offset(1, 1),
-                  blurRadius: 5,
-                  color: colorScheme.primary.withOpacity(0.5),
-                ),
-              ],
-            )),
+        title: Text(
+          "Ideaship",
+          style: GoogleFonts.playfairDisplay(
+            fontWeight: FontWeight.w700,
+            fontStyle: FontStyle.italic,
+            color: colorScheme.primary,
+            fontSize: 30,
+            shadows: [
+              Shadow(
+                offset: const Offset(1, 1),
+                blurRadius: 5,
+                color: colorScheme.primary.withOpacity(0.5),
+              ),
+            ],
+          ),
+        ),
         actions: actions,
         bottom: TabBar(
           controller: _tabController,
@@ -306,7 +286,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
           tabs: const [
             Tab(text: "Feed"),
             Tab(text: "Startups"),
-          
           ],
         ),
       );
@@ -342,14 +321,10 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
             TabBarView(
               controller: _tabController,
               children: const [
-                PostsPage(), // Dynamic feed from feed/posts.dart
-                 Center(child: Text("Startups Page")), // TODO: Replace with StartupsPage() from feed/startups.dart
-                // Center(child: Text("Investors Page")), // TODO: Replace with InvestorsPage() from feed/investors.dart
-                // Center(child: Text("Mentors Page")), // TODO: Replace with MentorsPage() from feed/mentors.dart
-                // Center(child: Text("Companies Page")), // TODO: Replace with CompaniesPage() from feed/companies.dart
+                PostsPage(),
+                StartupsPage(),
               ],
             ),
-            // Right-side handle
             Positioned(
               right: 6,
               top: MediaQuery.of(context).size.height * 0.25,
@@ -369,9 +344,11 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
                     ],
                   ),
                   child: Center(
-                      child: RotatedBox(
-                          quarterTurns: 1,
-                          child: Icon(Icons.arrow_forward_ios, size: 18, color: colorScheme.onSurface))),
+                    child: RotatedBox(
+                      quarterTurns: 1,
+                      child: Icon(Icons.arrow_forward_ios, size: 18, color: colorScheme.onSurface),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -409,7 +386,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   @override
   Widget build(BuildContext context) {
     final colorScheme = _buildColorScheme();
-
     final themeData = ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
@@ -429,7 +405,6 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
             floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
             floatingActionButton: FloatingActionButton(
               onPressed: () {
-                // Open post creation page createpost.dart
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const CreatePostPage()),
@@ -450,7 +425,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
                   children: [
                     _navButton(Icons.home_rounded, "Home", 0, colorScheme),
                     _navButton(Icons.work_outline, "Roles", 1, colorScheme),
-                    const SizedBox(width: 60), // Space for the notch/FAB
+                    const SizedBox(width: 60),
                     _navButton(Icons.notifications_outlined, "Alerts", 3, colorScheme),
                     _navButton(Icons.settings_outlined, "Settings", 4, colorScheme),
                   ],
@@ -478,23 +453,27 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
         } else {
           setState(() {
             _selectedIndex = index;
+            if (index == 0) {
+              _tabController.animateTo(_tabController.index);
+            }
           });
-          if (index == 0) {
-            _tabController.animateTo(0);
-          }
         }
       },
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, 
-              size: 26,
-              color: active ? colorScheme.primary : colorScheme.onSurfaceVariant),
-          Text(label,
-              style: TextStyle(
-                  fontSize: 12,
-                  color: active ? colorScheme.primary : colorScheme.onSurfaceVariant
-              )),
+          Icon(
+            icon,
+            size: 26,
+            color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
+          ),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: active ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            ),
+          ),
         ],
       ),
     );
@@ -526,8 +505,6 @@ class PostSearchDelegate extends SearchDelegate {
 
   @override
   Widget buildResults(BuildContext context) {
-    // TODO: Implement actual search results based on query
-    // For example, filter posts or search API
     return ListView(
       children: [
         ListTile(
@@ -540,7 +517,6 @@ class PostSearchDelegate extends SearchDelegate {
 
   @override
   Widget buildSuggestions(BuildContext context) {
-    // TODO: Implement suggestions based on query
     return ListView(
       children: [
         ListTile(

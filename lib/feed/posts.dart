@@ -5,6 +5,9 @@ import 'dart:async';
 import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:flutter/services.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'publicprofile.dart';
 
 class Skeleton extends StatefulWidget {
@@ -70,6 +73,7 @@ class PostSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final screenWidth = MediaQuery.of(context).size.width - 32;
     return Card(
       elevation: 2,
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -108,13 +112,15 @@ class PostSkeleton extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              height: 200,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: AspectRatio(
+              aspectRatio: 1.0,
+              child: Container(
+                width: screenWidth,
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ),
@@ -341,8 +347,6 @@ class _CommentsPageState extends State<CommentsPage> {
   late int? _userId;
   List<dynamic> comments = [];
   bool commentLoading = false;
-  bool isLiked = false;
-  int likeCount = 0;
   final TextEditingController commentController = TextEditingController();
   final FocusNode focusNode = FocusNode();
   int? replyToCommentId;
@@ -355,8 +359,6 @@ class _CommentsPageState extends State<CommentsPage> {
     post = widget.post;
     _username = widget.username;
     _userId = widget.userId;
-    isLiked = post['is_liked'] ?? false;
-    likeCount = post['like_count'] ?? 0;
     comments = widget.comments;
     _initializeUserId();
     _processLikeQueue();
@@ -458,10 +460,6 @@ class _CommentsPageState extends State<CommentsPage> {
       if (mounted) {
         _showSuccess('Synced offline actions');
         _fetchComments();
-        setState(() {
-          isLiked = post['is_liked'] ?? false;
-          likeCount = post['like_count'] ?? 0;
-        });
       }
     }
   }
@@ -525,59 +523,6 @@ class _CommentsPageState extends State<CommentsPage> {
       }
     } finally {
       if (mounted) setState(() => commentLoading = false);
-    }
-  }
-
-  Future<void> _toggleLike() async {
-    if (_userId == null || _userId == 0 || !mounted) {
-      _showError('User not authenticated. Please log in again.');
-      return;
-    }
-    final oldLiked = isLiked;
-    final oldCount = likeCount;
-    final newLiked = !oldLiked;
-    final newCount = oldCount + (newLiked ? 1 : -1);
-    if (mounted) {
-      setState(() {
-        isLiked = newLiked;
-        likeCount = newCount;
-      });
-    }
-    try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/like_action'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=${post['post_id']}&user_id=$_userId',
-      ).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is Map<String, dynamic> && mounted) {
-          setState(() {
-            if (data['like_count'] != null) {
-              likeCount = data['like_count'];
-            }
-            if (data['is_liked'] != null) {
-              isLiked = data['is_liked'];
-            }
-          });
-        }
-      } else {
-        throw http.ClientException('Server error: ${response.statusCode}');
-      }
-    } catch (e) {
-      final isOfflineError = e is SocketException || e is TimeoutException;
-      if (isOfflineError) {
-        await _queueLikeAction({'type': 'post', 'id': post['post_id']});
-        _showSuccess('Like action queued offline');
-      } else {
-        if (mounted) {
-          setState(() {
-            isLiked = oldLiked;
-            likeCount = oldCount;
-          });
-          _showError('Failed to ${newLiked ? 'like' : 'unlike'} post: ${_getErrorMessage(e)}');
-        }
-      }
     }
   }
 
@@ -678,91 +623,6 @@ class _CommentsPageState extends State<CommentsPage> {
     }
   }
 
-  Future<void> _sharePost(int postId) async {
-    if (_username.isEmpty) return;
-
-    try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/share_post'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
-      ).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is Map<String, dynamic> && mounted) {
-          _showSuccess('Post shared successfully!');
-        }
-      } else {
-        throw http.ClientException('Server error: ${response.statusCode}');
-      }
-    } catch (e) {
-      _showError('Failed to share post: ${_getErrorMessage(e)}');
-    }
-  }
-
-  Future<void> _deletePost(int postId) async {
-    if (_username.isEmpty) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Post'),
-        content: const Text('Are you sure you want to delete this post?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/delete_post'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200 && mounted) {
-        Navigator.pop(context);
-        _showSuccess('Post deleted successfully');
-      } else {
-        throw http.ClientException('Server error: ${response.statusCode}');
-      }
-    } catch (e) {
-      _showError('Failed to delete post: ${_getErrorMessage(e)}');
-    }
-  }
-
-  Future<void> _savePost(int postId) async {
-    if (_username.isEmpty) return;
-
-    try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/save_post'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is Map<String, dynamic> && mounted) {
-          _showSuccess(data['saved'] == true ? 'Post saved!' : 'Post unsaved');
-        }
-      } else {
-        throw http.ClientException('Server error: ${response.statusCode}');
-      }
-    } catch (e) {
-      _showError('Failed to save post: ${_getErrorMessage(e)}');
-    }
-  }
-
   void _navigateToProfile(String username, int userId) {
     Navigator.push(
       context,
@@ -772,18 +632,13 @@ class _CommentsPageState extends State<CommentsPage> {
     );
   }
 
-  bool _isOwnPost() {
-    if (_userId == null || _userId == 0) return false;
-    return post['user_id'] == _userId;
-  }
-
   void _addCommentsToFlat(List<dynamic> flat, dynamic comment, int depth) {
     (comment as Map<String, dynamic>)['_depth'] = depth;
     flat.add(comment);
     final children = comments
         .where((c) => c['parent_comment_id'] == comment['comment_id'])
         .toList()
-      ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
+        ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
     for (var child in children) {
       _addCommentsToFlat(flat, child, depth + 1);
     }
@@ -814,7 +669,7 @@ class _CommentsPageState extends State<CommentsPage> {
     final mainComments = allComments
         .where((c) => c['parent_comment_id'] == null)
         .toList()
-      ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
+        ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
     for (var main in mainComments) {
       _addCommentsToFlat(flatComments, main, 0);
     }
@@ -876,206 +731,19 @@ class _CommentsPageState extends State<CommentsPage> {
     }
   }
 
-  Widget _buildPostMedia(String imageUrl) {
-    const double aspectRatio = 16 / 9; // Fixed 16:9 aspect ratio like Instagram
-    final screenWidth = MediaQuery.of(context).size.width - 32; // Account for padding
-    final imageHeight = screenWidth / aspectRatio;
-
-    return SizedBox(
-      width: screenWidth,
-      height: imageHeight,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: CachedNetworkImage(
-          imageUrl: imageUrl,
-          fit: BoxFit.cover,
-          memCacheWidth: (screenWidth * MediaQuery.of(context).devicePixelRatio).round(),
-          memCacheHeight: (imageHeight * MediaQuery.of(context).devicePixelRatio).round(),
-          maxWidthDiskCache: (screenWidth * MediaQuery.of(context).devicePixelRatio).round(),
-          maxHeightDiskCache: (imageHeight * MediaQuery.of(context).devicePixelRatio).round(),
-          fadeInDuration: const Duration(milliseconds: 200),
-          fadeOutDuration: const Duration(milliseconds: 200),
-          placeholder: (context, url) => const Skeleton(
-            height: double.infinity,
-            width: double.infinity,
-          ),
-          errorWidget: (context, url, error) => Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.image_not_supported,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              size: 48,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final postId = post['post_id'];
-    final imageUrl = post['media_url'] != null && post['media_url'].isNotEmpty
-        ? 'https://server.awarcrown.com${post['media_url']}'
-        : null;
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text('Comments', style: TextStyle(color: colorScheme.onSurface)),
+        backgroundColor: colorScheme.surface,
+        elevation: 0,
+      ),
       body: Column(
         children: [
-          Container(
-            color: colorScheme.surface,
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                GestureDetector(
-                  onTap: () => _navigateToProfile(
-                      post['username'] ?? '', post['user_id'] ?? 0),
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundImage: post['profile_picture'] != null
-                        ? NetworkImage(
-                            'https://server.awarcrown.com/accessprofile/uploads/${post['profile_picture']}')
-                        : null,
-                    child: post['profile_picture'] == null
-                        ? Icon(Icons.person, color: colorScheme.onSurfaceVariant)
-                        : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      GestureDetector(
-                        onTap: () => _navigateToProfile(
-                            post['username'] ?? '', post['user_id'] ?? 0),
-                        child: Text(
-                          post['username'] ?? 'Unknown',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        _formatTime(post['created_at']),
-                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_isOwnPost())
-                  PopupMenuButton<String>(
-                    onSelected: (value) {
-                      if (value == 'delete') {
-                        _deletePost(postId);
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      PopupMenuItem(
-                        value: 'delete',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                            const SizedBox(width: 8),
-                            const Text('Delete', style: TextStyle(color: Colors.red)),
-                          ],
-                        ),
-                      ),
-                    ],
-                    icon: Icon(Icons.more_vert, size: 20, color: colorScheme.onSurfaceVariant),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ),
-              ],
-            ),
-          ),
-          if (imageUrl != null)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: _buildPostMedia(imageUrl),
-            ),
-          Container(
-            color: colorScheme.surface,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              children: [
-                InkWell(
-                  onTap: _toggleLike,
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          isLiked ? Icons.favorite : Icons.favorite_border,
-                          size: 24,
-                          color: isLiked ? Colors.red : colorScheme.onSurface,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$likeCount',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: isLiked ? Colors.red : colorScheme.onSurface,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                InkWell(
-                  onTap: () => _sharePost(postId),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Icon(
-                      Icons.share_outlined,
-                      size: 24,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                InkWell(
-                  onTap: () => _savePost(postId),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Icon(
-                      Icons.bookmark_border,
-                      size: 24,
-                      color: colorScheme.onSurface,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (post['content'] != null && post['content'].isNotEmpty)
-            Container(
-              color: colorScheme.surface,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              child: RichText(
-                text: TextSpan(
-                  style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
-                  children: [
-                    TextSpan(
-                      text: '${post['username']} ',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    TextSpan(text: post['content']),
-                  ],
-                ),
-              ),
-            ),
           Divider(height: 1, color: colorScheme.outline),
           Expanded(
             child: RefreshIndicator(
@@ -1229,6 +897,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   Map<int, AnimationController> likeAnimationControllers = {};
   Map<int, bool> showHeartOverlay = {};
   Map<int, AnimationController> heartOverlayControllers = {};
+  Map<int, bool> isFetchingComments = {};
   String _username = '';
   int? _userId;
   Timer? _scrollDebounceTimer;
@@ -1666,15 +1335,96 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data is Map<String, dynamic> && mounted) {
-          _showSuccess('Post shared successfully!');
+        if (data is Map<String, dynamic> && data['status'] == 'success') {
+          final shareUrl = data['share_url'] ?? '';
+          if (shareUrl.isNotEmpty) {
+            _showShareSheet(shareUrl);
+          } else {
+            _showSuccess('Post shared successfully!');
+          }
+        } else {
+          _showError(data['message'] ?? 'Failed to share post');
         }
       } else {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      _showError(_getErrorMessage(e));
+      _showError('Failed to share post: ${_getErrorMessage(e)}');
     }
+  }
+
+  void _showShareSheet(String shareUrl) {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Share this post',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 16),
+              SelectableText(
+                shareUrl,
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: shareUrl));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Link copied!')),
+                        );
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Copy Link'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                 
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _shareToInstagram(shareUrl),
+                      icon: const Icon(Icons.camera_alt),
+                      label: const Text('Share externally'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.purple,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  
+
+  Future<void> _shareToInstagram(String shareUrl) async {
+    await Share.share(shareUrl, subject: 'Check this post on Awarcrown');
+    Navigator.pop(context);
   }
 
   Future<void> _deletePost(int postId) async {
@@ -1714,7 +1464,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      _showError(_getErrorMessage(e));
+      _showError('Failed to delete post: ${_getErrorMessage(e)}');
     }
   }
 
@@ -1737,7 +1487,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      _showError(_getErrorMessage(e));
+      _showError('Failed to save post: ${_getErrorMessage(e)}');
     }
   }
 
@@ -1856,10 +1606,15 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
             : null;
         final isLiked = post['is_liked'] ?? false;
         final isLiking = isLikingMap[postId] ?? false;
+        final isFetchingComment = isFetchingComments[postId] ?? false;
         final iconAnimation = likeAnimationControllers[postId] ??
             const AlwaysStoppedAnimation(1.0);
         final overlayAnimation = heartOverlayControllers[postId] ??
             const AlwaysStoppedAnimation(0.0);
+
+        const double aspectRatio = 1.0;
+        final screenWidth = MediaQuery.of(context).size.width - 32;
+
         return Card(
           elevation: 2,
           margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1954,18 +1709,17 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                         children: [
                           Container(
                             margin: const EdgeInsets.symmetric(horizontal: 16),
-                            child: SizedBox(
-                              width: double.infinity,
-                              height: (MediaQuery.of(context).size.width - 32) / (16 / 9),
+                            child: AspectRatio(
+                              aspectRatio: aspectRatio,
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: CachedNetworkImage(
                                   imageUrl: imageUrl,
                                   fit: BoxFit.cover,
-                                  memCacheWidth: ((MediaQuery.of(context).size.width - 32) * MediaQuery.of(context).devicePixelRatio).round(),
-                                  memCacheHeight: (((MediaQuery.of(context).size.width - 32) / (16 / 9)) * MediaQuery.of(context).devicePixelRatio).round(),
-                                  maxWidthDiskCache: ((MediaQuery.of(context).size.width - 32) * MediaQuery.of(context).devicePixelRatio).round(),
-                                  maxHeightDiskCache: (((MediaQuery.of(context).size.width - 32) / (16 / 9)) * MediaQuery.of(context).devicePixelRatio).round(),
+                                  memCacheWidth: (screenWidth * MediaQuery.of(context).devicePixelRatio).round(),
+                                  memCacheHeight: (screenWidth * aspectRatio * MediaQuery.of(context).devicePixelRatio).round(),
+                                  maxWidthDiskCache: (screenWidth * MediaQuery.of(context).devicePixelRatio).round(),
+                                  maxHeightDiskCache: (screenWidth * aspectRatio * MediaQuery.of(context).devicePixelRatio).round(),
                                   fadeInDuration: const Duration(milliseconds: 200),
                                   fadeOutDuration: const Duration(milliseconds: 200),
                                   placeholder: (context, url) => const Skeleton(
@@ -2074,22 +1828,32 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                         ),
                         const SizedBox(width: 12),
                         InkWell(
-                          onTap: () async {
-                            await _fetchComments(postId);
-                            if (mounted) {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => CommentsPage(
-                                    post: post,
-                                    comments: commentsMap[postId] ?? [],
-                                    username: _username,
-                                    userId: _userId,
-                                  ),
-                                ),
-                              );
-                            }
-                          },
+                          onTap: isFetchingComment
+                              ? null
+                              : () async {
+                                  if (isFetchingComments[postId] ?? false) return;
+                                  setState(() => isFetchingComments[postId] = true);
+                                  try {
+                                    await _fetchComments(postId);
+                                    if (mounted) {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => CommentsPage(
+                                            post: post,
+                                            comments: commentsMap[postId] ?? [],
+                                            username: _username,
+                                            userId: _userId,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } finally {
+                                    if (mounted) {
+                                      setState(() => isFetchingComments[postId] = false);
+                                    }
+                                  }
+                                },
                           borderRadius: BorderRadius.circular(20),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
@@ -2097,11 +1861,21 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.mode_comment_outlined,
-                                  size: 24,
-                                  color: colorScheme.onSurface,
-                                ),
+                                isFetchingComment
+                                    ? const SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                              Colors.blue),
+                                        ),
+                                      )
+                                    : Icon(
+                                        Icons.mode_comment_outlined,
+                                        size: 24,
+                                        color: colorScheme.onSurface,
+                                      ),
                                 const SizedBox(width: 6),
                                 Text(
                                   '${post['comment_count'] ?? 0}',
