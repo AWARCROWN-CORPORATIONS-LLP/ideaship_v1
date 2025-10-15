@@ -31,13 +31,13 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
 
   String _getErrorMessage(dynamic e) {
     if (e is SocketException) {
-      return 'No internet connection. Please check your connection and try again.';
+      return 'It seems you\'re not connected to the internet. Please check your connection.';
     } else if (e is TimeoutException) {
-      return 'Request timed out. Please check your connection and try again.';
+      return 'The connection is taking too long. Please try again in a moment.';
     } else if (e is http.ClientException) {
-      return 'Network error occurred. Please try again.';
+      return 'There was a problem connecting to the server. Please try again.';
     } else {
-      return 'An unexpected error occurred: ${e.toString()}';
+      return 'Something unexpected happened. Please try again.';
     }
   }
 
@@ -58,6 +58,11 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
 
       await _fetchUserInfo();
       await _fetchUserPosts();
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -75,16 +80,54 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
               'https://server.awarcrown.com/accessprofile/user_info?target_username=${Uri.encodeComponent(widget.targetUsername)}&username=${Uri.encodeComponent(currentUsername)}'))
           .timeout(const Duration(seconds: 20));
 
+      String? specificError;
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (mounted) {
-          setState(() {
-            userInfo = data;
-            isFollowing = data['is_following'] ?? false;
-          });
+        try {
+          final data = json.decode(response.body);
+          if (data is! Map<String, dynamic>) {
+            throw const FormatException('Invalid JSON structure');
+          }
+          final processedData = Map<String, dynamic>.from(data);
+          processedData['followers_count'] = int.tryParse(processedData['followers_count']?.toString() ?? '0') ?? 0;
+          processedData['following_count'] = int.tryParse(processedData['following_count']?.toString() ?? '0') ?? 0;
+          if (mounted) {
+            setState(() {
+              userInfo = processedData;
+              isFollowing = data['is_following'] ?? false;
+            });
+          }
+          return;
+        } on FormatException {
+          specificError = 'The server sent invalid data. Please try again.';
+        } catch (e) {
+          rethrow;
         }
       } else {
-        throw http.ClientException('Server error: ${response.statusCode}');
+        switch (response.statusCode) {
+          case 401:
+            specificError = 'You need to log in to view this profile.';
+            break;
+          case 403:
+            specificError = 'You don\'t have permission to view this profile.';
+            break;
+          case 404:
+            specificError = 'This user doesn\'t exist.';
+            break;
+          case 500:
+            specificError = 'The server is having issues. Please try again later.';
+            break;
+          default:
+            specificError = 'There was a server issue (code ${response.statusCode}). Please try again.';
+        }
+      }
+
+      if (specificError != null && mounted) {
+        setState(() {
+          errorMessage = specificError;
+        });
+      }
+      if (specificError != null) {
+        throw Exception(specificError);
       }
     } on TimeoutException {
       throw TimeoutException('Request timed out', const Duration(seconds: 20));
@@ -93,8 +136,8 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
         setState(() {
           errorMessage = _getErrorMessage(e);
         });
-        rethrow; // Propagate to _loadCurrentUser if needed
       }
+      rethrow;
     }
   }
 
@@ -105,19 +148,57 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
               'https://server.awarcrown.com/accessprofile/fetch_user_posts?target_username=${Uri.encodeComponent(widget.targetUsername)}&username=${Uri.encodeComponent(currentUsername)}'))
           .timeout(const Duration(seconds: 20));
 
+      String? specificError;
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (mounted) {
-          setState(() {
-            posts = data['posts'] ?? [];
-            postsError = null;
-          });
+        try {
+          final data = json.decode(response.body);
+          if (data is! Map<String, dynamic>) {
+            throw const FormatException('Invalid JSON structure');
+          }
+          if (mounted) {
+            setState(() {
+              posts = List<dynamic>.from(data['posts'] ?? []);
+              postsError = null;
+            });
+          }
+          return;
+        } on FormatException {
+          specificError = 'The server sent invalid data. Please try again.';
+        } catch (e) {
+          specificError = _getErrorMessage(e);
         }
       } else {
-        throw http.ClientException('Server error: ${response.statusCode}');
+        switch (response.statusCode) {
+          case 401:
+            specificError = 'You need to log in to view posts.';
+            break;
+          case 403:
+            specificError = 'You don\'t have permission to view these posts.';
+            break;
+          case 404:
+            specificError = 'No posts found for this user.';
+            break;
+          case 500:
+            specificError = 'The server is having issues. Please try again later.';
+            break;
+          default:
+            specificError = 'There was a server issue (code ${response.statusCode}). Please try again.';
+        }
+      }
+
+      if (specificError != null && mounted) {
+        setState(() {
+          postsError = specificError;
+          posts = [];
+        });
       }
     } on TimeoutException {
-      throw TimeoutException('Request timed out', const Duration(seconds: 20));
+      if (mounted) {
+        setState(() {
+          postsError = _getErrorMessage(TimeoutException('Request timed out', const Duration(seconds: 20)));
+          posts = [];
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -137,24 +218,69 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
             'target_username=${Uri.encodeComponent(widget.targetUsername)}&username=${Uri.encodeComponent(currentUsername)}',
       ).timeout(const Duration(seconds: 10));
 
+      String? specificError;
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          if (mounted) {
-            setState(() {
-              isFollowing = !isFollowing;
-              userInfo!['followers_count'] =
-                  (userInfo!['followers_count'] ?? 0) + (isFollowing ? 1 : -1);
-            });
+        try {
+          final data = json.decode(response.body);
+          if (data is! Map<String, dynamic>) {
+            throw const FormatException('Invalid JSON structure');
           }
-        } else {
-          throw Exception('Follow action failed: ${data['message'] ?? 'Unknown error'}');
+          if (data['success'] == true) {
+            if (mounted) {
+              setState(() {
+                isFollowing = !isFollowing;
+                userInfo!['followers_count'] =
+                    (userInfo!['followers_count'] ?? 0) + (isFollowing ? 1 : -1);
+              });
+            }
+            return;
+          } else {
+            specificError = 'Follow action failed: ${data['message'] ?? 'Please try again.'}';
+          }
+        } on FormatException {
+          specificError = 'The server sent invalid data. Please try again.';
+        } catch (e) {
+          specificError = _getErrorMessage(e);
         }
       } else {
-        throw http.ClientException('Server error: ${response.statusCode}');
+        switch (response.statusCode) {
+          case 400:
+            specificError = 'Invalid request. Please try again.';
+            break;
+          case 401:
+            specificError = 'Please log in again.';
+            break;
+          case 403:
+            specificError = 'You can\'t follow this user.';
+            break;
+          case 404:
+            specificError = 'User not found.';
+            break;
+          case 500:
+            specificError = 'The server is having issues. Please try again later.';
+            break;
+          default:
+            specificError = 'There was a server issue (code ${response.statusCode}). Please try again.';
+        }
+      }
+
+      if (specificError != null && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(specificError),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } on TimeoutException {
-      throw TimeoutException('Request timed out', const Duration(seconds: 10));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_getErrorMessage(TimeoutException('Request timed out', const Duration(seconds: 10)))),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -217,7 +343,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                     radius: 40,
                     backgroundImage: userInfo!['profile_picture'] != null
                         ? NetworkImage(
-                            'https://server.awarcrown.com/${userInfo!['profile_picture']}')
+                            'https://server.awarcrown.com/accessprofile/uploads/${userInfo!['profile_picture']}')
                         : null,
                     child: userInfo!['profile_picture'] == null
                         ? const Icon(Icons.person, size: 40)
@@ -281,10 +407,9 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                 padding: const EdgeInsets.all(16),
                 child: Center(
                   child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.error_outline, color: Colors.grey, size: 48),
-                      const SizedBox(height: 8),
-                      Text(postsError!, style: const TextStyle(color: Colors.grey)),
+                      Text(postsError!, style: const TextStyle(fontSize: 16, color: Colors.grey)),
                       const SizedBox(height: 8),
                       TextButton(
                         onPressed: _fetchUserPosts,
@@ -314,7 +439,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> {
                     return ClipRRect(
                       borderRadius: BorderRadius.circular(4),
                       child: Image.network(
-                        'https://server.awarcrown.com$imageUrl',
+                        'https://server.awarcrown.com/feed/$imageUrl',
                         fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                           color: Colors.grey[300],

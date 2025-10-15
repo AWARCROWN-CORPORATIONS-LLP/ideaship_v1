@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -148,6 +147,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
     final connectivityResult = await Connectivity().checkConnectivity();
     if (!mounted) return;
     setState(() {
+      // ignore: unrelated_type_equality_checks
       _isConnected = connectivityResult != ConnectivityResult.none;
       if (!_isConnected) {
         _showErrorDialog("No Network", "You are not connected to a network. Please check your Wi-Fi or mobile data.");
@@ -220,10 +220,48 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
     );
   }
 
-  void _showSuccessDialog(String title, String message, {bool switchToLogin = false, required bool goToRole}) {
+  void _showSuccessDialog(String title, String message, {bool switchToLogin = false, bool goToRole = false, String? email}) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
+        List<Widget> actions = [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              if (switchToLogin && mounted) {
+                _tabController.animateTo(0);
+              }
+              if (goToRole && mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => const RoleSelectionPage(),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
+                    transitionDuration: const Duration(milliseconds: 500),
+                  ),
+                );
+              }
+            },
+            child: Text("OK", style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black)),
+          ),
+        ];
+        if (email != null) {
+          actions.insert(
+            0,
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop();
+                await _resendVerification(email);
+                if (mounted) {
+                  _tabController.animateTo(0);
+                }
+              },
+              child: Text("Resend Verification", style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black)),
+            ),
+          );
+        }
         return AlertDialog(
           backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -235,32 +273,63 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
             ],
           ),
           content: SingleChildScrollView(child: Text(message, style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black87))),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                if (switchToLogin && mounted) {
-                  _tabController.animateTo(0);
-                }
-                if (goToRole && mounted) {
-                  Navigator.pushReplacement(
-                    context,
-                    PageRouteBuilder(
-                      pageBuilder: (context, animation, secondaryAnimation) => const RoleSelectionPage(),
-                      transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                        return FadeTransition(opacity: animation, child: child);
-                      },
-                      transitionDuration: const Duration(milliseconds: 500),
-                    ),
-                  );
-                }
-              },
-              child: Text("Close", style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black)),
-            ),
-          ],
+          actions: actions,
         );
       },
     );
+  }
+
+  Future<void> _resendVerification(String email) async {
+    if (!_isConnected) {
+      _showErrorDialog("No Network", "Cannot resend verification without a network connection.");
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final url = Uri.parse("https://server.awarcrown.com/api?action=resend-verification");
+      final response = await http.post(
+        url,
+        body: {"email": email},
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      ).timeout(const Duration(seconds: 30));
+
+      debugPrint("Resend Verification Response Status: ${response.statusCode}");
+      debugPrint("Resend Verification Response Body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['success'] == true) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(data['message'] ?? "Verification email sent!"),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        } else {
+          final message = data['message'] ?? "Unable to resend verification email.";
+          _showErrorDialog("Resend Failed", message);
+        }
+      } else if (response.statusCode == 400) {
+        final data = json.decode(response.body);
+        final message = data['message'] ?? "Invalid request.";
+        _showErrorDialog("Resend Failed", message);
+      } else if (response.statusCode == 404) {
+        _showErrorDialog("Resend Failed", "Email not found.");
+      } else if (response.statusCode == 500) {
+        _showErrorDialog("Server Error", "Internal server issue. Please try again later.");
+      } else {
+        _showErrorDialog("Server Error", "Unexpected error (${response.statusCode}). Please try again.");
+      }
+    } catch (e) {
+      debugPrint("Resend Verification Error: $e");
+      final errorMsg = e.toString().contains('TimeoutException') ? "Request timed out. Check your connection." : "Failed to connect: ${e.toString()}. Check your internet.";
+      _showErrorDialog("Connection Error", errorMsg);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<bool> _refreshTokens() async {
@@ -277,7 +346,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
         return false;
       }
 
-      final url = Uri.parse("https://server.awarcrown.com/api?action=refresh");
+      final url = Uri.parse("https://vanguard.awarcrown.com/auth/api?action=refresh");
       final response = await http.post(
         url,
         body: json.encode({"refresh_token": refreshToken}),
@@ -397,10 +466,10 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
 
                           setState(() => _isLoading = true);
                           try {
-                            final url = Uri.parse("https://server.awarcrown.com/api?action=forgot-password");
+                            final url = Uri.parse("https://vanguard.awarcrown.com/auth/api?action=forgot-password");
                             final response = await http.post(
                               url,
-                              body: json.encode({"email": emailController.text.trim()}),
+                              body: {"email": emailController.text.trim()},
                               headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                             ).timeout(const Duration(seconds: 30));
 
@@ -476,7 +545,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
     setState(() => _isLoading = true);
 
     try {
-      final url = Uri.parse("https://server.awarcrown.com/api?action=login");
+      final url = Uri.parse("https://vanguard.awarcrown.com/auth/api?action=login");
       final response = await http.post(
         url,
         body: {
@@ -602,13 +671,15 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
 
     setState(() => _isLoading = true);
 
+    final String registeredEmail = _regEmailController.text.trim();
+
     try {
-      final url = Uri.parse("https://server.awarcrown.com/api?action=register");
+      final url = Uri.parse("https://vanguard.awarcrown.com/auth/api?action=register");
       final response = await http.post(
         url,
         body: {
           "username": _regUserController.text.trim(),
-          "email": _regEmailController.text.trim(),
+          "email": registeredEmail,
           "password": _regPassController.text.trim(),
         },
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -631,7 +702,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('id', userData['id']?.toString() ?? '');
           await prefs.setString('username', userData['username'] as String? ?? _regUserController.text.trim());
-          await prefs.setString('email', userData['email'] as String? ?? _regEmailController.text.trim());
+          await prefs.setString('email', userData['email'] as String? ?? registeredEmail);
           await prefs.setString('token', accessToken); // Store as 'token' for compatibility
           if (refreshToken != null && refreshToken.isNotEmpty) {
             await prefs.setString('refresh_token', refreshToken);
@@ -641,6 +712,14 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
           // For register, always go to role selection (first time)
           await prefs.setBool('profileCompleted', false);
 
+          _showSuccessDialog(
+            "Registration Successful",
+            data['message'] ?? "Account created! Please verify your email to continue.",
+            switchToLogin: true,
+            goToRole: false,
+            email: registeredEmail,
+          );
+
           setState(() {
             _regUserController.clear();
             _regEmailController.clear();
@@ -649,12 +728,6 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
             _agreeToTerms = false;
             _passwordStrength = 0.0;
           });
-          _showSuccessDialog(
-            "Registration Successful",
-            data['message'] ?? "Your account has been created! Please select your role to complete setup.",
-            switchToLogin: false,
-            goToRole: true,
-          );
         } else {
           final message = data['message'] ?? "Unable to create account. Please check your input and try again.";
           if (message.contains("username")) {
@@ -988,6 +1061,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
           ),
           if (_isLoading)
             Container(
+              // ignore: deprecated_member_use
               color: Colors.black.withOpacity(0.3),
               child: Center(
                 child: CircularProgressIndicator(

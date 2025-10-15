@@ -242,8 +242,8 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
         industryFilters[industry] = value ?? !industryFilters[industry]!;
         if (!industryFilters[industry]!) {
           selectedIndustry = null;
-        } else if (selectedIndustry == null) {
-          selectedIndustry = industry;
+        } else {
+          selectedIndustry ??= industry;
         }
       });
     }

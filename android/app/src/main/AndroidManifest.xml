@@ -48,19 +48,16 @@
 
             <!-- Deep link handling -->
             <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https"
-                      android:host="server.awarcrown.com"
-                      android:pathPrefix="/verify" />
-            </intent-filter>
-            <intent-filter android:autoVerify="true">
-    <action android:name="android.intent.action.VIEW" />
-    <category android:name="android.intent.category.DEFAULT" />
-    <category android:name="android.intent.category.BROWSABLE" />
-    <data android:scheme="https" android:host="share.awarcrown.com" />
-  </intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+
+        <!-- Multiple subdomains supported -->
+        <data android:scheme="https" android:host="server.awarcrown.com" android:pathPrefix="/verify" />
+        <data android:scheme="https" android:host="share.awarcrown.com" />
+        <data android:scheme="https" android:host="royalgate.awarcrown.com" />
+        <data android:scheme="https" android:host="vanguard.awarcrown.com" />
+    </intent-filter>
 
         </activity>
 

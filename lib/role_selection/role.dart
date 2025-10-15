@@ -79,6 +79,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
   String? _email;
   String? _id;
   String? _role;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -96,7 +97,12 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       _id = prefs.getString('id');
       _role = prefs.getString('role');
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) => _checkFormStatus());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setState(() {
+        _isLoading = true;
+      });
+      _checkFormStatus();
+    });
   }
 
   Future<void> _checkFormStatus() async {
@@ -190,10 +196,15 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
             MaterialPageRoute(builder: (context) => loadRolePage(route)),
           );
         }
+        return;
       }
-      return;
     }
     // Stay on role selection by default
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   String _getRouteForRole(String role) {
@@ -253,6 +264,57 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
+
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          title: Text(
+            'Welcome, $_username!',
+            style: const TextStyle(
+              color: Color(0xFF2C3E50),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          centerTitle: true,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.logout, color: Color(0xFF2C3E50)),
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.clear(); // Logout: clear all
+                if (mounted) {
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AuthLogReg()),
+                  );
+                }
+              },
+            ),
+          ],
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF27AE60)),
+              ),
+              SizedBox(height: 16),
+              Text(
+                'Checking your profile...',
+                style: TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFF333333),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
