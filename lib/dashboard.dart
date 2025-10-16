@@ -4,10 +4,16 @@ import 'package:ideaship/feed/createpost.dart';
 import 'package:ideaship/feed/posts.dart';
 import 'package:ideaship/feed/startups.dart';
 import 'package:ideaship/jobs/job_drawer.dart';
+import 'package:ideaship/main.dart';
 import 'package:ideaship/settings/usersettings.dart';
 import 'package:ideaship/user/userprofile.dart';
 import 'package:ideaship/thr_project/threads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart' as lpn;  // Alias to avoid conflict
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -36,6 +42,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     _tabController.addListener(_handleTabChange);
     _loadUserData();
     _loadThemePreference();
+    _setupFCM();  // Centralized FCM setup here
   }
 
   @override
@@ -93,6 +100,207 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
         _showErrorBanner('Failed to load user data: ${e.toString()}');
       }
     }
+  }
+
+  Future<void> _setupFCM() async {
+    final fcm = FirebaseMessaging.instance;
+
+    // Request permissions (existing)
+    NotificationSettings settings = await fcm.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,  // For iOS critical alerts if needed
+    );
+    debugPrint('User granted permission: ${settings.authorizationStatus}');
+
+    // Get token and send to backend (existing, with try-catch for FIS error)
+    String? token;
+    try {
+      token = await fcm.getToken();
+    } catch (e) {
+      debugPrint('FCM Token Error: $e');
+      // Retry logic if needed (as in previous fix)
+    }
+    if (token != null && _username != null && _username!.isNotEmpty) {
+      try {
+        await http.post(
+          Uri.parse('https://server.awarcrown.com/threads/update_token'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({'username': _username, 'token': token}),
+        );
+        debugPrint('FCM token sent to server: $token');
+      } catch (e) {
+        debugPrint('Error updating FCM token: $e');
+      }
+    }
+
+    // Foreground: Show LOCAL notification (WhatsApp-style tray)
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('Foreground message: ${message.notification?.title}');
+      _showLocalNotification(message);  // New: Use local plugin
+    });
+
+    // Background/Terminated tap: Navigate (FCM auto-shows system notif)
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      final data = message.data;
+      _handleNotificationNavigation(data);
+    });
+
+    // Initial message (app opened from terminated notif)
+    RemoteMessage? initialMessage = await fcm.getInitialMessage();
+    if (initialMessage != null) {
+      _handleNotificationNavigation(initialMessage.data);
+    }
+  }
+
+  void _handleNotificationNavigation(Map<String, dynamic> data) {
+    try {
+      if (data['type'] == 'new_comment' ||
+          data['type'] == 'inspired' ||
+          data['type'] == 'collab_request') {
+        final threadId = int.tryParse(data['thread_id'] ?? '');
+        if (threadId != null) _fetchAndNavigateToThread(threadId);
+      } else if (data['type'] == 'new_post_comment') {
+        final postId = int.tryParse(data['post_id'] ?? '');
+        if (postId != null) _fetchAndNavigateToPost(postId);
+      } else {
+        debugPrint('Unhandled notification type: ${data['type']}');
+      }
+    } catch (e) {
+      debugPrint('Error handling notification navigation: $e');
+    }
+  }
+
+  Future<void> _fetchAndNavigateToPost(int postId) async {
+    if (_username == null || _username!.isEmpty) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://server.awarcrown.com/feed/fetch_single_post?post_id=$postId&username=${Uri.encodeComponent(_username!)}'),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final post = data['post'] ?? {};
+        if (post.isNotEmpty) {
+          final commentsResponse = await http.get(
+            Uri.parse(
+                'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username!)}'),
+          ).timeout(const Duration(seconds: 10));
+
+          List<dynamic> comments = [];
+          if (commentsResponse.statusCode == 200) {
+            final commentsData = json.decode(commentsResponse.body);
+            comments = commentsData['comments'] ?? [];
+          }
+
+          final prefs = await SharedPreferences.getInstance();
+          final userId = prefs.getInt('user_id');
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Opening post...')),
+            );
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CommentsPage(
+                  post: post,
+                  comments: comments,
+                  username: _username!,
+                  userId: userId,
+                ),
+              ),
+            );
+          }
+        } else {
+          _showErrorBanner('Post not found');
+        }
+      } else {
+        _showErrorBanner('Failed to load post');
+      }
+    } catch (e) {
+      debugPrint('Error fetching post: $e');
+      _showErrorBanner('Error loading post: $e');
+    }
+  }
+
+  Future<void> _fetchAndNavigateToThread(int threadId) async {
+    if (_username == null || _username!.isEmpty) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('https://server.awarcrown.com/threads/$threadId'),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final thread = Thread.fromJson(data);
+
+        final prefs = await SharedPreferences.getInstance();
+        final userId = prefs.getInt('user_id');
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Opening thread...')),
+          );
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ThreadDetailScreen(
+                thread: thread,
+                username: _username!,
+                userId: userId ?? 0,
+              ),
+            ),
+          );
+        }
+      } else {
+        _showErrorBanner('Failed to load thread');
+      }
+    } catch (e) {
+      debugPrint('Error fetching thread: $e');
+      _showErrorBanner('Error loading thread: $e');
+    }
+  }
+
+  Future<void> _showLocalNotification(RemoteMessage message) async {
+    // Use the global plugin
+    const lpn.AndroidNotificationDetails androidPlatformChannelSpecifics =
+        lpn.AndroidNotificationDetails(
+      'high_importance_channel',
+      'High Importance Notifications',
+      channelDescription: 'Your app notifications',
+      importance: lpn.Importance.max,
+      priority: lpn.Priority.high,
+      showWhen: false,
+      icon: '@drawable/ic_notification',  // Custom icon
+    );
+
+    const lpn.DarwinNotificationDetails iOSPlatformChannelSpecifics =
+        lpn.DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+
+    const lpn.NotificationDetails platformChannelSpecifics = lpn.NotificationDetails(
+      android: androidPlatformChannelSpecifics,
+      iOS: iOSPlatformChannelSpecifics,
+    );
+
+    final title = message.notification?.title ?? message.data['title'] ?? 'Notification';
+    final body = message.notification?.body ?? message.data['body'] ?? '';
+
+    await flutterLocalNotificationsPlugin.show(
+      0,  // ID
+      title,
+      body,
+      platformChannelSpecifics,
+      payload: json.encode(message.data),  // For tap handling
+    );
   }
 
   void _showErrorBanner(String message) {

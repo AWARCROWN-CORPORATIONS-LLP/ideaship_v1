@@ -86,6 +86,8 @@ class Comment {
 }
 
 class ThreadsScreen extends StatefulWidget {
+  const ThreadsScreen({super.key});
+
   @override
   _ThreadsScreenState createState() => _ThreadsScreenState();
 }

@@ -714,6 +714,7 @@ class _CommentsPageState extends State<CommentsPage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    // ignore: unused_local_variable
     final postId = post['post_id'];
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -1433,6 +1434,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (BuildContext context) {
+        // ignore: unused_local_variable
         final colorScheme = Theme.of(context).colorScheme;
         return Container(
           padding: const EdgeInsets.all(16),

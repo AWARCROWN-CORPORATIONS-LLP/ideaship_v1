@@ -457,7 +457,6 @@ class _UserProfileState extends State<UserProfile> {
             color: colorScheme.onSurface,
           ),
         ),
-        children: fields,
         tilePadding: const EdgeInsets.symmetric(horizontal: 16.0),
         childrenPadding: const EdgeInsets.all(16.0),
         collapsedShape: RoundedRectangleBorder(
@@ -466,6 +465,7 @@ class _UserProfileState extends State<UserProfile> {
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
+        children: fields,
       ),
     );
   }

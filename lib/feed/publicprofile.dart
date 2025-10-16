@@ -665,6 +665,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> with TickerProvid
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (BuildContext context) {
+        // ignore: unused_local_variable
         final colorScheme = Theme.of(context).colorScheme;
         return Container(
           padding: const EdgeInsets.all(16),

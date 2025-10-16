@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "152237713909",
-    "project_id": "ideaship-thread-notifications",
-    "storage_bucket": "ideaship-thread-notifications.firebasestorage.app"
+    "project_number": "547705842775",
+    "project_id": "ideashipthreads-notifications",
+    "storage_bucket": "ideashipthreads-notifications.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:152237713909:android:69e015997b5e96761398bc",
+        "mobilesdk_app_id": "1:547705842775:android:0f945aa210b9befa820712",
         "android_client_info": {
           "package_name": "com.example.ideaship_ui"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyB8Ko_Qqlb_Vnx2CVv73H_uDi0at5li-Os"
+          "current_key": "AIzaSyB8u9Yakt55GNc72TImNKUTO7uE2Uj97B4"
         }
       ],
       "services": {
