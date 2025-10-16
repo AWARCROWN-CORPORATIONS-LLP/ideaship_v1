@@ -27,36 +27,13 @@ class _StudentRolePageState extends State<StudentRolePage> {
   final _nationalityController = TextEditingController();
   final _institutionController = TextEditingController();
   final _studentIdController = TextEditingController();
-  final _employeeIdController = TextEditingController();
-  final _jobTitleController = TextEditingController();
-  final _companyController = TextEditingController();
   final _linkedinController = TextEditingController();
   final _academicLevelController = TextEditingController();
   final _majorController = TextEditingController();
-  final _gpaController = TextEditingController();
-  final _courseworkController = TextEditingController();
-  final _extracurricularController = TextEditingController();
-  final _workExpController = TextEditingController();
-  final _skillsController = TextEditingController();
-  final _projectsController = TextEditingController();
-  final _certificationsController = TextEditingController();
   final _portfolioController = TextEditingController();
-  final _careerGoalsController = TextEditingController();
-  final _industryPrefController = TextEditingController();
-  final _jobTypeController = TextEditingController();
-  final _locationPrefController = TextEditingController();
-  final _workEnvController = TextEditingController();
-  final _availabilityController = TextEditingController();
   final _skillsDevController = TextEditingController();
   final _interestsController = TextEditingController();
-  final _govIdController = TextEditingController();
-  final _referenceController = TextEditingController();
   final _expectedPassoutYearController = TextEditingController();
-  bool _bgCheckConsent = false;
-  bool _isStudent = true;
-  String? _educationStatus;
-  String? _jobStatus;
-  String? _govIdType;
   String _username = '';
   String _email = '';
   String _id = '';
@@ -66,15 +43,7 @@ class _StudentRolePageState extends State<StudentRolePage> {
   final List<String> nationalities = ['United States', 'India', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'China', 'Japan', 'Brazil'];
   final List<String> academicLevels = ['High School', 'Bachelor\'s', 'Master\'s', 'PhD', 'Other'];
   final List<String> majors = ['Computer Science', 'Engineering', 'Business', 'Medicine', 'Arts', 'Law', 'Other'];
-  final List<String> industries = ['Tech', 'Finance', 'Healthcare', 'Education', 'Marketing', 'Other'];
-  final List<String> jobTypes = ['Full-time', 'Part-time', 'Internship', 'Freelance', 'Remote'];
-  final List<String> locations = ['New York', 'London', 'Mumbai', 'Toronto', 'Sydney', 'Berlin', 'Paris', 'Beijing', 'Tokyo', 'Sao Paulo'];
-  final List<String> workEnvs = ['Office', 'Remote', 'Hybrid'];
-  final List<String> availabilities = ['Immediate', '1-3 months', '3-6 months', '6+ months'];
   final List<String> skillsDevs = ['Leadership', 'Coding', 'Public Speaking', 'Project Management', 'Data Analysis', 'Other'];
-  final List<String> educationStatuses = ['Still Studying', 'Graduated'];
-  final List<String> jobStatuses = ['Current Job', 'Past Job'];
-  final List<String> govIdTypes = ['Aadhar', 'PAN', 'Passport', 'Other'];
 
   @override
   void initState() {
@@ -157,7 +126,6 @@ class _StudentRolePageState extends State<StudentRolePage> {
       final prefs = await SharedPreferences.getInstance();
       setState(() {
         _currentStep = prefs.getInt('currentStep') ?? 0;
-        _isStudent = prefs.getBool('isStudent') ?? true;
         _fullNameController.text = prefs.getString('fullName') ?? '';
         _dobController.text = prefs.getString('dob') ?? DateFormat('yyyy-MM-dd').format(DateTime.now().subtract(const Duration(days: 7300)));
         _phoneController.text = prefs.getString('phone') ?? '';
@@ -165,35 +133,13 @@ class _StudentRolePageState extends State<StudentRolePage> {
         _nationalityController.text = prefs.getString('nationality') ?? '';
         _institutionController.text = prefs.getString('institution') ?? '';
         _studentIdController.text = prefs.getString('studentId') ?? '';
-        _employeeIdController.text = prefs.getString('employeeId') ?? '';
-        _jobTitleController.text = prefs.getString('jobTitle') ?? '';
-        _companyController.text = prefs.getString('company') ?? '';
         _linkedinController.text = prefs.getString('linkedin') ?? '';
         _academicLevelController.text = prefs.getString('academicLevel') ?? '';
         _majorController.text = prefs.getString('major') ?? '';
-        _gpaController.text = prefs.getString('gpa') ?? '';
-        _courseworkController.text = prefs.getString('coursework') ?? '';
-        _extracurricularController.text = prefs.getString('extracurricular') ?? '';
-        _workExpController.text = prefs.getString('workExp') ?? '';
-        _skillsController.text = prefs.getString('skills') ?? '';
-        _projectsController.text = prefs.getString('projects') ?? '';
-        _certificationsController.text = prefs.getString('certifications') ?? '';
         _portfolioController.text = prefs.getString('portfolio') ?? '';
-        _careerGoalsController.text = prefs.getString('careerGoals') ?? '';
-        _industryPrefController.text = prefs.getString('industryPref') ?? '';
-        _jobTypeController.text = prefs.getString('jobType') ?? '';
-        _locationPrefController.text = prefs.getString('locationPref') ?? '';
-        _workEnvController.text = prefs.getString('workEnv') ?? '';
-        _availabilityController.text = prefs.getString('availability') ?? '';
         _skillsDevController.text = prefs.getString('skillsDev') ?? '';
         _interestsController.text = prefs.getString('interests') ?? '';
-        _govIdController.text = prefs.getString('govId') ?? '';
-        _govIdType = prefs.getString('govIdType');
-        _referenceController.text = prefs.getString('reference') ?? '';
         _expectedPassoutYearController.text = prefs.getString('expectedPassoutYear') ?? '';
-        _educationStatus = prefs.getString('educationStatus');
-        _jobStatus = prefs.getString('jobStatus');
-        _bgCheckConsent = prefs.getBool('bgCheckConsent') ?? false;
       });
     } catch (e) {
       print('Error loading form data: $e');
@@ -205,7 +151,6 @@ class _StudentRolePageState extends State<StudentRolePage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('currentStep', _currentStep);
-      await prefs.setBool('isStudent', _isStudent);
       await prefs.setString('fullName', _fullNameController.text);
       await prefs.setString('dob', _dobController.text);
       await prefs.setString('phone', _phoneController.text);
@@ -213,35 +158,13 @@ class _StudentRolePageState extends State<StudentRolePage> {
       await prefs.setString('nationality', _nationalityController.text);
       await prefs.setString('institution', _institutionController.text);
       await prefs.setString('studentId', _studentIdController.text);
-      await prefs.setString('employeeId', _employeeIdController.text);
-      await prefs.setString('jobTitle', _jobTitleController.text);
-      await prefs.setString('company', _companyController.text);
       await prefs.setString('linkedin', _linkedinController.text);
       await prefs.setString('academicLevel', _academicLevelController.text);
       await prefs.setString('major', _majorController.text);
-      await prefs.setString('gpa', _gpaController.text);
-      await prefs.setString('coursework', _courseworkController.text);
-      await prefs.setString('extracurricular', _extracurricularController.text);
-      await prefs.setString('workExp', _workExpController.text);
-      await prefs.setString('skills', _skillsController.text);
-      await prefs.setString('projects', _projectsController.text);
-      await prefs.setString('certifications', _certificationsController.text);
       await prefs.setString('portfolio', _portfolioController.text);
-      await prefs.setString('careerGoals', _careerGoalsController.text);
-      await prefs.setString('industryPref', _industryPrefController.text);
-      await prefs.setString('jobType', _jobTypeController.text);
-      await prefs.setString('locationPref', _locationPrefController.text);
-      await prefs.setString('workEnv', _workEnvController.text);
-      await prefs.setString('availability', _availabilityController.text);
       await prefs.setString('skillsDev', _skillsDevController.text);
       await prefs.setString('interests', _interestsController.text);
-      await prefs.setString('govId', _govIdController.text);
-      if (_govIdType != null) await prefs.setString('govIdType', _govIdType!);
-      await prefs.setString('reference', _referenceController.text);
       await prefs.setString('expectedPassoutYear', _expectedPassoutYearController.text);
-      if (_educationStatus != null) await prefs.setString('educationStatus', _educationStatus!);
-      if (_jobStatus != null) await prefs.setString('jobStatus', _jobStatus!);
-      await prefs.setBool('bgCheckConsent', _bgCheckConsent);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -262,7 +185,6 @@ class _StudentRolePageState extends State<StudentRolePage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('currentStep');
-      await prefs.remove('isStudent');
       await prefs.remove('fullName');
       await prefs.remove('dob');
       await prefs.remove('phone');
@@ -270,35 +192,13 @@ class _StudentRolePageState extends State<StudentRolePage> {
       await prefs.remove('nationality');
       await prefs.remove('institution');
       await prefs.remove('studentId');
-      await prefs.remove('employeeId');
-      await prefs.remove('jobTitle');
-      await prefs.remove('company');
       await prefs.remove('linkedin');
       await prefs.remove('academicLevel');
       await prefs.remove('major');
-      await prefs.remove('gpa');
-      await prefs.remove('coursework');
-      await prefs.remove('extracurricular');
-      await prefs.remove('workExp');
-      await prefs.remove('skills');
-      await prefs.remove('projects');
-      await prefs.remove('certifications');
       await prefs.remove('portfolio');
-      await prefs.remove('careerGoals');
-      await prefs.remove('industryPref');
-      await prefs.remove('jobType');
-      await prefs.remove('locationPref');
-      await prefs.remove('workEnv');
-      await prefs.remove('availability');
       await prefs.remove('skillsDev');
       await prefs.remove('interests');
-      await prefs.remove('govId');
-      await prefs.remove('govIdType');
-      await prefs.remove('reference');
       await prefs.remove('expectedPassoutYear');
-      await prefs.remove('educationStatus');
-      await prefs.remove('jobStatus');
-      await prefs.remove('bgCheckConsent');
     } catch (e) {
       print('Error clearing form data: $e');
     }
@@ -315,30 +215,12 @@ class _StudentRolePageState extends State<StudentRolePage> {
     _nationalityController.dispose();
     _institutionController.dispose();
     _studentIdController.dispose();
-    _employeeIdController.dispose();
-    _jobTitleController.dispose();
-    _companyController.dispose();
     _linkedinController.dispose();
     _academicLevelController.dispose();
     _majorController.dispose();
-    _gpaController.dispose();
-    _courseworkController.dispose();
-    _extracurricularController.dispose();
-    _workExpController.dispose();
-    _skillsController.dispose();
-    _projectsController.dispose();
-    _certificationsController.dispose();
     _portfolioController.dispose();
-    _careerGoalsController.dispose();
-    _industryPrefController.dispose();
-    _jobTypeController.dispose();
-    _locationPrefController.dispose();
-    _workEnvController.dispose();
-    _availabilityController.dispose();
     _skillsDevController.dispose();
     _interestsController.dispose();
-    _govIdController.dispose();
-    _referenceController.dispose();
     _expectedPassoutYearController.dispose();
     super.dispose();
   }
@@ -346,7 +228,7 @@ class _StudentRolePageState extends State<StudentRolePage> {
   void _nextStep() {
     if (_formKey.currentState!.validate()) {
       _saveFormData(); // Save data before moving to next step
-      if (_currentStep < 3) {
+      if (_currentStep < 2) {
         setState(() => _currentStep++);
       } else {
         _submitForm();
@@ -402,7 +284,7 @@ class _StudentRolePageState extends State<StudentRolePage> {
           // Handle duplicate: set completed and navigate
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('profileCompleted', true);
-          await prefs.setString('role', _isStudent ? 'student' : 'professional');
+          await prefs.setString('role', 'student');
           await _clearFormData();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -434,7 +316,7 @@ class _StudentRolePageState extends State<StudentRolePage> {
 
       if (isSuccess) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('role', _isStudent ? 'student' : 'professional');
+        await prefs.setString('role', 'student');
         await prefs.setBool('profileCompleted', true);
         await prefs.setString('fullName', _fullNameController.text);
         await prefs.setString('phone', _phoneController.text);
@@ -501,38 +383,16 @@ class _StudentRolePageState extends State<StudentRolePage> {
       'address': _addressController.text,
       'nationality': _nationalityController.text,
       'institution': _institutionController.text,
-      'student_id': _isStudent ? _studentIdController.text : '',
-      'employee_id': !_isStudent ? _employeeIdController.text : '',
-      'job_title': _jobTitleController.text,
-      'company': _companyController.text,
+      'student_id': _studentIdController.text,
       'linkedin': _linkedinController.text,
       'academic_level': _academicLevelController.text,
       'major': _majorController.text,
-      'gpa': _gpaController.text,
-      'coursework': _courseworkController.text,
-      'extracurricular': _extracurricularController.text,
-      'work_exp': _workExpController.text,
-      'skills': _skillsController.text,
-      'projects': _projectsController.text,
-      'certifications': _certificationsController.text,
       'portfolio': _portfolioController.text,
-      'career_goals': _careerGoalsController.text,
-      'industry_pref': _industryPrefController.text,
-      'job_type': _jobTypeController.text,
-      'location_pref': _locationPrefController.text,
-      'work_env': _workEnvController.text,
-      'availability': _availabilityController.text,
       'skills_dev': _skillsDevController.text,
       'interests': _interestsController.text,
-      'education_status': _educationStatus ?? '',
       'expected_passout_year': _expectedPassoutYearController.text,
-      'job_status': _jobStatus ?? '',
-      'gov_id': _govIdController.text,
-      'gov_id_type': _govIdType ?? '',
       'email_verification': 'verified',
-      'reference': _referenceController.text,
-      'bg_check_consent': _bgCheckConsent.toString(),
-      'role_type': _isStudent ? 'student' : 'professional',
+      'role_type': 'student',
     };
     return http
         .post(
@@ -549,7 +409,7 @@ class _StudentRolePageState extends State<StudentRolePage> {
       margin: EdgeInsets.symmetric(vertical: screenWidth * 0.02),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(4, (index) {
+        children: List.generate(3, (index) {
           return Expanded(
             child: Column(
               children: [
@@ -573,7 +433,7 @@ class _StudentRolePageState extends State<StudentRolePage> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  ['Basics', 'Experience', 'Preferences', 'Verify'][index],
+                  ['Basics', 'Experience', 'Preferences'][index],
                   style: TextStyle(
                     fontSize: 12,
                     color: index <= _currentStep ? const Color(0xFF27AE60) : Colors.grey,
@@ -595,8 +455,6 @@ class _StudentRolePageState extends State<StudentRolePage> {
         return _buildExperienceStep();
       case 2:
         return _buildPreferencesStep();
-      case 3:
-        return _buildVerificationStep();
       default:
         return const SizedBox();
     }
@@ -621,29 +479,10 @@ class _StudentRolePageState extends State<StudentRolePage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Start your journey to the world\'s largest career network! Choose if you are a Student or Professional to tailor the form.',
+                  'Start your journey to the world\'s largest career network!',
                   style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                 ),
                 const SizedBox(height: 20),
-                Row(
-                  children: [
-                    Radio<bool>(
-                      value: true,
-                      groupValue: _isStudent,
-                      onChanged: (value) => setState(() => _isStudent = value!),
-                      activeColor: const Color(0xFF27AE60),
-                    ),
-                    const Text('Student'),
-                    Radio<bool>(
-                      value: false,
-                      groupValue: _isStudent,
-                      onChanged: (value) => setState(() => _isStudent = value!),
-                      activeColor: const Color(0xFF27AE60),
-                    ),
-                    const Text('Professional'),
-                  ],
-                ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: _usernameController,
                   decoration: InputDecoration(
@@ -776,11 +615,11 @@ class _StudentRolePageState extends State<StudentRolePage> {
                 TextFormField(
                   controller: _institutionController,
                   decoration: InputDecoration(
-                    labelText: 'Educational Institution / Current Employer',
-                    hintText: 'e.g., Harvard University or Google Inc.',
+                    labelText: 'Educational Institution',
+                    hintText: 'e.g., Harvard University',
                     prefixIcon: const Icon(Icons.school, color: Color(0xFF27AE60)),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'Name of your current school/university or employer',
+                    helperText: 'Name of your current school/university',
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
@@ -789,38 +628,21 @@ class _StudentRolePageState extends State<StudentRolePage> {
                   },
                 ),
                 const SizedBox(height: 16),
-                if (_isStudent)
-                  TextFormField(
-                    controller: _studentIdController,
-                    decoration: InputDecoration(
-                      labelText: 'Student ID / Roll Number',
-                      hintText: 'e.g., 2023001',
-                      prefixIcon: const Icon(Icons.card_membership, color: Color(0xFF27AE60)),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      helperText: 'Your unique student identification number',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) return 'Required';
-                      if (!RegExp(r'^[A-Za-z0-9]+$').hasMatch(value)) return 'Alphanumeric only';
-                      return null;
-                    },
-                  )
-                else
-                  TextFormField(
-                    controller: _employeeIdController,
-                    decoration: InputDecoration(
-                      labelText: 'Employee ID',
-                      hintText: 'e.g., EMP-45678',
-                      prefixIcon: const Icon(Icons.badge, color: Color(0xFF27AE60)),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                      helperText: 'Your unique employee identification number',
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) return 'Required';
-                      if (!RegExp(r'^[A-Za-z0-9\-]+$').hasMatch(value)) return 'Alphanumeric and hyphen only';
-                      return null;
-                    },
+                TextFormField(
+                  controller: _studentIdController,
+                  decoration: InputDecoration(
+                    labelText: 'Student ID / Roll Number',
+                    hintText: 'e.g., 2023001',
+                    prefixIcon: const Icon(Icons.card_membership, color: Color(0xFF27AE60)),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    helperText: 'Your unique student identification number',
                   ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) return 'Required';
+                    if (!RegExp(r'^[A-Za-z0-9]+$').hasMatch(value)) return 'Alphanumeric only';
+                    return null;
+                  },
+                ),
               ],
             ),
           ),
@@ -852,104 +674,6 @@ class _StudentRolePageState extends State<StudentRolePage> {
                   style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
                 const SizedBox(height: 20),
-                if (!_isStudent)
-                  ...[
-                    DropdownButtonFormField<String>(
-                      value: _jobStatus,
-                      decoration: InputDecoration(
-                        labelText: 'Job Status',
-                        hintText: 'Select your current job status',
-                        prefixIcon: const Icon(Icons.work_outline, color: Color(0xFF27AE60)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        helperText: 'Are you currently employed here?',
-                      ),
-                      items: jobStatuses.map((String status) {
-                        return DropdownMenuItem<String>(value: status, child: Text(status));
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _jobStatus = newValue;
-                        });
-                      },
-                      validator: (value) => value == null ? 'Required for professionals' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _jobTitleController,
-                      decoration: InputDecoration(
-                        labelText: 'Current/Past Job Title',
-                        hintText: 'e.g., Software Engineer',
-                        prefixIcon: const Icon(Icons.work, color: Color(0xFF27AE60)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        helperText: '$_jobStatus? Enter job title (required for professionals)',
-                      ),
-                      validator: (value) {
-                        if (!_isStudent && (value == null || value.isEmpty)) return 'Required for professionals';
-                        if (value != null && value.length < 2) return 'Too short';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _companyController,
-                      decoration: InputDecoration(
-                        labelText: 'Current/Past Company',
-                        hintText: 'e.g., Google',
-                        prefixIcon: const Icon(Icons.business, color: Color(0xFF27AE60)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        helperText: 'Company name where you work(ed) (required for professionals)',
-                      ),
-                      validator: (value) {
-                        if (!_isStudent && (value == null || value.isEmpty)) return 'Required for professionals';
-                        if (value != null && value.length < 2) return 'Too short';
-                        return null;
-                      },
-                    ),
-                  ],
-                if (_isStudent)
-                  ...[
-                    DropdownButtonFormField<String>(
-                      value: _educationStatus,
-                      decoration: InputDecoration(
-                        labelText: 'Education Status',
-                        hintText: 'Select your current education status',
-                        prefixIcon: const Icon(Icons.school, color: Color(0xFF27AE60)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        helperText: 'Are you still studying?',
-                      ),
-                      items: educationStatuses.map((String status) {
-                        return DropdownMenuItem<String>(value: status, child: Text(status));
-                      }).toList(),
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          _educationStatus = newValue;
-                        });
-                      },
-                      validator: (value) => value == null ? 'Required for students' : null,
-                    ),
-                    const SizedBox(height: 16),
-                    if (_educationStatus == 'Still Studying')
-                      TextFormField(
-                        controller: _expectedPassoutYearController,
-                        decoration: InputDecoration(
-                          labelText: 'Expected Passout Year',
-                          hintText: 'e.g., 2026',
-                          prefixIcon: const Icon(Icons.calendar_today, color: Color(0xFF27AE60)),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                          helperText: 'Year you expect to graduate',
-                        ),
-                        keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) return 'Required if still studying';
-                          final year = int.tryParse(value);
-                          if (year == null) return 'Enter a valid year';
-                          final currentYear = DateTime.now().year;
-                          if (year < currentYear || year > currentYear + 10) return 'Year must be between $currentYear and ${currentYear + 10}';
-                          return null;
-                        },
-                      ),
-                  ],
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: _linkedinController,
                   decoration: InputDecoration(
@@ -969,11 +693,11 @@ class _StudentRolePageState extends State<StudentRolePage> {
                 DropdownButtonFormField<String>(
                   value: _academicLevelController.text.isEmpty ? null : _academicLevelController.text,
                   decoration: InputDecoration(
-                    labelText: 'Current Academic Level (optional for professionals)',
+                    labelText: 'Current Academic Level',
                     hintText: 'e.g., Bachelor\'s',
                     prefixIcon: const Icon(Icons.book, color: Color(0xFF27AE60)),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: '${_isStudent ? "Required" : "Optional"} - Your highest education level',
+                    helperText: 'Required - Your highest education level',
                   ),
                   items: academicLevels.map((String level) {
                     return DropdownMenuItem<String>(value: level, child: Text(level));
@@ -984,7 +708,7 @@ class _StudentRolePageState extends State<StudentRolePage> {
                     });
                   },
                   validator: (value) {
-                    if (_isStudent && (value == null || value.isEmpty)) return 'Required';
+                    if (value == null || value.isEmpty) return 'Required';
                     return null;
                   },
                 ),
@@ -1002,14 +726,14 @@ class _StudentRolePageState extends State<StudentRolePage> {
                       controller: controller,
                       focusNode: focusNode,
                       decoration: InputDecoration(
-                        labelText: 'Major/Field of Study (optional for professionals)',
+                        labelText: 'Major/Field of Study',
                         hintText: 'e.g., Computer Science',
                         prefixIcon: const Icon(Icons.subject, color: Color(0xFF27AE60)),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        helperText: '${_isStudent ? "Required" : "Optional"} - Your area of study or expertise',
+                        helperText: 'Required - Your area of study or expertise',
                       ),
                       validator: (value) {
-                        if (_isStudent && (value == null || value.isEmpty)) return 'Required';
+                        if (value == null || value.isEmpty) return 'Required';
                         return null;
                       },
                       onFieldSubmitted: (String value) => onFieldSubmitted(),
@@ -1018,122 +742,23 @@ class _StudentRolePageState extends State<StudentRolePage> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
-                  controller: _gpaController,
+                  controller: _expectedPassoutYearController,
                   decoration: InputDecoration(
-                    labelText: 'GPA/Grades (optional)',
-                    hintText: 'e.g., 3.8/4.0',
-                    prefixIcon: const Icon(Icons.grade, color: Color(0xFF27AE60)),
+                    labelText: 'Expected Passout Year',
+                    hintText: 'e.g., 2026',
+                    prefixIcon: const Icon(Icons.calendar_today, color: Color(0xFF27AE60)),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'Your academic performance (format: X/Y)',
+                    helperText: 'Year you expect to graduate',
                   ),
                   keyboardType: TextInputType.number,
                   validator: (value) {
-                    if (value == null || value.isEmpty) return null;
-                    if (!RegExp(r'^[\d.]+/[1-4]$').hasMatch(value)) return 'Format: X/Y where Y is 1-4';
-                    final parts = value.split('/');
-                    final gpa = double.tryParse(parts[0]);
-                    final scale = int.tryParse(parts[1]);
-                    if (gpa == null || gpa < 0 || gpa > scale!) return 'GPA must be 0 to $scale';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _courseworkController,
-                  decoration: InputDecoration(
-                    labelText: 'Relevant Coursework (optional for professionals)',
-                    hintText: 'e.g., Data Structures, Machine Learning',
-                    prefixIcon: const Icon(Icons.menu_book, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: '${_isStudent ? "Required" : "Optional"} - Key courses you\'ve taken',
-                  ),
-                  maxLines: 3,
-                  validator: (value) {
-                    if (_isStudent && (value == null || value.isEmpty)) return 'Required';
-                    if (value != null && value.length < 10) return 'At least 10 characters';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _extracurricularController,
-                  decoration: InputDecoration(
-                    labelText: 'Extracurricular Activities / Professional Achievements (optional)',
-                    hintText: 'e.g., Debate Club, Hackathon Winner',
-                    prefixIcon: const Icon(Icons.group, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'Clubs, events, or achievements that showcase your skills',
-                  ),
-                  maxLines: 3,
-                  validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
-                    if (value.length < 10) return 'At least 10 characters';
+                    final year = int.tryParse(value);
+                    if (year == null) return 'Enter a valid year';
+                    final currentYear = DateTime.now().year;
+                    if (year < currentYear || year > currentYear + 10) return 'Year must be between $currentYear and ${currentYear + 10}';
                     return null;
                   },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _workExpController,
-                  decoration: InputDecoration(
-                    labelText: 'Work Experience / Internships (optional for students)',
-                    hintText: 'e.g., Summer intern at XYZ Corp, 3 months',
-                    prefixIcon: const Icon(Icons.work, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: '${_isStudent ? "Optional - include internships" : "Required"} - Describe roles and duration',
-                  ),
-                  maxLines: 3,
-                  validator: (value) {
-                    if (!_isStudent && (value == null || value.isEmpty)) return 'Required';
-                    if (value != null && value.length < 20) return 'At least 20 characters describing experience';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _skillsController,
-                  decoration: InputDecoration(
-                    labelText: 'Skills',
-                    hintText: 'e.g., Python, Leadership, Teamwork',
-                    prefixIcon: const Icon(Icons.lightbulb, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'List 3-5 key skills separated by commas',
-                  ),
-                  maxLines: 3,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    final skills = value.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-                    if (skills.length < 3) return 'At least 3 skills';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _projectsController,
-                  decoration: InputDecoration(
-                    labelText: 'Projects',
-                    hintText: 'e.g., Built a web app using React',
-                    prefixIcon: const Icon(Icons.folder, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'Describe 1-3 notable projects with outcomes',
-                  ),
-                  maxLines: 3,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (value.length < 20) return 'At least 20 characters';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _certificationsController,
-                  decoration: InputDecoration(
-                    labelText: 'Certifications (optional)',
-                    hintText: 'e.g., AWS Certified Developer',
-                    prefixIcon: const Icon(Icons.verified, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'List relevant certifications with issuing body',
-                  ),
-                  maxLines: 2,
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
@@ -1183,139 +808,6 @@ class _StudentRolePageState extends State<StudentRolePage> {
                   style: TextStyle(fontSize: 14, color: Colors.grey),
                 ),
                 const SizedBox(height: 20),
-                TextFormField(
-                  controller: _careerGoalsController,
-                  decoration: InputDecoration(
-                    labelText: 'Career Goals',
-                    hintText: 'e.g., Become a full-stack developer',
-                    prefixIcon: const Icon(Icons.star, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'Short-term and long-term career objectives',
-                  ),
-                  maxLines: 3,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (value.length < 20) return 'At least 20 characters';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                Autocomplete<String>(
-                  optionsBuilder: (TextEditingValue textEditingValue) {
-                    return industries.where((String option) => option.toLowerCase().contains(textEditingValue.text.toLowerCase())).toList();
-                  },
-                  onSelected: (String selection) {
-                    _industryPrefController.text = selection;
-                  },
-                  fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                    _industryPrefController.text = controller.text;
-                    return TextFormField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      decoration: InputDecoration(
-                        labelText: 'Industry Preferences',
-                        hintText: 'e.g., Tech',
-                        prefixIcon: const Icon(Icons.business_center, color: Color(0xFF27AE60)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        helperText: 'Preferred sectors to work in',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Required';
-                        return null;
-                      },
-                      onFieldSubmitted: (String value) => onFieldSubmitted(),
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _jobTypeController.text.isEmpty ? null : _jobTypeController.text,
-                  decoration: InputDecoration(
-                    labelText: 'Job/Opportunity Type',
-                    hintText: 'e.g., Full-time',
-                    prefixIcon: const Icon(Icons.work_outline, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'Type of role you are seeking',
-                  ),
-                  items: jobTypes.map((String type) {
-                    return DropdownMenuItem<String>(value: type, child: Text(type));
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _jobTypeController.text = newValue ?? '';
-                    });
-                  },
-                  validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                Autocomplete<String>(
-                  optionsBuilder: (TextEditingValue textEditingValue) {
-                    return locations.where((String option) => option.toLowerCase().contains(textEditingValue.text.toLowerCase())).toList();
-                  },
-                  onSelected: (String selection) {
-                    _locationPrefController.text = selection;
-                  },
-                  fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                    _locationPrefController.text = controller.text;
-                    return TextFormField(
-                      controller: controller,
-                      focusNode: focusNode,
-                      decoration: InputDecoration(
-                        labelText: 'Location Preferences',
-                        hintText: 'e.g., New York',
-                        prefixIcon: const Icon(Icons.map, color: Color(0xFF27AE60)),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        helperText: 'Preferred work locations (cities/countries)',
-                      ),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) return 'Required';
-                        return null;
-                      },
-                      onFieldSubmitted: (String value) => onFieldSubmitted(),
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _workEnvController.text.isEmpty ? null : _workEnvController.text,
-                  decoration: InputDecoration(
-                    labelText: 'Work Environment',
-                    hintText: 'e.g., Remote',
-                    prefixIcon: const Icon(Icons.home_work, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'Preferred work setup',
-                  ),
-                  items: workEnvs.map((String env) {
-                    return DropdownMenuItem<String>(value: env, child: Text(env));
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _workEnvController.text = newValue ?? '';
-                    });
-                  },
-                  validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: _availabilityController.text.isEmpty ? null : _availabilityController.text,
-                  decoration: InputDecoration(
-                    labelText: 'Availability',
-                    hintText: 'e.g., Immediate',
-                    prefixIcon: const Icon(Icons.schedule, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'When can you start?',
-                  ),
-                  items: availabilities.map((String avail) {
-                    return DropdownMenuItem<String>(value: avail, child: Text(avail));
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _availabilityController.text = newValue ?? '';
-                    });
-                  },
-                  validator: (value) => value == null || value.isEmpty ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
                 Autocomplete<String>(
                   optionsBuilder: (TextEditingValue textEditingValue) {
                     return skillsDevs.where((String option) => option.toLowerCase().contains(textEditingValue.text.toLowerCase())).toList();
@@ -1368,111 +860,6 @@ class _StudentRolePageState extends State<StudentRolePage> {
     );
   }
 
-  Widget _buildVerificationStep() {
-    final screenWidth = MediaQuery.of(context).size.width;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Card(
-          elevation: 4,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          child: Padding(
-            padding: EdgeInsets.all(screenWidth * 0.04),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Step 4: Verify and join',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2C3E50)),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'One last step to unlock your profile and connect with millions!',
-                  style: TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-                const SizedBox(height: 20),
-                DropdownButtonFormField<String>(
-                  value: _govIdType,
-                  decoration: const InputDecoration(
-                    labelText: 'Government ID Type',
-                    hintText: 'Select ID type',
-                    prefixIcon: Icon(Icons.credit_card, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12))),
-                    helperText: 'Choose the type of ID you are providing',
-                  ),
-                  items: govIdTypes.map((String type) {
-                    return DropdownMenuItem<String>(value: type, child: Text(type));
-                  }).toList(),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      _govIdType = newValue;
-                      _govIdController.clear();
-                    });
-                  },
-                  validator: (value) => value == null ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _govIdController,
-                  decoration: InputDecoration(
-                    labelText: 'Government-Issued ID Number',
-                    hintText: _govIdType == 'Aadhar' ? 'e.g., 1234 5678 9012 (12 digits)' : _govIdType == 'PAN' ? 'e.g., ABCDE1234F (10 alphanumeric)' : _govIdType == 'Passport' ? 'e.g., Z1234567 (6-12 chars)' : 'Enter full ID',
-                    prefixIcon: const Icon(Icons.credit_card, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'Provide full ID number for verification',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return 'Required';
-                    if (_govIdType == 'Aadhar' && !RegExp(r'^\d{12}$').hasMatch(value.replaceAll(' ', ''))) return 'Aadhar must be 12 digits';
-                    if (_govIdType == 'PAN' && !RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]{1}$').hasMatch(value.toUpperCase())) return 'PAN must be 10 alphanumeric (5 letters, 4 digits, 1 letter)';
-                    if (_govIdType == 'Passport' && (value.length < 6 || value.length > 12)) return 'Passport ID must be 6-12 characters';
-                    if (_govIdType == 'Other' && value.length < 4) return 'At least 4 characters';
-                    return null;
-                  },
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _referenceController,
-                  decoration: InputDecoration(
-                    labelText: 'Reference Contact (optional)',
-                    hintText: 'e.g., mentor@example.com',
-                    prefixIcon: const Icon(Icons.person_add, color: Color(0xFF27AE60)),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                    helperText: 'Email or phone of a reference person',
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) return null;
-                    if (value.contains('@')) {
-                      if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) return 'Invalid email';
-                    } else if (!RegExp(r'^\+?[\d\s\-\(\)]{10,}$').hasMatch(value)) return 'Invalid phone';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _bgCheckConsent,
-                      activeColor: const Color(0xFF27AE60),
-                      onChanged: (value) => setState(() => _bgCheckConsent = value!),
-                    ),
-                    const Expanded(
-                      child: Text(
-                        'I consent to a background check to ensure a safe community.',
-                        style: TextStyle(fontSize: 14),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _buildNavigationButtons() {
     final screenWidth = MediaQuery.of(context).size.width;
     return Padding(
@@ -1490,7 +877,7 @@ class _StudentRolePageState extends State<StudentRolePage> {
           const Spacer(),
           Row(
             children: [
-              if (_currentStep < 3) // Only show Save & Next for steps before the last
+              if (_currentStep < 2) // Only show Save & Next for steps before the last
                 ElevatedButton(
                   onPressed: _isLoading ? null : () {
                     if (_formKey.currentState!.validate()) {
@@ -1528,7 +915,7 @@ class _StudentRolePageState extends State<StudentRolePage> {
                         height: 20,
                         child: CircularProgressIndicator(strokeWidth: 2, valueColor: AlwaysStoppedAnimation<Color>(Colors.white)),
                       )
-                    : Text(_currentStep == 3 ? 'Join Now' : 'Save & Next'),
+                    : Text(_currentStep == 2 ? 'Join Now' : 'Save & Next'),
               ),
             ],
           ),

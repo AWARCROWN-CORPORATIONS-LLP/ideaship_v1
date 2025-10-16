@@ -1476,7 +1476,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                       icon: const Icon(Icons.camera_alt),
                       label: const Text('Share externally'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.purple,
+                        backgroundColor: const Color.fromARGB(255, 2, 0, 135),
                         foregroundColor: Colors.white,
                       ),
                     ),

@@ -14,7 +14,7 @@ class UserProfile extends StatefulWidget {
   State<UserProfile> createState() => _UserProfileState();
 }
 
-class _UserProfileState extends State<UserProfile> with SingleTickerProviderStateMixin {
+class _UserProfileState extends State<UserProfile> {
   String? _username;
   String? _email;
   String? _role;
@@ -24,14 +24,12 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
   bool _isLoading = true;
   bool _isEditing = false;
   final _formKey = GlobalKey<FormState>();
-  late TabController _tabController;
   XFile? _selectedImage;
   final Map<String, TextEditingController> _controllers = {};
   final Map<String, bool> _expandedSections = {
     'basic': true,
     'personal': true,
     'education': true,
-    'professional': true,
     'preferences': true,
     'company': true,
   };
@@ -39,7 +37,6 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
     _loadUserData();
     _loadThemePreference();
   }
@@ -90,17 +87,54 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
             // Construct full profile picture URL from profile_path
             final profilePath = _profileData?['profile_picture']?.toString();
             _profilePicture = profilePath != null && profilePath.isNotEmpty
-                // ignore: unnecessary_string_interpolations
-                ? '$profilePath'
+                ? 'https://server.awarcrown.com/accessprofile/uploads/$profilePath'
                 : null;
             _username = _profileData?['username']?.toString() ?? _username;
             _email = _profileData?['email']?.toString() ?? _email;
             _controllers.clear();
-            _profileData?.forEach((key, value) {
-              if (key != 'id' && key != 'user_id' && key != 'created_at' && key != 'updated_at' && key != 'profile_id' && key != 'profile_path') {
-                _controllers[key] = TextEditingController(text: value?.toString() ?? '');
-              }
-            });
+            // Common fields
+            _controllers['role'] = TextEditingController(text: _role ?? '');
+            _controllers['full_name'] = TextEditingController(text: _profileData?['full_name']?.toString() ?? '');
+            _controllers['email'] = TextEditingController(text: _profileData?['email']?.toString() ?? '');
+            _controllers['phone'] = TextEditingController(text: _profileData?['phone']?.toString() ?? '');
+            _controllers['dob'] = TextEditingController(text: _profileData?['dob']?.toString() ?? '');
+            _controllers['address'] = TextEditingController(text: _profileData?['address']?.toString() ?? '');
+            _controllers['nationality'] = TextEditingController(text: _profileData?['nationality']?.toString() ?? '');
+            if (_role == 'student') {
+              _controllers['student_id'] = TextEditingController(text: _profileData?['student_id']?.toString() ?? '');
+              _controllers['institution'] = TextEditingController(text: _profileData?['institution']?.toString() ?? '');
+              _controllers['linkedin'] = TextEditingController(text: _profileData?['linkedin']?.toString() ?? '');
+              _controllers['academic_level'] = TextEditingController(text: _profileData?['academic_level']?.toString() ?? '');
+              _controllers['major'] = TextEditingController(text: _profileData?['major']?.toString() ?? '');
+              _controllers['portfolio'] = TextEditingController(text: _profileData?['portfolio']?.toString() ?? '');
+              _controllers['skills_dev'] = TextEditingController(text: _profileData?['skills_dev']?.toString() ?? '');
+              _controllers['interests'] = TextEditingController(text: _profileData?['interests']?.toString() ?? '');
+              _controllers['expected_passout_year'] = TextEditingController(text: _profileData?['expected_passout_year']?.toString() ?? '');
+            } else if (_role == 'Company/HR') {
+              _controllers['company_name'] = TextEditingController(text: _profileData?['company_name']?.toString() ?? '');
+              _controllers['contact_person_name'] = TextEditingController(text: _profileData?['contact_person_name']?.toString() ?? '');
+              _controllers['contact_designation'] = TextEditingController(text: _profileData?['contact_designation']?.toString() ?? '');
+              _controllers['contact_email'] = TextEditingController(text: _profileData?['contact_email']?.toString() ?? '');
+              _controllers['contact_phone'] = TextEditingController(text: _profileData?['contact_phone']?.toString() ?? '');
+              _controllers['company_address'] = TextEditingController(text: _profileData?['company_address']?.toString() ?? '');
+              _controllers['industry'] = TextEditingController(text: _profileData?['industry']?.toString() ?? '');
+              _controllers['company_size'] = TextEditingController(text: _profileData?['company_size']?.toString() ?? '');
+              _controllers['website'] = TextEditingController(text: _profileData?['website']?.toString() ?? '');
+              _controllers['linkedin_profile'] = TextEditingController(text: _profileData?['linkedin_profile']?.toString() ?? '');
+              _controllers['budget'] = TextEditingController(text: _profileData?['budget']?.toString() ?? '');
+              _controllers['company_culture'] = TextEditingController(text: _profileData?['company_culture']?.toString() ?? '');
+              _controllers['preferred_talent_sources'] = TextEditingController(text: _profileData?['preferred_talent_sources']?.toString() ?? '');
+              _controllers['training_programs'] = TextEditingController(text: _profileData?['training_programs']?.toString() ?? '');
+              _controllers['candidate_preferences'] = TextEditingController(text: _profileData?['candidate_preferences']?.toString() ?? '');
+              _controllers['diversity_goals'] = TextEditingController(text: _profileData?['diversity_goals']?.toString() ?? '');
+              _controllers['location_preferences'] = TextEditingController(text: _profileData?['location_preferences']?.toString() ?? '');
+              _controllers['business_registration'] = TextEditingController(text: _profileData?['business_registration']?.toString() ?? '');
+              _controllers['authorized_signatory'] = TextEditingController(text: _profileData?['authorized_signatory']?.toString() ?? '');
+              _controllers['ein'] = TextEditingController(text: _profileData?['ein']?.toString() ?? '');
+              _controllers['reference_contact'] = TextEditingController(text: _profileData?['reference_contact']?.toString() ?? '');
+              _controllers['website_domain_verification'] = TextEditingController(text: _profileData?['website_domain_verification']?.toString() ?? '');
+              _controllers['email_verification'] = TextEditingController(text: _profileData?['email_verification']?.toString() ?? '');
+            }
             _isLoading = false;
           });
         } else {
@@ -334,132 +368,104 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
   }
 
   Widget _buildProfileField(String label, dynamic value, String fieldKey,
-      {bool isRequired = false, bool isMultiline = false, bool isNumeric = false, bool readOnly = false, String? Function(String? value)? customValidator}) {
+      {bool isRequired = false, bool isMultiline = false, bool isNumeric = false, bool alwaysReadOnly = false, String? Function(String? value)? customValidator}) {
+    final colorScheme = _buildColorScheme();
+    final effectiveReadOnly = alwaysReadOnly || !_isEditing;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: _buildColorScheme().onSurface,
-            ),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: TextFormField(
+        controller: _controllers[fieldKey],
+        maxLines: isMultiline ? 3 : 1,
+        readOnly: effectiveReadOnly,
+        keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
+        inputFormatters: isNumeric
+            ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$'))]
+            : fieldKey == 'phone' || fieldKey == 'contact_phone'
+                ? [FilteringTextInputFormatter.allow(RegExp(r'^\+?[\d\s-]*$'))]
+                : null,
+        decoration: InputDecoration(
+          labelText: label + (isRequired && !effectiveReadOnly ? ' *' : ''),
+          labelStyle: TextStyle(
+            color: effectiveReadOnly ? colorScheme.onSurfaceVariant : colorScheme.onSurface,
+            fontWeight: FontWeight.w500,
           ),
-          const SizedBox(height: 8),
-          _isEditing && !readOnly
-              ? TextFormField(
-                  controller: _controllers[fieldKey],
-                  maxLines: isMultiline ? 3 : 1,
-                  keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
-                  inputFormatters: isNumeric
-                      ? [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*$'))]
-                      : fieldKey == 'phone' || fieldKey == 'contact_phone'
-                          ? [FilteringTextInputFormatter.allow(RegExp(r'^\+?[\d\s-]*$'))]
-                          : null,
-                  decoration: InputDecoration(
-                    filled: true,
-                    fillColor: _buildColorScheme().surface,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide.none,
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: _buildColorScheme().primary, width: 1.5),
-                    ),
-                    errorBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
-                      borderSide: BorderSide(color: _buildColorScheme().error),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    errorStyle: TextStyle(color: _buildColorScheme().error, fontSize: 12),
-                  ),
-                  validator: (value) {
-                    if (isRequired && (value == null || value.trim().isEmpty)) {
-                      return '$label is required';
-                    }
-                    if (isNumeric && value != null && double.tryParse(value) == null) {
-                      return '$label must be a valid number';
-                    }
-                    if (customValidator != null) {
-                      return customValidator(value);
-                    }
-                    return null;
-                  },
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                )
-              : Text(
-                  value?.toString() ?? 'Not specified',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: _buildColorScheme().onSurfaceVariant,
-                  ),
-                ),
-        ],
+          filled: true,
+          fillColor: effectiveReadOnly ? colorScheme.surfaceContainer : colorScheme.surface,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.outline, width: 1),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.outline, width: 1),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.primary, width: 2),
+          ),
+          errorBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.error, width: 1),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.outline, width: 1),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          errorStyle: TextStyle(color: colorScheme.error, fontSize: 12),
+        ),
+        style: TextStyle(
+          fontSize: 16,
+          color: effectiveReadOnly ? colorScheme.onSurfaceVariant : colorScheme.onSurface,
+        ),
+        validator: effectiveReadOnly ? null : (value) {
+          if (isRequired && (value == null || value.trim().isEmpty)) {
+            return '$label is required';
+          }
+          if (isNumeric && value != null && double.tryParse(value) == null) {
+            return '$label must be a valid number';
+          }
+          if (customValidator != null) {
+            return customValidator(value);
+          }
+          return null;
+        },
+        autovalidateMode: effectiveReadOnly ? AutovalidateMode.disabled : AutovalidateMode.onUserInteraction,
       ),
     );
   }
 
-  Widget _buildSection(String title, List<Widget> fields, String sectionKey) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-      decoration: BoxDecoration(
-        color: _buildColorScheme().surfaceContainer,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _buildColorScheme().outline, width: 0.5),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.segment,
-                  color: _buildColorScheme().primary,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: _buildColorScheme().onSurface,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: Icon(
-                    _expandedSections[sectionKey]! ? Icons.expand_less : Icons.expand_more,
-                    color: _buildColorScheme().onSurfaceVariant,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _expandedSections[sectionKey] = !_expandedSections[sectionKey]!;
-                    });
-                  },
-                ),
-              ],
-            ),
+  Widget _buildSection(String title, List<Widget> fields, String sectionKey, {IconData? icon}) {
+    final colorScheme = _buildColorScheme();
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: ExpansionTile(
+        initiallyExpanded: _expandedSections[sectionKey] ?? false,
+        onExpansionChanged: (expanded) {
+          setState(() {
+            _expandedSections[sectionKey] = expanded;
+          });
+        },
+        leading: icon != null ? Icon(icon, color: colorScheme.primary, size: 24) : null,
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurface,
           ),
-          if (_expandedSections[sectionKey]!) ...[
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Column(children: fields),
-            ),
-            const Divider(height: 1),
-          ] else
-            const Divider(height: 1),
-        ],
+        ),
+        children: fields,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 16.0),
+        childrenPadding: const EdgeInsets.all(16.0),
+        collapsedShape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
       ),
     );
   }
@@ -529,54 +535,46 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
                     style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
                   ),
                   if (_isEditing) ...[
-                    const SizedBox(height: 12),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        HapticFeedback.lightImpact();
-                        _pickImage();
-                      },
-                      icon: const Icon(Icons.camera_alt),
-                      label: const Text('Select Profile Picture'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: colorScheme.onPrimary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      ),
-                    ),
-                    if (_selectedImage != null) ...[
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
                         onPressed: () {
-                          HapticFeedback.mediumImpact();
-                          _uploadProfilePicture();
+                          HapticFeedback.lightImpact();
+                          _pickImage();
                         },
-                        icon: const Icon(Icons.save),
-                        label: const Text('Save Profile Picture'),
+                        icon: const Icon(Icons.camera_alt),
+                        label: const Text('Select Profile Picture'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: colorScheme.primary,
                           foregroundColor: colorScheme.onPrimary,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    ),
+                    if (_selectedImage != null) ...[
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            HapticFeedback.mediumImpact();
+                            _uploadProfilePicture();
+                          },
+                          icon: const Icon(Icons.save),
+                          label: const Text('Save Profile Picture'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: colorScheme.onPrimary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
                         ),
                       ),
                     ],
                   ],
                   const SizedBox(height: 16),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: colorScheme.surface,
-                      border: Border(bottom: BorderSide(color: colorScheme.outline, width: 0.5)),
-                    ),
-                    child: TabBar(
-                      controller: _tabController,
-                      tabs: const [
-                        Tab(icon: Icon(Icons.person), text: 'Details'),
-                        Tab(icon: Icon(Icons.post_add), text: 'Posts'),
-                        Tab(icon: Icon(Icons.bookmark), text: 'Saved'),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -595,12 +593,15 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
                           _role ?? 'Not specified',
                           'role',
                           isRequired: true,
-                          readOnly: true,
+                          alwaysReadOnly: true,
                           customValidator: (value) => value != 'student' && value != 'Company/HR' ? 'Role must be "student" or "Company/HR"' : null,
                         ),
                         _buildProfileField('Full Name', _profileData?['full_name'] ?? 'Not specified', 'full_name', isRequired: true),
+                        if (_role == 'student')
+                          _buildProfileField('Student ID', _profileData?['student_id'] ?? 'Not specified', 'student_id', isRequired: true),
                       ],
                       'basic',
+                      icon: Icons.info_outline,
                     ),
                     _buildSection(
                       'Personal Information',
@@ -609,14 +610,14 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
                           'Email',
                           _profileData?['email'] ?? 'Not specified',
                           'email',
-                          readOnly: true,
+                          alwaysReadOnly: true,
                           customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value) ? 'Enter valid email' : null,
                         ),
                         _buildProfileField(
                           'Phone',
                           _profileData?['phone'] ?? 'Not specified',
                           'phone',
-                          readOnly: true,
+                          alwaysReadOnly: true,
                           customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^\+\d{10,15}$').hasMatch(value) ? 'Enter valid phone number (e.g., +1234567890)' : null,
                         ),
                         _buildProfileField(
@@ -638,36 +639,21 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
                         _buildProfileField('Nationality', _profileData?['nationality'] ?? 'Not specified', 'nationality'),
                       ],
                       'personal',
+                      icon: Icons.person_outline,
                     ),
                     if (_role == 'student') ...[
                       _buildSection(
                         'Education',
                         [
-                          _buildProfileField('Institution', _profileData?['institution'] ?? 'Not specified', 'institution', readOnly: true),
-                          _buildProfileField('Academic Level', _profileData?['academic_level'] ?? 'Not specified', 'academic_level', readOnly: true),
-                          _buildProfileField('Major', _profileData?['major'] ?? 'Not specified', 'major', readOnly: true),
-                          _buildProfileField(
-                            'GPA',
-                            _profileData?['gpa'] ?? 'Not specified',
-                            'gpa',
-                            isNumeric: true,
-                            readOnly: true,
-                            customValidator: (value) {
-                              if (value != null && value.isNotEmpty) {
-                                final gpa = double.tryParse(value);
-                                if (gpa == null || gpa < 0 || gpa > 10) return 'GPA must be between 0 and 10';
-                              }
-                              return null;
-                            },
-                          ),
-                          _buildProfileField('Coursework', _profileData?['coursework'] ?? 'Not specified', 'coursework', isMultiline: true, readOnly: true),
-                          _buildProfileField('Education Status', _profileData?['education_status'] ?? 'Not specified', 'education_status', readOnly: true),
+                          _buildProfileField('Institution', _profileData?['institution'] ?? 'Not specified', 'institution', alwaysReadOnly: true),
+                          _buildProfileField('Academic Level', _profileData?['academic_level'] ?? 'Not specified', 'academic_level', alwaysReadOnly: true),
+                          _buildProfileField('Major', _profileData?['major'] ?? 'Not specified', 'major', alwaysReadOnly: true),
                           _buildProfileField(
                             'Expected Passout Year',
                             _profileData?['expected_passout_year'] ?? 'Not specified',
                             'expected_passout_year',
                             isNumeric: true,
-                            readOnly: true,
+                            alwaysReadOnly: true,
                             customValidator: (value) {
                               if (value != null && value.isNotEmpty) {
                                 final year = int.tryParse(value);
@@ -678,14 +664,6 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
                               return null;
                             },
                           ),
-                        ],
-                        'education',
-                      ),
-                      _buildSection(
-                        'Professional Details',
-                        [
-                          _buildProfileField('Job Title', _profileData?['job_title'] ?? 'Not specified', 'job_title'),
-                          _buildProfileField('Company', _profileData?['company'] ?? 'Not specified', 'company'),
                           _buildProfileField(
                             'LinkedIn',
                             _profileData?['linkedin'] ?? 'Not specified',
@@ -694,34 +672,24 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
                                 ? 'Enter valid LinkedIn URL'
                                 : null,
                           ),
-                          _buildProfileField('Work Experience', _profileData?['work_exp'] ?? 'Not specified', 'work_exp', isMultiline: true),
-                          _buildProfileField('Skills', _profileData?['skills'] ?? 'Not specified', 'skills', isMultiline: true),
-                          _buildProfileField('Projects', _profileData?['projects'] ?? 'Not specified', 'projects', isMultiline: true),
-                          _buildProfileField('Certifications', _profileData?['certifications'] ?? 'Not specified', 'certifications', isMultiline: true),
                           _buildProfileField(
                             'Portfolio',
                             _profileData?['portfolio'] ?? 'Not specified',
                             'portfolio',
                             customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^https?://.+$').hasMatch(value) ? 'Enter valid URL' : null,
                           ),
-                          _buildProfileField('Employee ID', _profileData?['employee_id'] ?? 'Not specified', 'employee_id', isNumeric: true),
-                          _buildProfileField('Job Status', _profileData?['job_status'] ?? 'Not specified', 'job_status'),
                         ],
-                        'professional',
+                        'education',
+                        icon: Icons.school_outlined,
                       ),
                       _buildSection(
                         'Preferences & Other',
                         [
-                          _buildProfileField('Career Goals', _profileData?['career_goals'] ?? 'Not specified', 'career_goals', isMultiline: true),
-                          _buildProfileField('Industry Preference', _profileData?['industry_pref'] ?? 'Not specified', 'industry_pref'),
-                          _buildProfileField('Job Type', _profileData?['job_type'] ?? 'Not specified', 'job_type'),
-                          _buildProfileField('Location Preference', _profileData?['location_pref'] ?? 'Not specified', 'location_pref'),
-                          _buildProfileField('Work Environment', _profileData?['work_env'] ?? 'Not specified', 'work_env'),
-                          _buildProfileField('Availability', _profileData?['availability'] ?? 'Not specified', 'availability'),
                           _buildProfileField('Skills Development', _profileData?['skills_dev'] ?? 'Not specified', 'skills_dev', isMultiline: true),
                           _buildProfileField('Interests', _profileData?['interests'] ?? 'Not specified', 'interests', isMultiline: true),
                         ],
                         'preferences',
+                        icon: Icons.favorite_outline,
                       ),
                     ] else if (_role == 'Company/HR') ...[
                       _buildSection(
@@ -734,14 +702,14 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
                             'Contact Email',
                             _profileData?['contact_email'] ?? 'Not specified',
                             'contact_email',
-                            readOnly: true,
+                            alwaysReadOnly: true,
                             customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value) ? 'Enter valid email' : null,
                           ),
                           _buildProfileField(
                             'Contact Phone',
                             _profileData?['contact_phone'] ?? 'Not specified',
                             'contact_phone',
-                            readOnly: true,
+                            alwaysReadOnly: true,
                             customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^\+\d{10,15}$').hasMatch(value) ? 'Enter valid phone number (e.g., +1234567890)' : null,
                           ),
                           _buildProfileField('Company Address', _profileData?['company_address'] ?? 'Not specified', 'company_address', isMultiline: true),
@@ -783,6 +751,7 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
                           _buildProfileField('Training Programs', _profileData?['training_programs'] ?? 'Not specified', 'training_programs', isMultiline: true),
                         ],
                         'company',
+                        icon: Icons.business_outlined,
                       ),
                       _buildSection(
                         'Preferences & Compliance',
@@ -798,50 +767,60 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
                           _buildProfileField('Email Verification', _profileData?['email_verification'] ?? 'Not specified', 'email_verification'),
                         ],
                         'preferences',
+                        icon: Icons.verified_user_outlined,
                       ),
                     ],
                   ],
                   if (_isEditing) ...[
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        ElevatedButton.icon(
-                          onPressed: () {
-                            HapticFeedback.mediumImpact();
-                            _updateProfile();
-                          },
-                          icon: const Icon(Icons.save),
-                          label: const Text('Save Profile'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: colorScheme.onPrimary,
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: 2,
+                    const SizedBox(height: 24),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () {
+                                HapticFeedback.mediumImpact();
+                                _updateProfile();
+                              },
+                              icon: const Icon(Icons.save),
+                              label: const Text('Save Profile'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: colorScheme.onPrimary,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                elevation: 2,
+                              ),
+                            ),
                           ),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            setState(() {
-                              _isEditing = false;
-                              _selectedImage = null;
-                            });
-                            _controllers.forEach((key, controller) {
-                              controller.text = _profileData?[key]?.toString() ?? '';
-                            });
-                          },
-                          icon: const Icon(Icons.cancel),
-                          label: const Text('Cancel'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: colorScheme.primary,
-                            side: BorderSide(color: colorScheme.primary, width: 1.5),
-                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                HapticFeedback.lightImpact();
+                                setState(() {
+                                  _isEditing = false;
+                                  _selectedImage = null;
+                                });
+                                _controllers.forEach((key, controller) {
+                                  controller.text = _profileData?[key]?.toString() ?? '';
+                                });
+                              },
+                              icon: const Icon(Icons.cancel),
+                              label: const Text('Cancel'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: colorScheme.primary,
+                                side: BorderSide(color: colorScheme.primary, width: 1.5),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ],
                 ],
@@ -853,54 +832,9 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildPostsTab() {
-    final colorScheme = _buildColorScheme();
-    return RefreshIndicator(
-      onRefresh: _loadUserData,
-      color: colorScheme.primary,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            Center(
-              child: Text(
-                'Posts feature coming soon!',
-                style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSavedPostsTab() {
-    final colorScheme = _buildColorScheme();
-    return RefreshIndicator(
-      onRefresh: _loadUserData,
-      color: colorScheme.primary,
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            Center(
-              child: Text(
-                'Saved Posts feature coming soon!',
-                style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _controllers.forEach((_, controller) => controller.dispose());
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -920,15 +854,6 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
           fontWeight: FontWeight.w600,
         ),
         iconTheme: IconThemeData(color: colorScheme.onSurface),
-      ),
-      tabBarTheme: TabBarThemeData(
-        labelColor: colorScheme.primary,
-        unselectedLabelColor: colorScheme.onSurfaceVariant,
-        indicator: UnderlineTabIndicator(
-          borderSide: BorderSide(color: colorScheme.primary, width: 3),
-        ),
-        labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w400, fontSize: 14),
       ),
     );
 
@@ -957,7 +882,7 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
                       ),
                     ),
                     actions: [
-                      if (!_isLoading && _profileData != null && _tabController.index == 0)
+                      if (!_isLoading && _profileData != null)
                         IconButton(
                           icon: Icon(_isEditing ? Icons.save : Icons.edit),
                           onPressed: () {
@@ -972,18 +897,11 @@ class _UserProfileState extends State<UserProfile> with SingleTickerProviderStat
                     ],
                   ),
                   SliverFillRemaining(
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildPersonalDetailsTab(),
-                        _buildPostsTab(),
-                        _buildSavedPostsTab(),
-                      ],
-                    ),
+                    child: _buildPersonalDetailsTab(),
                   ),
                 ],
               ),
-        floatingActionButton: _tabController.index == 0 && !_isEditing && !_isLoading && _profileData != null
+        floatingActionButton: !_isEditing && !_isLoading && _profileData != null
             ? FloatingActionButton(
                 onPressed: () {
                   HapticFeedback.mediumImpact();

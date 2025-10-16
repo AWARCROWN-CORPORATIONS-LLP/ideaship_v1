@@ -6,6 +6,7 @@ import 'package:ideaship/feed/startups.dart';
 import 'package:ideaship/jobs/job_drawer.dart';
 import 'package:ideaship/settings/usersettings.dart';
 import 'package:ideaship/user/userprofile.dart';
+import 'package:ideaship/thr_project/threads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -293,7 +294,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       String title;
       switch (_selectedIndex) {
         case 1:
-          title = 'Roles';
+          title = 'Threads';
           break;
         case 3:
           title = 'Alerts';
@@ -355,25 +356,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
           ],
         );
       case 1:
-        return Center(
-          child: _isLoading
-              ? const CircularProgressIndicator()
-              : Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Welcome, $_username!', style: TextStyle(color: colorScheme.onSurface)),
-                    Text('Email: $_email', style: TextStyle(color: colorScheme.onSurface)),
-                    Text('Role: $_role', style: TextStyle(color: colorScheme.onSurface)),
-                    if (_major != null) Text('Major: $_major', style: TextStyle(color: colorScheme.onSurface)),
-                    ElevatedButton(
-                      onPressed: () {
-                        // Navigate to role-specific dashboard or features
-                      },
-                      child: const Text('Go to Features'),
-                    ),
-                  ],
-                ),
-        );
+        return ThreadsScreen();
       case 3:
         return Center(child: Text('Alerts Page', style: TextStyle(color: colorScheme.onSurface)));
       case 4:
@@ -424,7 +407,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _navButton(Icons.home_rounded, "Home", 0, colorScheme),
-                    _navButton(Icons.work_outline, "Roles", 1, colorScheme),
+                    _navButton(Icons.article, "Threads", 1, colorScheme),
                     const SizedBox(width: 60),
                     _navButton(Icons.notifications_outlined, "Alerts", 3, colorScheme),
                     _navButton(Icons.settings_outlined, "Settings", 4, colorScheme),

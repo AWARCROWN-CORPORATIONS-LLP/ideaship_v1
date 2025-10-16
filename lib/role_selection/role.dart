@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'studentrole.dart';
-import 'companyrole.dart';
+
 import 'startuprole.dart';
 // import other role files as needed
 
@@ -15,8 +15,7 @@ Widget loadRolePage(String route) {
   switch (route) {
     case 'studentrole.dart':
       return const StudentRolePage();
-    case 'companyrole.dart':
-      return const CompanyRolePage();
+   
     case 'startuprole.dart':
       return const StartupRolePage();
     
@@ -39,7 +38,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, String>> roles = [
     {
-      'title': 'Student/Professional',
+      'title': 'Student',
       'subtitle': 'Seeking opportunities',
       'icon': 'assets/student.svg',
       'route': 'studentrole.dart',
@@ -53,21 +52,9 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       'route': 'startuprole.dart',
       'heroTag': 'startup-icon'
     },
-    {
-      'title': 'Freelancer/Consultant',
-      'subtitle': 'Expertise on-demand',
-      'icon': 'assets/freelancer.svg',
-      'route': 'freelancerrole.dart',
-      'heroTag': 'freelancer-icon'
-    },
     
-    {
-      'title': 'Service Provider',
-      'subtitle': 'Legal & Tech support',
-      'icon': 'assets/service.svg',
-      'route': 'servicerole.dart',
-      'heroTag': 'service-icon'
-    },
+    
+   
     
    
   ];
@@ -216,11 +203,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
       case 'startup':
       case 'entrepreneur':
         return 'startuprole.dart';
-      case 'freelancer':
-      case 'consultant':
-        return 'freelancerrole.dart';
-      case 'service provider':
-        return 'servicerole.dart';  
+      
 
       default:
         return '';

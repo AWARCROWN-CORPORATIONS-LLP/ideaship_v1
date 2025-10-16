@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
+   id("com.google.gms.google-services")
 }
 
 android {
@@ -23,14 +24,15 @@ android {
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
+defaultConfig {
+    applicationId = "com.example.ideaship_ui"
+    minSdk = 23
+    targetSdk = 34
+    versionCode = 1
+    versionName = "1.0"
+}
 
-    defaultConfig {
-        applicationId = "com.example.ideaship_ui"
-        minSdk = flutter.minSdkVersion
-        targetSdkVersion(flutter.targetSdkVersion)
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
-    }
+
 
     buildTypes {
         release {
@@ -46,4 +48,7 @@ flutter {
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.23")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    implementation(platform("com.google.firebase:firebase-bom:34.4.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-messaging")
 }

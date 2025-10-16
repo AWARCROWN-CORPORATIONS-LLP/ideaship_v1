@@ -4,17 +4,28 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:app_links/app_links.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
-// import your auth screen
+// import your auth/dashboard/other screens
 import 'auth/auth_log_reg.dart';
 import 'role_selection/role.dart';
 import 'dashboard.dart';
-import 'feed/posts.dart'; // For CommentsPage
+import 'feed/posts.dart';
+import 'thr_project/threads.dart';
+
+// Background message handler
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  debugPrint('Handling background message: ${message.messageId}');
+}
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(); // ✅ No DefaultFirebaseOptions
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   runApp(const MyApp());
 }
 
@@ -34,6 +45,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _loadUsername();
     _initDeepLinks();
+    _setupFCM();
   }
 
   Future<void> _loadUsername() async {
@@ -41,33 +53,92 @@ class _MyAppState extends State<MyApp> {
     _username = prefs.getString('username') ?? '';
   }
 
-  Future<void> _initDeepLinks() async {
-    // Handle initial link if the app was opened via deep link
-    final initialLink = await _appLinks.getInitialLink(); // This line is causing the error
-    if (initialLink != null) {
-      _handleDeepLink(initialLink);
-    }
+  Future<void> _setupFCM() async {
+    final fcm = FirebaseMessaging.instance;
 
-    // Listen for incoming links
-    _appLinks.uriLinkStream.listen((uri) {
-      _handleDeepLink(uri);
-    });
-  }
+    // Request permissions
+    NotificationSettings settings = await fcm.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+    debugPrint('User granted permission: ${settings.authorizationStatus}');
 
-  void _handleDeepLink(Uri uri) {
-    // Handle custom scheme: awarcrown://post/{post_id}
-    if (uri.scheme == 'awarcrown' && uri.host == 'post') {
-      final postIdStr = uri.pathSegments.first;
-      final postId = int.tryParse(postIdStr);
-      if (postId != null) {
-        _navigateToPost(postId);
+    // Get token and send to backend
+    String? token = await fcm.getToken();
+    if (token != null && _username != null && _username!.isNotEmpty) {
+      try {
+        await http.post(
+          Uri.parse('https://server.awarcrown.com/threads/update_token'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({'username': _username, 'token': token}),
+        );
+      } catch (e) {
+        debugPrint('Error updating FCM token: $e');
       }
     }
 
-    
-    else if (uri.host == 'share.awarcrown.com' && uri.pathSegments[0] == 'post_feature') {
-      final token = uri.pathSegments[1];
-      _handleShareToken(token);
+    // Foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint('Foreground message: ${message.notification?.title}');
+      final data = message.data;
+      if (navigatorKey.currentContext != null) {
+        ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
+          SnackBar(
+            content: Text('${message.notification?.title ?? 'Notification'}: ${message.notification?.body ?? ''}'),
+            action: SnackBarAction(
+              label: 'View',
+              onPressed: () {
+                if (data['type'] == 'new_comment' || data['type'] == 'inspired' || data['type'] == 'collab_request') {
+                  final threadId = int.tryParse(data['thread_id'] ?? '');
+                  if (threadId != null) _fetchAndNavigateToThread(threadId);
+                } else if (data['type'] == 'new_post_comment') {
+                  final postId = int.tryParse(data['post_id'] ?? '');
+                  if (postId != null) _fetchAndNavigateToPost(postId);
+                }
+              },
+            ),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    });
+  }
+
+  Future<void> _initDeepLinks() async {
+    try {
+      final initialLink = await _appLinks.getInitialLink();
+      if (initialLink != null) _handleDeepLink(initialLink);
+    } catch (e) {
+      debugPrint('Error getting initial deep link: $e');
+    }
+
+    _appLinks.uriLinkStream.listen(
+      (uri) {
+        try {
+          _handleDeepLink(uri);
+        } catch (e) {
+          debugPrint('Error handling deep link: $e');
+        }
+      },
+      onError: (error) {
+        debugPrint('Deep link stream error: $error');
+      },
+    );
+  }
+
+  void _handleDeepLink(Uri uri) {
+    if (uri.scheme == 'awarcrown' && uri.host == 'post') {
+      final postId = int.tryParse(uri.pathSegments.first);
+      if (postId != null) _navigateToPost(postId);
+    } else if (uri.scheme == 'awarcrown' && uri.host == 'thread') {
+      final threadId = int.tryParse(uri.pathSegments.first);
+      if (threadId != null) _navigateToThread(threadId);
+    } else if (uri.host == 'share.awarcrown.com' && uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'post_feature') {
+      final token = uri.pathSegments.length > 1 ? uri.pathSegments[1] : '';
+      if (token.isNotEmpty) _handleShareToken(token);
+    } else {
+      debugPrint('Unhandled deep link: $uri');
     }
   }
 
@@ -77,11 +148,16 @@ class _MyAppState extends State<MyApp> {
     });
   }
 
+  void _navigateToThread(int threadId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchAndNavigateToThread(threadId);
+    });
+  }
+
   Future<void> _fetchAndNavigateToPost(int postId) async {
     if (_username == null || _username!.isEmpty) return;
 
     try {
-      // Fetch post by ID
       final response = await http.get(
         Uri.parse('https://server.awarcrown.com/feed/fetch_single_post?post_id=$postId&username=${Uri.encodeComponent(_username!)}'),
       ).timeout(const Duration(seconds: 10));
@@ -90,7 +166,6 @@ class _MyAppState extends State<MyApp> {
         final data = json.decode(response.body);
         final post = data['post'] ?? {};
         if (post.isNotEmpty) {
-          // Fetch comments
           final commentsResponse = await http.get(
             Uri.parse('https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username!)}'),
           ).timeout(const Duration(seconds: 10));
@@ -101,11 +176,13 @@ class _MyAppState extends State<MyApp> {
             comments = commentsData['comments'] ?? [];
           }
 
-          // Navigate to CommentsPage
           final prefs = await SharedPreferences.getInstance();
           final userId = prefs.getInt('user_id');
 
           if (navigatorKey.currentState != null) {
+            ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
+              const SnackBar(content: Text('Opening post...')),
+            );
             navigatorKey.currentState!.push(
               MaterialPageRoute(
                 builder: (context) => CommentsPage(
@@ -117,11 +194,53 @@ class _MyAppState extends State<MyApp> {
               ),
             );
           }
+        } else {
+          _showDeepLinkError('Post not found');
         }
+      } else {
+        _showDeepLinkError('Failed to load post');
       }
     } catch (e) {
       debugPrint('Error fetching post: $e');
-      // Optionally show error snackbar
+      _showDeepLinkError('Error loading post: $e');
+    }
+  }
+
+  Future<void> _fetchAndNavigateToThread(int threadId) async {
+    if (_username == null || _username!.isEmpty) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('https://server.awarcrown.com/threads/$threadId'),
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final thread = Thread.fromJson(data);
+
+        final prefs = await SharedPreferences.getInstance();
+        final userId = prefs.getInt('user_id');
+
+        if (navigatorKey.currentState != null) {
+          ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
+            const SnackBar(content: Text('Opening thread...')),
+          );
+          navigatorKey.currentState!.push(
+            MaterialPageRoute(
+              builder: (context) => ThreadDetailScreen(
+                thread: thread,
+                username: _username!,
+                userId: userId ?? 0,
+              ),
+            ),
+          );
+        }
+      } else {
+        _showDeepLinkError('Failed to load thread');
+      }
+    } catch (e) {
+      debugPrint('Error fetching thread: $e');
+      _showDeepLinkError('Error loading thread: $e');
     }
   }
 
@@ -134,16 +253,30 @@ class _MyAppState extends State<MyApp> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['status'] == 'success') {
-          final post = data['post'];
-          final postId = post['post_id'];
+          final postId = data['post']['post_id'];
           _navigateToPost(postId);
         } else {
-          // Handle error
-          debugPrint('Invalid share link: ${data['message']}');
+          _showDeepLinkError('Invalid share link: ${data['message']}');
         }
+      } else {
+        _showDeepLinkError('Failed to validate share link');
       }
     } catch (e) {
       debugPrint('Error handling share token: $e');
+      _showDeepLinkError('Error processing share link: $e');
+    }
+  }
+
+  void _showDeepLinkError(String message) {
+    if (navigatorKey.currentContext != null) {
+      ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } else {
+      debugPrint('Deep link error (no context): $message');
     }
   }
 
@@ -152,11 +285,16 @@ class _MyAppState extends State<MyApp> {
     return MaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+      ),
       home: const SplashScreen(),
     );
   }
 }
 
+// SplashScreen (same as before)
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -190,16 +328,11 @@ class _SplashScreenState extends State<SplashScreen>
 
     _controller.forward();
 
-    // after animation finishes
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         Future.delayed(const Duration(seconds: 2), () {
           if (mounted) {
-            setState(() {
-              _showLoader = true;
-            });
-
-            // Immediately check route after loader shows
+            setState(() => _showLoader = true);
             _checkInitialRoute();
           }
         });
@@ -214,19 +347,16 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (mounted) {
       if (token != null && profileCompleted) {
-        // Token exists and profile complete -> Dashboard
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const DashboardPage()),
         );
       } else if (token != null) {
-        // Token exists but profile incomplete -> Role Selection
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const RoleSelectionPage()),
         );
       } else {
-        // No token -> Login/Register
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => const AuthLogReg()),
@@ -254,23 +384,19 @@ class _SplashScreenState extends State<SplashScreen>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const SizedBox(),
-              // Logo first -> then loader
               _showLoader
-                  ? const CircularProgressIndicator(
-                      color: Colors.black,
-                    )
+                  ? const CircularProgressIndicator(color: Colors.black)
                   : ScaleTransition(
                       scale: _scaleAnimation,
                       child: FadeTransition(
                         opacity: _fadeAnimation,
                         child: Image.asset(
-                          "assets/black_logo.png", 
+                          "assets/black_logo.png",
                           width: 150,
                           height: 150,
                         ),
                       ),
                     ),
-              
               Padding(
                 padding: const EdgeInsets.only(bottom: 24.0),
                 child: Column(
@@ -279,23 +405,14 @@ class _SplashScreenState extends State<SplashScreen>
                   children: const [
                     Text(
                       "Powered by",
-                      style: TextStyle(
-                        color: Colors.black54,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        fontFamily: 'Times New Roman',
-                    
-                      ),
+                      style: TextStyle(color: Colors.black54, fontSize: 14),
                     ),
                     Text(
                       "Awarcrown",
                       style: TextStyle(
-                        color: Colors.black,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Lucida Console',
-
-                      ),
+                          color: Colors.black,
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
