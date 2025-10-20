@@ -119,7 +119,7 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
 
   Future<void> _initializeData() async {
     await _loadUsernameAndUserId();
-    await _setupFCM();
+    // Remove: await _setupFCM();  // Centralized in dashboard
     await _fetchThreads();
   }
 
@@ -170,47 +170,6 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
     } catch (e) {
       _showError(_getErrorMessage(e));
     }
-  }
-
-  Future<void> _setupFCM() async {
-    final fcm = FirebaseMessaging.instance;
-    NotificationSettings settings = await fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    print('User granted permission: ${settings.authorizationStatus}');
-
-    // Get token and send to backend
-    String? token = await fcm.getToken();
-    if (token != null && username != null) {
-      try {
-        await http.post(
-          Uri.parse('https://server.awarcrown.com/threads/update_token'),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({'username': username, 'token': token}),
-        ).timeout(Duration(seconds: 10));
-      } catch (e) {
-        print('Failed to update FCM token: $e');
-      }
-    }
-
-    // Foreground message handling
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Got foreground message: ${message.notification?.title}');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${message.notification?.title}: ${message.notification?.body}'),
-            action: SnackBarAction(
-              label: 'Refresh',
-              onPressed: () => _fetchThreads(),
-            ),
-            backgroundColor: Colors.blue,
-          ),
-        );
-      }
-    });
   }
 
   String _getErrorMessage(dynamic e) {
@@ -481,210 +440,130 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
                 .map((s) => PopupMenuItem(value: s.toLowerCase(), child: Text(s)))
                 .toList(),
           ),
-          IconButton(onPressed: _showCreateDialog, icon: Icon(Icons.add, color: Colors.blue)),
+          IconButton(onPressed: _showCreateDialog, icon: Icon(Icons.add)),
         ],
       ),
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: isLoading
-            ? RefreshIndicator(
-                onRefresh: _fetchThreads,
-                color: Colors.blue,
-                child: ListView.builder(
-                  physics: AlwaysScrollableScrollPhysics(),
-                  itemCount: 5,
-                  itemBuilder: (context, index) => Shimmer.fromColors(
-                    baseColor: Colors.grey[300]!,
-                    highlightColor: Colors.grey[100]!,
-                    child: Card(
-                      margin: EdgeInsets.all(8),
-                      child: SizedBox(height: 100, child: Container(color: Colors.white)),
+      body: Column(
+        children: [
+          if (isLoading)
+            Expanded(
+              child: ListView.builder(
+                itemCount: 5,
+                itemBuilder: (context, index) => Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: Card(
+                    margin: EdgeInsets.all(8),
+                    child: ListTile(
+                      leading: CircleAvatar(child: Container()),
+                      title: Container(height: 10, color: Colors.white),
+                      subtitle: Container(height: 10, color: Colors.white),
                     ),
                   ),
                 ),
-              )
-            : hasError
-                ? RefreshIndicator(
-                    onRefresh: _initializeData, // Retry full load
-                    color: Colors.blue,
-                    child: SingleChildScrollView(
-                      physics: AlwaysScrollableScrollPhysics(),
-                      child: Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(32),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.error_outline, size: 80, color: Colors.red[300]),
-                              SizedBox(height: 16),
-                              Text(
-                                errorMessage ?? 'An unknown error occurred',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(fontSize: 16),
-                              ),
-                              SizedBox(height: 24),
-                              ElevatedButton.icon(
-                                onPressed: _initializeData,
-                                icon: Icon(Icons.refresh),
-                                label: Text('Retry'),
-                              ),
-                            ],
+              ),
+            )
+          else if (hasError)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    SizedBox(height: 16),
+                    Text(errorMessage ?? 'Failed to load threads'),
+                    SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _fetchThreads,
+                      child: Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Expanded(
+              child: ListView.builder(
+                itemCount: threads.length,
+                itemBuilder: (context, index) {
+                  final thread = threads[index];
+                  return Card(
+                    margin: EdgeInsets.all(8),
+                    child: InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ThreadDetailScreen(
+                              thread: thread,
+                              username: username!,
+                              userId: userId!,
+                            ),
                           ),
+                        );
+                      },
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Chip(
+                                  label: Text(thread.category),
+                                  backgroundColor: Colors.blue[100],
+                                ),
+                                SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    thread.creator,
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              thread.title,
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              thread.body,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            SizedBox(height: 16),
+                            Row(
+                              children: [
+                                _ActionButton(
+                                  icon: Icons.thumb_up,
+                                  label: '${thread.inspiredCount}',
+                                  onTap: () => _toggleInspire(thread.id),
+                                ),
+                                SizedBox(width: 16),
+                                _ActionButton(
+                                  icon: Icons.comment,
+                                  label: '${thread.commentCount}',
+                                  onTap: () {},
+                                ),
+                                SizedBox(width: 16),
+                                _ActionButton(
+                                  icon: Icons.people,
+                                  label: '${thread.collabCount}',
+                                  onTap: () => _sendCollab(thread.id, 'Interested in collaborating!'),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  )
-                : threads.isEmpty
-                    ? RefreshIndicator(
-                        onRefresh: _fetchThreads,
-                        color: Colors.blue,
-                        child: SingleChildScrollView(
-                          physics: AlwaysScrollableScrollPhysics(),
-                          child: Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(32),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.inbox_outlined, size: 80, color: Colors.grey[400]),
-                                  SizedBox(height: 16),
-                                  Text(
-                                    'No threads available',
-                                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    'Be the first to create one!',
-                                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                                  ),
-                                  SizedBox(height: 24),
-                                  ElevatedButton.icon(
-                                    onPressed: _showCreateDialog,
-                                    icon: Icon(Icons.add),
-                                    label: Text('Create Thread'),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _fetchThreads,
-                        color: Colors.blue,
-                        child: ListView.builder(
-                          itemCount: threads.length,
-                          itemBuilder: (context, index) {
-                            final thread = threads[index];
-                            return Hero(
-                              tag: 'thread_${thread.id}', // For smooth navigation animation
-                              child: Card(
-                                margin: EdgeInsets.all(8),
-                                elevation: 4,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ThreadDetailScreen(
-                                        thread: thread,
-                                        username: username ?? '',
-                                        userId: userId ?? 0,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Container(
-                                    padding: EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      gradient: LinearGradient(
-                                        colors: [Colors.white, Colors.blue[50]!], // Subtle gradient
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          thread.title,
-                                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                                        ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                          thread.body,
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(color: Colors.grey[600]),
-                                        ),
-                                        SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Chip(
-                                              label: Text(thread.category),
-                                              backgroundColor: Colors.blue[100],
-                                              padding: EdgeInsets.symmetric(horizontal: 8),
-                                            ),
-                                            ...thread.tags.take(2).map((t) => Padding(
-                                              padding: EdgeInsets.only(left: 4),
-                                              child: Chip(
-                                                label: Text('#$t'),
-                                                backgroundColor: Colors.green[100],
-                                                padding: EdgeInsets.symmetric(horizontal: 4),
-                                              ),
-                                            )),
-                                            if (thread.tags.length > 2)
-                                              Padding(
-                                                padding: EdgeInsets.only(left: 4),
-                                                child: Chip(label: Text('+${thread.tags.length - 2} more'), backgroundColor: Colors.grey[200]),
-                                              ),
-                                          ],
-                                        ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                          '${thread.creatorRole.isNotEmpty ? '${thread.creatorRole} • ' : ''}${thread.creator} • ${thread.createdAt.toString().split(' ')[0]}',
-                                          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                                        ),
-                                        SizedBox(height: 12),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                          children: [
-                                            _ActionButton(
-                                              icon: Icons.lightbulb_outline,
-                                              label: '${thread.inspiredCount}',
-                                              onTap: () => _toggleInspire(thread.id),
-                                            ),
-                                            _ActionButton(
-                                              icon: Icons.comment_outlined,
-                                              label: '${thread.commentCount}',
-                                              onTap: () => Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) => ThreadDetailScreen(
-                                                    thread: thread,
-                                                    username: username ?? '',
-                                                    userId: userId ?? 0,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                            _ActionButton(
-                                              icon: Icons.people_outline,
-                                              label: '${thread.collabCount}',
-                                              onTap: () => _sendCollab(thread.id, 'Interested in collaborating!'),
-                                            ),
-                                          ],
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                  );
+                },
+              ),
+            ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showCreateDialog,

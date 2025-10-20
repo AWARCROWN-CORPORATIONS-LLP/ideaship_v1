@@ -1,19 +1,23 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ideaship/feed/createpost.dart';
-import 'package:ideaship/feed/posts.dart';
+import 'package:ideaship/feed/posts.dart'; // For CommentsPage
 import 'package:ideaship/feed/startups.dart';
 import 'package:ideaship/jobs/job_drawer.dart';
-import 'package:ideaship/main.dart';
 import 'package:ideaship/settings/usersettings.dart';
 import 'package:ideaship/user/userprofile.dart';
 import 'package:ideaship/thr_project/threads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:ideaship/notify/notifications.dart'; // Import NotificationsPage
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart' as lpn;  // Alias to avoid conflict
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -31,9 +35,9 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   String? _role;
   String? _major;
   bool _isLoading = true;
-  bool _isNotificationActive = false;
   bool _isMessageActive = false;
   bool _isDarkMode = false;
+  int _unreadCount = 0;  // New: Track unread notifications
 
   @override
   void initState() {
@@ -42,7 +46,9 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     _tabController.addListener(_handleTabChange);
     _loadUserData();
     _loadThemePreference();
-    _setupFCM();  // Centralized FCM setup here
+    _setupLocalNotifications();  // New: Init local notifs here
+    _setupFCM();
+    _loadUnreadCount();  // New: Load initial unread count
   }
 
   @override
@@ -102,73 +108,190 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     }
   }
 
+  // New: Initialize local notifications (moved from main.dart)
+  Future<void> _setupLocalNotifications() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    const DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+    );
+
+    const InitializationSettings initializationSettings =
+        InitializationSettings(
+      android: initializationSettingsAndroid,
+      iOS: initializationSettingsIOS,
+    );
+
+    await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        final data = response.payload != null ? json.decode(response.payload!) as Map<String, dynamic> : <String, dynamic>{};
+        _handleNotificationTap(data);  // Use local handler
+      },
+    );
+
+    // Android channel
+    const AndroidNotificationChannel channel = AndroidNotificationChannel(
+      'high_importance_channel',
+      'High Importance Notifications',
+      description: 'Your app notifications',
+      importance: Importance.max,
+      playSound: true,
+    );
+
+    if (Platform.isAndroid) {
+      await flutterLocalNotificationsPlugin
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(channel);
+    }
+  }
+
+  // Updated: Centralized FCM setup (remove from threads.dart)
   Future<void> _setupFCM() async {
     final fcm = FirebaseMessaging.instance;
 
-    // Request permissions (existing)
     NotificationSettings settings = await fcm.requestPermission(
       alert: true,
       badge: true,
       sound: true,
-      provisional: false,  // For iOS critical alerts if needed
     );
     debugPrint('User granted permission: ${settings.authorizationStatus}');
 
-    // Get token and send to backend (existing, with try-catch for FIS error)
-    String? token;
-    try {
-      token = await fcm.getToken();
-    } catch (e) {
-      debugPrint('FCM Token Error: $e');
-      // Retry logic if needed (as in previous fix)
-    }
-    if (token != null && _username != null && _username!.isNotEmpty) {
-      try {
-        await http.post(
-          Uri.parse('https://server.awarcrown.com/threads/update_token'),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({'username': _username, 'token': token}),
-        );
-        debugPrint('FCM token sent to server: $token');
-      } catch (e) {
-        debugPrint('Error updating FCM token: $e');
-      }
+    String? token = await fcm.getToken();
+    if (_username != null) {
+      await http.post(
+        Uri.parse('https://server.awarcrown.com/threads/update_token'),  // Or general endpoint
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'username': _username, 'token': token}),
+      );
     }
 
-    // Foreground: Show LOCAL notification (WhatsApp-style tray)
+    // Foreground: Show local notif AND store
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('Foreground message: ${message.notification?.title}');
-      _showLocalNotification(message);  // New: Use local plugin
+      _showLocalNotification(message); // Show local notification
+      _storeNotification(message); // Use local helper
+      // No manual update; _storeNotification will load and set count
     });
 
-    // Background/Terminated tap: Navigate (FCM auto-shows system notif)
+    // Background/Terminated tap: Store and handle nav
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      final data = message.data;
-      _handleNotificationNavigation(data);
+      _storeNotification(message);
+      _handleNotificationNavigation(message.data); // Handle navigation
+      _markAllRead();  // Optional: Mark on app open
     });
 
-    // Initial message (app opened from terminated notif)
     RemoteMessage? initialMessage = await fcm.getInitialMessage();
     if (initialMessage != null) {
+      await _storeNotification(initialMessage);
       _handleNotificationNavigation(initialMessage.data);
     }
   }
 
-  void _handleNotificationNavigation(Map<String, dynamic> data) {
-    try {
-      if (data['type'] == 'new_comment' ||
-          data['type'] == 'inspired' ||
-          data['type'] == 'collab_request') {
-        final threadId = int.tryParse(data['thread_id'] ?? '');
-        if (threadId != null) _fetchAndNavigateToThread(threadId);
-      } else if (data['type'] == 'new_post_comment') {
-        final postId = int.tryParse(data['post_id'] ?? '');
-        if (postId != null) _fetchAndNavigateToPost(postId);
-      } else {
-        debugPrint('Unhandled notification type: ${data['type']}');
+  // Store notification from RemoteMessage
+  Future<void> _storeNotification(RemoteMessage message) async {
+    final prefs = await SharedPreferences.getInstance();
+    final notifData = {
+      'id': message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
+      'title': message.notification?.title ?? message.data['title'] ?? '',
+      'body': message.notification?.body ?? message.data['body'] ?? '',
+      'data': message.data,
+      'read': false,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    final notificationsJson = prefs.getStringList('notifications') ?? [];
+    notificationsJson.insert(0, json.encode(notifData));
+    await prefs.setStringList('notifications', notificationsJson);
+    await _loadUnreadCount();  // Reload to set accurate count
+  }
+
+  // New: Load unread count from prefs
+  Future<void> _loadUnreadCount() async {
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsJson = prefs.getStringList('notifications') ?? [];
+    final unread = notificationsJson.where((jsonStr) {
+      final data = json.decode(jsonStr);
+      return !(data['read'] ?? false);
+    }).length;
+    if (mounted) setState(() => _unreadCount = unread);
+  }
+
+  // Updated: Set unread count to absolute value (for callback)
+  void _setUnreadCount(int count) {
+    if (mounted) setState(() => _unreadCount = count);
+  }
+
+  // New: Mark all as read
+  Future<void> _markAllRead() async {
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsJson = prefs.getStringList('notifications') ?? [];
+    bool updated = false;
+    for (int i = 0; i < notificationsJson.length; i++) {
+      final data = json.decode(notificationsJson[i]);
+      if (!(data['read'] ?? false)) {
+        data['read'] = true;
+        notificationsJson[i] = json.encode(data);
+        updated = true;
       }
-    } catch (e) {
-      debugPrint('Error handling notification navigation: $e');
+    }
+    if (updated) {
+      await prefs.setStringList('notifications', notificationsJson);
+      await _loadUnreadCount();  // Reload to set accurate count
+    }
+  }
+
+  // New: Mark specific as read by ID
+  Future<void> _markAsReadById(String id) async {
+    if (id.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsJson = prefs.getStringList('notifications') ?? [];
+    bool updated = false;
+    for (int i = 0; i < notificationsJson.length; i++) {
+      final notifData = json.decode(notificationsJson[i]);
+      if (notifData['id'] == id && !(notifData['read'] ?? false)) {
+        notifData['read'] = true;
+        notificationsJson[i] = json.encode(notifData);
+        updated = true;
+        break;
+      }
+    }
+    if (updated) {
+      await prefs.setStringList('notifications', notificationsJson);
+      await _loadUnreadCount();  // Reload to set accurate count
+    }
+  }
+
+  // New: Clear all notifications (delete them)
+  Future<void> _clearAllNotifications() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('notifications');
+    await _loadUnreadCount();  // Set count to 0
+  }
+
+  // Updated: Handle navigation (store first, then nav)
+  Future<void> _handleNotificationNavigation(Map<String, dynamic> data) async {
+    if (data['type'] == 'new_comment' || data['type'] == 'inspired' || data['type'] == 'collab_request') {
+      final threadId = int.tryParse(data['thread_id'] ?? '');
+      if (threadId != null) {
+        await _fetchAndNavigateToThread(threadId);
+        await _markAsReadById(data['id'] ?? '');
+        return;
+      }
+    } else if (data['type'] == 'new_post_comment') { // Corrected type for post comments
+      final postId = int.tryParse(data['post_id'] ?? '');
+      if (postId != null) {
+        await _fetchAndNavigateToPost(postId);
+        await _markAsReadById(data['id'] ?? '');
+        return;
+      }
+    }
+    // Default: Nav to notifications page
+    if (mounted) {
+      Navigator.pushNamed(context, '/notifications');  // Or push to NotificationsPage
     }
   }
 
@@ -266,40 +389,42 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     }
   }
 
+  // Updated: _showLocalNotification (now with payload for tap)
   Future<void> _showLocalNotification(RemoteMessage message) async {
-    // Use the global plugin
-    const lpn.AndroidNotificationDetails androidPlatformChannelSpecifics =
-        lpn.AndroidNotificationDetails(
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
       'high_importance_channel',
       'High Importance Notifications',
       channelDescription: 'Your app notifications',
-      importance: lpn.Importance.max,
-      priority: lpn.Priority.high,
+      importance: Importance.max,
+      priority: Priority.high,
       showWhen: false,
-      icon: '@drawable/ic_notification',  // Custom icon
     );
 
-    const lpn.DarwinNotificationDetails iOSPlatformChannelSpecifics =
-        lpn.DarwinNotificationDetails(
+    const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
     );
 
-    const lpn.NotificationDetails platformChannelSpecifics = lpn.NotificationDetails(
-      android: androidPlatformChannelSpecifics,
-      iOS: iOSPlatformChannelSpecifics,
+    const NotificationDetails details = NotificationDetails(
+      android: androidDetails,
+      iOS: iOSDetails,
     );
 
     final title = message.notification?.title ?? message.data['title'] ?? 'Notification';
     final body = message.notification?.body ?? message.data['body'] ?? '';
 
+    final payloadData = {
+      ...message.data,
+      'id': message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),  // Include ID for marking
+    };
+
     await flutterLocalNotificationsPlugin.show(
-      0,  // ID
+      DateTime.now().millisecondsSinceEpoch.remainder(100000),  // Unique ID
       title,
       body,
-      platformChannelSpecifics,
-      payload: json.encode(message.data),  // For tap handling
+      details,
+      payload: json.encode(payloadData),  // Enhanced payload with ID
     );
   }
 
@@ -340,6 +465,24 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     );
   }
 
+  // New: Handle notification tap (moved from main.dart)
+  void _handleNotificationTap(Map<String, dynamic> data) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final threadId = int.tryParse(data['thread_id'] ?? '');
+      final postId = int.tryParse(data['post_id'] ?? '');
+      final notifId = data['id'] ?? '';
+      if (threadId != null) {
+        _fetchAndNavigateToThread(threadId);
+        _markAsReadById(notifId);  // Now with ID
+      } else if (postId != null) {
+        _fetchAndNavigateToPost(postId);
+        _markAsReadById(notifId);  // Now with ID
+      } else if (mounted) {
+        Navigator.pushNamed(context, '/notifications');
+      }
+    });
+  }
+
   void _openJobDrawer() {
     _scaffoldKey.currentState?.openEndDrawer();
   }
@@ -375,18 +518,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   }
 
   void _handleNotificationPress() {
-    if (_isNotificationActive) return;
-    setState(() {
-      _isNotificationActive = true;
-    });
-    _showErrorBanner('Notifications coming soon!');
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) {
-        setState(() {
-          _isNotificationActive = false;
-        });
-      }
-    });
+    setState(() => _selectedIndex = 3);
   }
 
   void _handleMessagePress() {
@@ -439,13 +571,13 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     List<Widget> actions = [
       IconButton(
         onPressed: _handleSearchPress,
-        icon: const Icon(Icons.search, color: Colors.black87),
+        icon: Icon(Icons.search, color: colorScheme.onSurface),
       ),
       IconButton(
-        onPressed: _isNotificationActive ? null : _handleNotificationPress,
+        onPressed: _handleNotificationPress,
         icon: Icon(
           Icons.notifications_outlined,
-          color: _isNotificationActive ? colorScheme.onSurfaceVariant : colorScheme.onSurface,
+          color: colorScheme.onSurface,
         ),
       ),
       IconButton(
@@ -566,7 +698,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       case 1:
         return ThreadsScreen();
       case 3:
-        return Center(child: Text('Alerts Page', style: TextStyle(color: colorScheme.onSurface)));
+        return NotificationsPage(onUnreadChanged: _setUnreadCount);  // Updated callback
       case 4:
         return const SizedBox();
       default:
@@ -631,7 +763,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
 
   Widget _navButton(IconData icon, String label, int index, ColorScheme colorScheme) {
     bool active = _selectedIndex == index;
-    return MaterialButton(
+    Widget button = MaterialButton(
       minWidth: 70,
       onPressed: () {
         if (index == 4) {
@@ -668,6 +800,31 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
         ],
       ),
     );
+    if (index == 3 && _unreadCount > 0) {  // Alerts index
+      return Stack(
+        children: [
+          button,
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.all(2),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              constraints: const BoxConstraints(minWidth: 12, minHeight: 12),
+              child: Text(
+                '$_unreadCount',
+                style: const TextStyle(color: Colors.white, fontSize: 8),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return button;
   }
 }
 
