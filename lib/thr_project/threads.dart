@@ -2,12 +2,14 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shimmer/shimmer.dart'; 
+import 'package:lottie/lottie.dart'; // Add lottie: ^3.1.2 to pubspec.yaml for Lottie animations
 
 class Thread {
   final int id;
@@ -16,9 +18,9 @@ class Thread {
   final String category;
   final String creator;
   final String creatorRole;
-  final int inspiredCount;
+  int inspiredCount;
   final int commentCount;
-  final int collabCount;
+  int collabCount;
   final List<String> tags;
   final DateTime createdAt;
 
@@ -85,6 +87,264 @@ class Comment {
   }
 }
 
+class RoundTablePainter extends CustomPainter {
+  final double rotation;
+
+  RoundTablePainter({this.rotation = 0.0});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final tableRadius = size.width / 2 - 4;
+
+    // Save and rotate the canvas
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(rotation);
+    canvas.translate(-center.dx, -center.dy);
+
+    // Draw round table
+    final tablePaint = Paint()
+      ..color = Colors.blue.withOpacity(0.3)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, tableRadius, tablePaint);
+
+    // Draw table edge
+    final edgePaint = Paint()
+      ..color = Colors.blue
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+    canvas.drawCircle(center, tableRadius, edgePaint);
+
+    // Draw chairs around the table
+    final chairPaint = Paint()
+      ..color = Colors.blue
+      ..style = PaintingStyle.fill;
+    for (int i = 0; i < 8; i++) {
+      final angle = (2 * pi / 8) * i;
+      final chairRadius = 2.0;
+      final chairDistance = tableRadius + 6;
+      final chairX = center.dx + chairDistance * cos(angle);
+      final chairY = center.dy + chairDistance * sin(angle);
+      canvas.drawCircle(Offset(chairX, chairY), chairRadius, chairPaint);
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+}
+
+class AnimatedRoundTableIcon extends StatefulWidget {
+  final double size;
+  final Color color;
+
+  const AnimatedRoundTableIcon({
+    Key? key,
+    this.size = 24.0,
+    this.color = Colors.blue,
+  }) : super(key: key);
+
+  @override
+  State<AnimatedRoundTableIcon> createState() => _AnimatedRoundTableIconState();
+}
+
+class _AnimatedRoundTableIconState extends State<AnimatedRoundTableIcon>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _rotationAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(seconds: 6),
+      vsync: this,
+    )..repeat();
+    _rotationAnimation = Tween<double>(
+      begin: 0.0,
+      end: 2 * pi,
+    ).animate(CurvedAnimation(
+      parent: _controller,
+      curve: Curves.linear,
+    ));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _rotationAnimation,
+      builder: (context, child) {
+        return CustomPaint(
+          size: Size(widget.size, widget.size),
+          painter: RoundTablePainter(rotation: _rotationAnimation.value),
+        );
+      },
+    );
+  }
+}
+
+// Onboarding Tour Screen
+class OnboardingTourScreen extends StatefulWidget {
+  const OnboardingTourScreen({super.key});
+
+  @override
+  State<OnboardingTourScreen> createState() => _OnboardingTourScreenState();
+}
+
+class _OnboardingTourScreenState extends State<OnboardingTourScreen> with TickerProviderStateMixin {
+  late PageController _pageController;
+  late AnimationController _tableController;
+  late AnimationController _chairsController;
+  late Animation<double> _tableAnimation;
+  late Animation<double> _chairsAnimation;
+  int currentPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _tableController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _chairsController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _tableAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _tableController, curve: Curves.easeInOut),
+    );
+    _chairsAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _chairsController, curve: Curves.bounceOut),
+    );
+    _tableController.forward().then((_) => _chairsController.forward());
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _tableController.dispose();
+    _chairsController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          PageView(
+            controller: _pageController,
+            onPageChanged: (index) {
+              setState(() => currentPage = index);
+              _tableController.reset();
+              _chairsController.reset();
+              _tableController.forward().then((_) => _chairsController.forward());
+            },
+            children: [
+              // Page 1: Welcome to Roundtable
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FadeTransition(
+                      opacity: _tableAnimation,
+                      child: ScaleTransition(
+                        scale: _tableAnimation,
+                        child: AnimatedRoundTableIcon(size: 150),
+                      ),
+                    ),
+                    SizedBox(height: 32),
+                    Text('Gather \'Round!', style: Theme.of(context).textTheme.headlineMedium),
+                    Text('Join discussions like a virtual roundtable.'),
+                  ],
+                ),
+              ),
+              // Page 2: Create & Engage
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FadeTransition(
+                      opacity: _tableAnimation,
+                      child: ScaleTransition(
+                        scale: _tableAnimation,
+                        child: AnimatedRoundTableIcon(size: 150),
+                      ),
+                    ),
+                    SizedBox(height: 32),
+                    Text('Start Conversations', style: Theme.of(context).textTheme.headlineSmall),
+                    Text('Create threads and watch ideas circle the table.'),
+                  ],
+                ),
+              ),
+              // Page 3: Collaborate
+              Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    FadeTransition(
+                      opacity: _tableAnimation,
+                      child: ScaleTransition(
+                        scale: _tableAnimation,
+                        child: AnimatedRoundTableIcon(size: 150),
+                      ),
+                    ),
+                    SizedBox(height: 32),
+                    Text('Pull Up a Chair', style: Theme.of(context).textTheme.headlineSmall),
+                    Text('Join collabs with a simple tap.'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Positioned(
+            bottom: 50,
+            left: 0,
+            right: 0,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(3, (index) => AnimatedContainer(
+                duration: Duration(milliseconds: 300),
+                margin: EdgeInsets.symmetric(horizontal: 4),
+                height: 8,
+                width: currentPage == index ? 24 : 8,
+                decoration: BoxDecoration(
+                  color: currentPage == index ? Colors.blue : Colors.grey,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              )),
+            ),
+          ),
+          Positioned(
+            bottom: 100,
+            right: 20,
+            child: FloatingActionButton(
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('hasSeenOnboarding', true);
+                if (context.mounted) Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => ThreadsScreen()),
+                );
+              },
+              child: Icon(Icons.arrow_forward),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class ThreadsScreen extends StatefulWidget {
   const ThreadsScreen({super.key});
 
@@ -101,13 +361,20 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
   bool hasError = false;
   String? errorMessage;
   late AnimationController _animationController;
+  late AnimationController _staggerController;
   late Animation<double> _fadeAnimation;
+  List<Animation<double>> _slideAnimations = [];
 
   @override
   void initState() {
     super.initState();
+    _checkOnboarding();
     _animationController = AnimationController(
       duration: Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _staggerController = AnimationController(
+      duration: Duration(milliseconds: 800),
       vsync: this,
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -115,6 +382,17 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
     );
     _animationController.forward();
     _initializeData();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeen = prefs.getBool('hasSeenOnboarding') ?? false;
+    if (!hasSeen && mounted) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => OnboardingTourScreen()),
+      );
+    }
   }
 
   Future<void> _initializeData() async {
@@ -260,10 +538,21 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
       final response = await http.get(uri).timeout(Duration(seconds: 10));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
+        final newThreads = data.map((json) => Thread.fromJson(json)).toList();
         setState(() {
-          threads = data.map((json) => Thread.fromJson(json)).toList();
+          threads = newThreads;
           isLoading = false;
         });
+        // Staggered animation for new threads
+        _slideAnimations = List.generate(threads.length, (index) => 
+          Tween<double>(begin: -1.0, end: 0.0).animate(
+            CurvedAnimation(
+              parent: _staggerController,
+              curve: Interval(index * 0.1, 1.0, curve: Curves.elasticOut),
+            ),
+          )
+        );
+        _staggerController.forward(from: 0.0);
       } else {
         throw Exception('Server error: ${response.statusCode} - ${response.body}');
       }
@@ -271,12 +560,12 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
       setState(() {
         isLoading = false;
         hasError = true;
-        errorMessage = 'Failed to fetch threads: $e';
+        errorMessage = 'Failed to fetch roundtables: $e';
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load threads: $e'),
+            content: Text('Failed to load roundtables: $e'),
             action: SnackBarAction(label: 'Retry', onPressed: _fetchThreads),
           ),
         );
@@ -287,7 +576,7 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
   Future<void> _createThread(String title, String body, String category, List<String> tags) async {
     if (userId == null || userId == 0 || username == null || username!.isEmpty) {
       if (mounted) {
-        _showError('Please log in to create a thread');
+        _showError('Please wait to create a roundtable');
       }
       return;
     }
@@ -306,20 +595,41 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
         body: bodyData,
       ).timeout(Duration(seconds: 10));
       if (response.statusCode == 200) {
-        await _fetchThreads();
+        try {
+          final data = json.decode(response.body);
+          if (data is Map<String, dynamic> && data.containsKey('thread_id')) {
+            final newThread = Thread.fromJson(data);
+            if (mounted) {
+              setState(() {
+                threads.insert(0, newThread);
+              });
+              _showSuccess('Roundtable created!');
+            }
+          } else {
+            await _fetchThreads();
+          }
+        } catch (parseError) {
+          await _fetchThreads();
+        }
         if (mounted) Navigator.pop(context);
       } else {
-        throw Exception('Failed to create thread: ${response.statusCode}');
+        throw Exception('Failed to create roundtable: ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
-        _showError('Failed to create thread: $e');
+        _showError('Failed to create roundtable: $e');
       }
     }
   }
 
   Future<void> _toggleInspire(int threadId) async {
     if (username == null || username!.isEmpty) return;
+    final threadIndex = threads.indexWhere((t) => t.id == threadId);
+    if (threadIndex == -1) return;
+    final thread = threads[threadIndex];
+    final oldCount = thread.inspiredCount;
+    thread.inspiredCount++;
+    if (mounted) setState(() {});
     try {
       final bodyData = json.encode({'type': 'inspired', 'username': username});
       final response = await http.post(
@@ -328,11 +638,21 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
         body: bodyData,
       ).timeout(Duration(seconds: 10));
       if (response.statusCode == 200 || response.statusCode == 201) {
-        await _fetchThreads();
+        try {
+          final data = json.decode(response.body);
+          if (data is Map<String, dynamic> && data.containsKey('inspired_count')) {
+            thread.inspiredCount = data['inspired_count'];
+          }
+        } catch (_) {
+          // Keep optimistic update
+        }
+        _showSuccess('Inspired this discussion!');
       } else {
         throw Exception('Failed to toggle inspire: ${response.statusCode}');
       }
     } catch (e) {
+      thread.inspiredCount = oldCount;
+      if (mounted) setState(() {});
       if (mounted) {
         _showError('Failed to toggle inspire: $e');
       }
@@ -341,6 +661,12 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
 
   Future<void> _sendCollab(int threadId, String message) async {
     if (username == null || username!.isEmpty) return;
+    final threadIndex = threads.indexWhere((t) => t.id == threadId);
+    if (threadIndex == -1) return;
+    final thread = threads[threadIndex];
+    final oldCount = thread.collabCount;
+    thread.collabCount++;
+    if (mounted) setState(() {});
     try {
       final bodyData = json.encode({'message': message, 'username': username});
       final response = await http.post(
@@ -349,18 +675,78 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
         body: bodyData,
       ).timeout(Duration(seconds: 10));
       if (response.statusCode == 200 || response.statusCode == 201) {
-        await _fetchThreads();
+        try {
+          final data = json.decode(response.body);
+          if (data is Map<String, dynamic> && data.containsKey('collab_count')) {
+            thread.collabCount = data['collab_count'];
+          }
+        } catch (_) {
+          // Keep optimistic update
+        }
         if (mounted) {
-          _showSuccess('Collab request sent!');
+          _showJoinAnimation(context, threadId);
+          _showSuccess('Joined the roundtable discussion!');
         }
       } else {
-        throw Exception('Failed to send collab: ${response.statusCode}');
+        throw Exception('Failed to join discussion: ${response.statusCode}');
       }
     } catch (e) {
+      thread.collabCount = oldCount;
+      if (mounted) setState(() {});
       if (mounted) {
-        _showError('Failed to send collab: $e');
+        _showError('Failed to join discussion: $e');
       }
     }
+  }
+
+  void _showJoinAnimation(BuildContext context, int threadId) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setDialogState) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            Timer(const Duration(milliseconds: 2000), () {
+              Navigator.of(dialogContext).pop();
+            });
+          });
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            child: Stack(
+              children: [
+                // Central table
+                const Center(
+                  child: AnimatedRoundTableIcon(size: 200),
+                ),
+                // Chair pull animation (using Lottie for simplicity; replace with Rive if preferred)
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Lottie.asset(
+                    'assets/chair_pull.json', // Assume you have a Lottie file for chair animation
+                    width: 300,
+                    height: 200,
+                  ),
+                ),
+                // Confetti (simple particle simulation or use confetti package)
+                Align(
+                  alignment: Alignment.topCenter,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    duration: const Duration(milliseconds: 500),
+                    builder: (context, value, child) => Opacity(
+                      opacity: value,
+                      child: Icon(Icons.party_mode, size: 50 * value, color: Colors.yellow),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   void _showCreateDialog() {
@@ -374,13 +760,13 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(children: [Icon(Icons.add, color: Colors.blue), SizedBox(width: 8), Text('Create Thread')]),
+          title: Row(children: [Icon(Icons.add, color: Colors.blue), SizedBox(width: 8), Text('Start Roundtable')]),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(controller: titleController, decoration: InputDecoration(
-                  labelText: 'Title',
+                  labelText: 'Topic Title',
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 )),
                 SizedBox(height: 8),
@@ -388,14 +774,14 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
                   controller: bodyController,
                   maxLines: 3,
                   decoration: InputDecoration(
-                    labelText: 'Body',
+                    labelText: 'Opening Thoughts',
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                   ),
                 ),
                 SizedBox(height: 8),
                 DropdownButtonFormField<String>(
                   value: selectedCategory,
-                  decoration: InputDecoration(labelText: 'Category', border: OutlineInputBorder()),
+                  decoration: InputDecoration(labelText: 'Theme', border: OutlineInputBorder()),
                   items: ['Idea', 'Problem', 'Build', 'Event', 'Collab']
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
@@ -409,7 +795,7 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
                     }
                   },
                   decoration: InputDecoration(
-                    labelText: 'Add Tag (Enter to add)',
+                    labelText: 'Add Topic Tag (Enter to add)',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -427,7 +813,7 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
             TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
             ElevatedButton(
               onPressed: () => _createThread(titleController.text, bodyController.text, selectedCategory, selectedTags),
-              child: Text('Create'),
+              child: Text('Start Discussion'),
             ),
           ],
         ),
@@ -443,10 +829,10 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.login, size: 80, color: Colors.grey[400]),
+              AnimatedRoundTableIcon(size: 80, color: Colors.grey),
               SizedBox(height: 16),
               Text(
-                'Please log in to view threads',
+                'Please wait to join the roundtable',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
               ),
               SizedBox(height: 8),
@@ -468,11 +854,18 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Threads', style: TextStyle(fontWeight: FontWeight.bold)),
-        elevation: 0, // Material 3 flat
+        title: Row(
+          children: [
+            AnimatedRoundTableIcon(size: 24, color: Colors.white),
+            SizedBox(width: 8),
+            Text('Roundtable', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        elevation: 0,
+        backgroundColor: Colors.blue,
         actions: [
           PopupMenuButton<String>(
-            icon: Icon(Icons.sort),
+            icon: Icon(Icons.sort, color: Colors.white),
             onSelected: (value) {
               setState(() => sort = value);
               _fetchThreads();
@@ -481,7 +874,7 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
                 .map((s) => PopupMenuItem(value: s.toLowerCase(), child: Text(s)))
                 .toList(),
           ),
-          IconButton(onPressed: _showCreateDialog, icon: Icon(Icons.add, color: Colors.blue)),
+          IconButton(onPressed: _showCreateDialog, icon: Icon(Icons.add, color: Colors.white)),
         ],
       ),
       body: FadeTransition(
@@ -546,22 +939,22 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.inbox_outlined, size: 80, color: Colors.grey[400]),
+                                  AnimatedRoundTableIcon(size: 80, color: Colors.grey),
                                   SizedBox(height: 16),
                                   Text(
-                                    'No threads available',
+                                    'No roundtables yet',
                                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                                   ),
                                   SizedBox(height: 8),
                                   Text(
-                                    'Be the first to create one!',
+                                    'Start the conversation!',
                                     style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                                   ),
                                   SizedBox(height: 24),
                                   ElevatedButton.icon(
                                     onPressed: _showCreateDialog,
                                     icon: Icon(Icons.add),
-                                    label: Text('Create Thread'),
+                                    label: Text('Start Roundtable'),
                                   ),
                                 ],
                               ),
@@ -576,111 +969,152 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
                           itemCount: threads.length,
                           itemBuilder: (context, index) {
                             final thread = threads[index];
-                            return Hero(
-                              tag: 'thread_${thread.id}', // For smooth navigation animation
-                              child: Card(
-                                margin: EdgeInsets.all(8),
-                                elevation: 4,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(12),
-                                  onTap: () => Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => ThreadDetailScreen(
-                                        thread: thread,
-                                        username: username ?? '',
-                                        userId: userId ?? 0,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Container(
-                                    padding: EdgeInsets.all(16),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(12),
-                                      gradient: LinearGradient(
-                                        colors: [Colors.white, Colors.blue[50]!], // Subtle gradient
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                    ),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          thread.title,
-                                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-                                        ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                          thread.body,
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(color: Colors.grey[600]),
-                                        ),
-                                        SizedBox(height: 12),
-                                        Row(
-                                          children: [
-                                            Chip(
-                                              label: Text(thread.category),
-                                              backgroundColor: Colors.blue[100],
-                                              padding: EdgeInsets.symmetric(horizontal: 8),
-                                            ),
-                                            ...thread.tags.take(2).map((t) => Padding(
-                                              padding: EdgeInsets.only(left: 4),
-                                              child: Chip(
-                                                label: Text('#$t'),
-                                                backgroundColor: Colors.green[100],
-                                                padding: EdgeInsets.symmetric(horizontal: 4),
+                            final slideAnimation = _slideAnimations.length > index ? _slideAnimations[index] : const AlwaysStoppedAnimation(0.0);
+                            return AnimatedBuilder(
+                              animation: slideAnimation,
+                              builder: (context, child) {
+                                return Transform.translate(
+                                  // ignore: unnecessary_null_comparison
+                                  offset: slideAnimation != null ? Offset(slideAnimation.value * 100, 0) : Offset.zero,
+                                  child: Opacity(
+                                    // ignore: unnecessary_null_comparison
+                                    opacity: slideAnimation != null ? (slideAnimation.value + 1.0).clamp(0.0, 1.0) : 1.0,
+                                    child: Hero(
+                                      tag: 'thread_${thread.id}', // For smooth navigation animation
+                                      child: Card(
+                                        margin: EdgeInsets.all(8),
+                                        elevation: 4,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(12),
+                                          onTap: () => Navigator.push(
+                                            context,
+                                            PageRouteBuilder(
+                                              pageBuilder: (context, animation, secondaryAnimation) => ThreadDetailScreen(
+                                                thread: thread,
+                                                username: username ?? '',
+                                                userId: userId ?? 0,
                                               ),
-                                            )),
-                                            if (thread.tags.length > 2)
-                                              Padding(
-                                                padding: EdgeInsets.only(left: 4),
-                                                child: Chip(label: Text('+${thread.tags.length - 2} more'), backgroundColor: Colors.grey[200]),
-                                              ),
-                                          ],
-                                        ),
-                                        SizedBox(height: 8),
-                                        Text(
-                                          '${thread.creatorRole.isNotEmpty ? '${thread.creatorRole} • ' : ''}${thread.creator} • ${thread.createdAt.toString().split(' ')[0]}',
-                                          style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                                        ),
-                                        SizedBox(height: 12),
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                          children: [
-                                            _ActionButton(
-                                              icon: Icons.lightbulb_outline,
-                                              label: '${thread.inspiredCount}',
-                                              onTap: () => _toggleInspire(thread.id),
+                                              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                                return SlideTransition(
+                                                  position: Tween<Offset>(
+                                                    begin: const Offset(1.0, 0.0),
+                                                    end: Offset.zero,
+                                                  ).animate(CurvedAnimation(
+                                                    parent: animation,
+                                                    curve: Curves.easeInOut,
+                                                  )),
+                                                  child: child,
+                                                );
+                                              },
                                             ),
-                                            _ActionButton(
-                                              icon: Icons.comment_outlined,
-                                              label: '${thread.commentCount}',
-                                              onTap: () => Navigator.push(
-                                                context,
-                                                MaterialPageRoute(
-                                                  builder: (context) => ThreadDetailScreen(
-                                                    thread: thread,
-                                                    username: username ?? '',
-                                                    userId: userId ?? 0,
-                                                  ),
+                                          ),
+                                          child: Container(
+                                            padding: EdgeInsets.all(16),
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(12),
+                                              gradient: LinearGradient(
+                                                colors: [Colors.white, Colors.blue[50]!],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                            ),
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  children: [
+                                                    AnimatedRoundTableIcon(size: 20),
+                                                    SizedBox(width: 8),
+                                                    Expanded(
+                                                      child: Text(
+                                                        thread.title,
+                                                        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                                      ),
+                                                    ),
+                                                  ],
                                                 ),
-                                              ),
+                                                SizedBox(height: 8),
+                                                Text(
+                                                  thread.body,
+                                                  maxLines: 3,
+                                                  overflow: TextOverflow.ellipsis,
+                                                  style: TextStyle(color: Colors.grey[600]),
+                                                ),
+                                                SizedBox(height: 12),
+                                                Wrap(
+                                                  spacing: 4,
+                                                  children: [
+                                                    Chip(
+                                                      label: Text(thread.category),
+                                                      backgroundColor: Colors.blue[100],
+                                                      padding: EdgeInsets.symmetric(horizontal: 8),
+                                                    ),
+                                                    ...thread.tags.take(2).map((t) => Chip(
+                                                      label: Text('#$t'),
+                                                      backgroundColor: Colors.green[100],
+                                                      padding: EdgeInsets.symmetric(horizontal: 4),
+                                                    )),
+                                                    if (thread.tags.length > 2)
+                                                      Chip(label: Text('+${thread.tags.length - 2} more'), backgroundColor: Colors.grey[200]),
+                                                  ],
+                                                ),
+                                                SizedBox(height: 8),
+                                                Text(
+                                                  '${thread.creatorRole.isNotEmpty ? '${thread.creatorRole} • ' : ''}${thread.creator} • ${thread.createdAt.toString().split(' ')[0]}',
+                                                  style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                                                ),
+                                                SizedBox(height: 12),
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                                                  children: [
+                                                    _ActionButton(
+                                                      icon: Icons.lightbulb_outline,
+                                                      label: '${thread.inspiredCount}',
+                                                      onTap: () => _toggleInspire(thread.id),
+                                                    ),
+                                                    _ActionButton(
+                                                      icon: Icons.comment_outlined,
+                                                      label: '${thread.commentCount}',
+                                                      onTap: () => Navigator.push(
+                                                        context,
+                                                        PageRouteBuilder(
+                                                          pageBuilder: (context, animation, secondaryAnimation) => ThreadDetailScreen(
+                                                            thread: thread,
+                                                            username: username ?? '',
+                                                            userId: userId ?? 0,
+                                                          ),
+                                                          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                                            return SlideTransition(
+                                                              position: Tween<Offset>(
+                                                                begin: const Offset(1.0, 0.0),
+                                                                end: Offset.zero,
+                                                              ).animate(CurvedAnimation(
+                                                                parent: animation,
+                                                                curve: Curves.easeInOut,
+                                                              )),
+                                                              child: child,
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                    ),
+                                                    _ActionButton(
+                                                      icon: Icons.people_outline,
+                                                      label: '${thread.collabCount}',
+                                                      onTap: () => _sendCollab(thread.id, 'Interested in discussing!'),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
                                             ),
-                                            _ActionButton(
-                                              icon: Icons.people_outline,
-                                              label: '${thread.collabCount}',
-                                              onTap: () => _sendCollab(thread.id, 'Interested in collaborating!'),
-                                            ),
-                                          ],
+                                          ),
                                         ),
-                                      ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ),
+                                );
+                              },
                             );
                           },
                         ),
@@ -691,7 +1125,7 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
         backgroundColor: Colors.blue,
         // ignore: sort_child_properties_last
         child: Icon(Icons.add),
-        tooltip: 'Create Thread',
+        tooltip: 'Start Roundtable',
       ),
     );
   }
@@ -699,6 +1133,7 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
   @override
   void dispose() {
     _animationController.dispose();
+    _staggerController.dispose();
     super.dispose();
   }
 }
@@ -743,16 +1178,32 @@ class ThreadDetailScreen extends StatefulWidget {
   _ThreadDetailScreenState createState() => _ThreadDetailScreenState();
 }
 
-class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
+class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProviderStateMixin {
   List<Comment> comments = [];
   bool isLoading = true;
   bool hasError = false;
   String? errorMessage;
   final TextEditingController _commentController = TextEditingController();
+  late AnimationController _detailAnimationController;
+  late Animation<double> _detailFadeAnimation;
+  late AnimationController _rotationController;
+  double _rotationAngle = 0.0;
 
   @override
   void initState() {
     super.initState();
+    _detailAnimationController = AnimationController(
+      duration: Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _rotationController = AnimationController(
+      duration: Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _detailFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _detailAnimationController, curve: Curves.easeInBack),
+    );
+    _detailAnimationController.forward();
     _loadComments();
   }
 
@@ -824,7 +1275,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       ).timeout(Duration(seconds: 10));
       if (response.statusCode == 200 || response.statusCode == 201) {
         _commentController.clear();
-        await _loadComments(); // Refresh
+        await _loadComments(); // Refresh comments
       } else {
         throw Exception('Failed to add comment: ${response.statusCode}');
       }
@@ -839,6 +1290,9 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
 
   Future<void> _sendCollab(int threadId, String message) async {
     if (widget.username.isEmpty) return;
+    final oldCount = widget.thread.collabCount;
+    widget.thread.collabCount++;
+    if (mounted) setState(() {});
     try {
       final bodyData = json.encode({'message': message, 'username': widget.username});
       final response = await http.post(
@@ -847,18 +1301,28 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         body: bodyData,
       ).timeout(Duration(seconds: 10));
       if (response.statusCode == 200 || response.statusCode == 201) {
+        try {
+          final data = json.decode(response.body);
+          if (data is Map<String, dynamic> && data.containsKey('collab_count')) {
+            widget.thread.collabCount = data['collab_count'];
+          }
+        } catch (_) {
+          // Keep optimistic update
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Collab request sent!')),
+            const SnackBar(content: Text('Joined the roundtable!')),
           );
         }
       } else {
-        throw Exception('Failed to send collab: ${response.statusCode}');
+        throw Exception('Failed to join roundtable: ${response.statusCode}');
       }
     } catch (e) {
+      widget.thread.collabCount = oldCount;
+      if (mounted) setState(() {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send collab: $e')),
+          SnackBar(content: Text('Failed to join roundtable: $e')),
         );
       }
     }
@@ -866,6 +1330,9 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
 
   Future<void> _toggleInspire(int threadId) async {
     if (widget.username.isEmpty) return;
+    final oldCount = widget.thread.inspiredCount;
+    widget.thread.inspiredCount++;
+    if (mounted) setState(() {});
     try {
       final bodyData = json.encode({'type': 'inspired', 'username': widget.username});
       final response = await http.post(
@@ -874,16 +1341,25 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         body: bodyData,
       ).timeout(Duration(seconds: 10));
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Optionally refresh thread data, but for now, just snackbar
+        try {
+          final data = json.decode(response.body);
+          if (data is Map<String, dynamic> && data.containsKey('inspired_count')) {
+            widget.thread.inspiredCount = data['inspired_count'];
+          }
+        } catch (_) {
+          // Keep optimistic update
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Inspired!')),
+            const SnackBar(content: Text('Inspired by this discussion!')),
           );
         }
       } else {
         throw Exception('Failed to toggle inspire: ${response.statusCode}');
       }
     } catch (e) {
+      widget.thread.inspiredCount = oldCount;
+      if (mounted) setState(() {});
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to toggle inspire: $e')),
@@ -892,43 +1368,110 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
     }
   }
 
-  Widget _buildCommentTree(Comment comment, {int level = 0}) {
-    return Padding(
-      padding: EdgeInsets.only(left: level * 16.0),
-      child: Card(
-        margin: EdgeInsets.symmetric(vertical: 4),
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        child: Padding(
-          padding: EdgeInsets.all(12),
+  Widget _buildCircularCommentLayout() {
+    if (comments.isEmpty) {
+      return Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 12,
-                    backgroundColor: Colors.blue[100],
-                    child: Text(comment.commenter[0].toUpperCase(), style: TextStyle(fontSize: 12)),
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(comment.commenter, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                        Text(comment.createdAt.toString().split(' ')[1].substring(0, 5), style: TextStyle(fontSize: 12, color: Colors.grey)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              AnimatedRoundTableIcon(size: 50),
               SizedBox(height: 8),
-              Text(comment.body),
-              if (comment.replies.isNotEmpty)
-                ...comment.replies.map((reply) => _buildCommentTree(reply, level: level + 1)),
+              Text('No comments yet'),
+              SizedBox(height: 8),
+              Text('Join the discussion around the table!'),
             ],
           ),
+        ),
+      );
+    }
+
+    final ringRadius = 120.0;
+    final center = Offset(MediaQuery.of(context).size.width / 2, 200.0);
+
+    return GestureDetector(
+      onPanUpdate: (details) {
+        setState(() {
+          _rotationAngle += details.delta.dx / 100;
+        });
+      },
+      child: Container(
+        height: 500,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Central table
+            AnimatedRoundTableIcon(size: 100),
+            // Comments in ring
+            ...comments.asMap().entries.map((entry) {
+              final index = entry.key;
+              final comment = entry.value;
+              final angle = (2 * pi / comments.length * index) + _rotationAngle;
+              final x = center.dx + ringRadius * cos(angle);
+              final y = center.dy + ringRadius * sin(angle);
+
+              return Positioned(
+                left: x - 80, // Adjust for card width
+                top: y - 60, // Adjust for card height
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: Duration(milliseconds: 600 + (index * 100)),
+                  builder: (context, value, child) {
+                    return Transform(
+                      alignment: Alignment.center,
+                      transform: Matrix4.identity()
+                        ..setEntry(3, 2, 0.001) // Perspective for 3D-ish
+                        ..rotateY((1 - value) * pi / 4) // Flip in like dealing cards
+                        ..rotateZ(angle),
+                      child: Opacity(
+                        opacity: value,
+                        child: Transform.translate(
+                          offset: Offset(0, (1 - value) * 50), // Rise from bottom
+                          child: Card(
+                            child: Container(
+                              width: 160,
+                              padding: EdgeInsets.all(8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 10,
+                                        backgroundColor: Colors.blue[100],
+                                        child: Text(comment.commenter[0].toUpperCase(), style: TextStyle(fontSize: 10, color: Colors.blue)),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Expanded(child: Text(comment.commenter, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12))),
+                                    ],
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(comment.body, style: TextStyle(fontSize: 11), maxLines: 3, overflow: TextOverflow.ellipsis),
+                                  if (comment.replies.isNotEmpty) ...[
+                                    SizedBox(height: 4),
+                                    Text('${comment.replies.length} replies', style: TextStyle(fontSize: 10, color: Colors.grey)),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            }),
+            // Replies as spokes (simplified: show count or mini previews outward)
+            ...comments.expand((comment) => comment.replies.map((reply) {
+              // Position replies further out; for brevity, add as small badges
+              return Positioned(
+                // Calculate position based on parent angle + offset
+                child: Container(), // Placeholder for reply spokes
+              );
+            })).toList(),
+          ],
         ),
       ),
     );
@@ -967,169 +1510,169 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
           ),
         ),
       );
-    } else if (comments.isEmpty) {
-      return Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(
-          child: Column(
-            children: [
-              Icon(Icons.comment_outlined, size: 50, color: Colors.grey[400]),
-              SizedBox(height: 8),
-              Text('No comments yet'),
-              SizedBox(height: 8),
-              Text('Be the first to comment!'),
-            ],
-          ),
-        ),
-      );
     } else {
-      return ListView.builder(
-        shrinkWrap: true,
-        physics: NeverScrollableScrollPhysics(),
-        itemCount: comments.length,
-        itemBuilder: (context, index) => _buildCommentTree(comments[index]),
-      );
+      return _buildCircularCommentLayout();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: CustomScrollView(
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 200,
-            floating: false,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(widget.thread.title),
-              background: Hero(
-                tag: 'thread_${widget.thread.id}',
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.blue[600]!, Colors.blue[800]!],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
+      body: FadeTransition(
+        opacity: _detailFadeAnimation,
+        child: CustomScrollView(
+          slivers: [
+            SliverAppBar(
+              expandedHeight: 200,
+              floating: false,
+              pinned: true,
+              flexibleSpace: FlexibleSpaceBar(
+                title: Row(
+                  children: [
+                    AnimatedRoundTableIcon(size: 20, color: Colors.white),
+                    SizedBox(width: 4),
+                    Flexible(child: Text(widget.thread.title)),
+                  ],
+                ),
+                background: Hero(
+                  tag: 'thread_${widget.thread.id}',
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.blue[600]!, Colors.blue[800]!],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
                     ),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.thread.title,
-                          style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          widget.thread.body,
-                          style: TextStyle(color: Colors.white70),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        SizedBox(height: 16),
-                        Row(
-                          children: [
-                            Chip(label: Text(widget.thread.category), backgroundColor: Colors.white24),
-                            SizedBox(width: 8),
-                            ...widget.thread.tags.take(3).map((t) => Chip(
-                              label: Text('#$t'),
-                              backgroundColor: Colors.white24,
-                              padding: EdgeInsets.symmetric(horizontal: 4),
-                            )),
-                          ],
-                        ),
-                      ],
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.thread.title,
+                            style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            widget.thread.body,
+                            style: TextStyle(color: Colors.white70),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          SizedBox(height: 16),
+                          Wrap(
+                            spacing: 4,
+                            children: [
+                              Chip(label: Text(widget.thread.category), backgroundColor: Colors.white24),
+                              SizedBox(width: 8),
+                              ...widget.thread.tags.take(3).map((t) => Chip(
+                                label: Text('#$t'),
+                                backgroundColor: Colors.white24,
+                                padding: EdgeInsets.symmetric(horizontal: 4),
+                              )),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
+              backgroundColor: Colors.blue,
             ),
-          ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'By ${widget.thread.creator} • ${widget.thread.createdAt.toString().split(' ')[0]}',
-                    style: TextStyle(color: Colors.grey[600]),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    widget.thread.body,
-                    style: TextStyle(fontSize: 16, height: 1.5),
-                  ),
-                  SizedBox(height: 24),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _ActionButton(
-                        icon: Icons.lightbulb_outline,
-                        label: '${widget.thread.inspiredCount}',
-                        onTap: () => _toggleInspire(widget.thread.id),
-                      ),
-                      _ActionButton(
-                        icon: Icons.people_outline,
-                        label: '${widget.thread.collabCount}',
-                        onTap: () => _sendCollab(widget.thread.id, 'Interested!'),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 24),
-                  Text('Comments (${widget.thread.commentCount})', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  _buildCommentsSection(),
-                  SizedBox(height: 16),
-                  if (!isLoading && !hasError)
-                    Card(
-                      child: Padding(
-                        padding: EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _commentController,
-                                decoration: InputDecoration(
-                                  hintText: 'Add a comment...',
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hosted by ${widget.thread.creator} • ${widget.thread.createdAt.toString().split(' ')[0]}',
+                      style: TextStyle(color: Colors.grey[600]),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      widget.thread.body,
+                      style: TextStyle(fontSize: 16, height: 1.5),
+                    ),
+                    SizedBox(height: 24),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _ActionButton(
+                          icon: Icons.lightbulb_outline,
+                          label: '${widget.thread.inspiredCount}',
+                          onTap: () => _toggleInspire(widget.thread.id),
+                        ),
+                        _ActionButton(
+                          icon: Icons.people_outline,
+                          label: '${widget.thread.collabCount}',
+                          onTap: () => _sendCollab(widget.thread.id, 'Interested in joining!'),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Icon(Icons.comment, color: Colors.blue),
+                        SizedBox(width: 8),
+                        Text('Discussion (${widget.thread.commentCount})', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    _buildCommentsSection(),
+                    SizedBox(height: 16),
+                    if (!isLoading && !hasError)
+                      Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _commentController,
+                                  decoration: InputDecoration(
+                                    hintText: 'Share your thoughts...',
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  ),
+                                  onSubmitted: (text) {
+                                    if (text.isNotEmpty) {
+                                      _addComment(text);
+                                    }
+                                  },
                                 ),
-                                onSubmitted: (text) {
-                                  if (text.isNotEmpty) {
-                                    _addComment(text);
+                              ),
+                              SizedBox(width: 8),
+                              FloatingActionButton(
+                                mini: true,
+                                backgroundColor: Colors.blue,
+                                onPressed: () {
+                                  if (_commentController.text.isNotEmpty) {
+                                    _addComment(_commentController.text);
                                   }
                                 },
+                                child: Icon(Icons.send, color: Colors.white),
                               ),
-                            ),
-                            SizedBox(width: 8),
-                            FloatingActionButton(
-                              mini: true,
-                              onPressed: () {
-                                if (_commentController.text.isNotEmpty) {
-                                  _addComment(_commentController.text);
-                                }
-                              },
-                              child: Icon(Icons.send),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   @override
   void dispose() {
+    _detailAnimationController.dispose();
+    _rotationController.dispose();
     _commentController.dispose();
     super.dispose();
   }
