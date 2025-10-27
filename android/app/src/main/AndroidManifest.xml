@@ -30,7 +30,7 @@
         android:name="${applicationName}"
         android:label="Ideaship"
         android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher_round"
+        android:roundIcon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
 
         <!-- MainActivity for Flutter -->

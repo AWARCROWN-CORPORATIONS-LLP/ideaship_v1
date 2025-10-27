@@ -141,10 +141,10 @@ class AnimatedRoundTableIcon extends StatefulWidget {
   final Color color;
 
   const AnimatedRoundTableIcon({
-    Key? key,
+    super.key,
     this.size = 24.0,
     this.color = Colors.blue,
-  }) : super(key: key);
+  });
 
   @override
   State<AnimatedRoundTableIcon> createState() => _AnimatedRoundTableIconState();
@@ -331,10 +331,12 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen> with Ticker
               onPressed: () async {
                 final prefs = await SharedPreferences.getInstance();
                 await prefs.setBool('hasSeenOnboarding', true);
-                if (context.mounted) Navigator.pushReplacement(
+                if (context.mounted) {
+                  Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(builder: (context) => ThreadsScreen()),
                 );
+                }
               },
               child: Icon(Icons.arrow_forward),
             ),
@@ -1395,7 +1397,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
           _rotationAngle += details.delta.dx / 100;
         });
       },
-      child: Container(
+      child: SizedBox(
         height: 500,
         child: Stack(
           alignment: Alignment.center,
@@ -1470,7 +1472,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
                 // Calculate position based on parent angle + offset
                 child: Container(), // Placeholder for reply spokes
               );
-            })).toList(),
+            })),
           ],
         ),
       ),

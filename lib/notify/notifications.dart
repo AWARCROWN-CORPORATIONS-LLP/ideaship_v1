@@ -425,7 +425,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       margin: const EdgeInsets.only(bottom: 8),
                       elevation: isRead ? 0 : 2,
                       color: isRead 
-                          ? colorScheme.surfaceVariant.withOpacity(0.5)
+                          ? colorScheme.surfaceContainerHighest.withOpacity(0.5)
                           : colorScheme.surface,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),

@@ -4,9 +4,9 @@ import 'dart:convert';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
-// For debugPrint
+
 import '../role_selection/role.dart';
-import '../dashboard.dart'; // Placeholder
+import '../dashboard.dart'; 
 
 class AuthLogReg extends StatefulWidget {
   const AuthLogReg({super.key});
@@ -22,13 +22,13 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
   bool _isConnected = false;
   bool _isLoading = false;
 
-  // Login controllers and errors
+  
   final TextEditingController _loginUserController = TextEditingController();
   final TextEditingController _loginPassController = TextEditingController();
   String? _loginUserError;
   String? _loginPassError;
 
-  // Register controllers and errors
+  
   final TextEditingController _regUserController = TextEditingController();
   final TextEditingController _regEmailController = TextEditingController();
   final TextEditingController _regPassController = TextEditingController();
@@ -89,7 +89,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
       }
     });
 
-    // Auto-login check after frame is built
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _autoLoginCheck();
     });
@@ -101,11 +101,11 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token'); // This is the access_token
+      final token = prefs.getString('token');
       final profileCompleted = prefs.getBool('profileCompleted') ?? false;
 
       if (token != null && token.isNotEmpty) {
-        // Rely on server validation for token expiration in future API calls
+      
         if (profileCompleted) {
           if (mounted) {
             Navigator.pushReplacement(
@@ -147,6 +147,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
     final connectivityResult = await Connectivity().checkConnectivity();
     if (!mounted) return;
     setState(() {
+      
       // ignore: unrelated_type_equality_checks
       _isConnected = connectivityResult != ConnectivityResult.none;
       if (!_isConnected) {

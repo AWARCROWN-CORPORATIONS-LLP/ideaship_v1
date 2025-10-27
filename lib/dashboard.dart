@@ -37,7 +37,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   bool _isLoading = true;
   bool _isMessageActive = false;
   bool _isDarkMode = false;
-  int _unreadCount = 0;  // New: Track unread notifications
+  int _unreadCount = 0; 
 
   @override
   void initState() {
@@ -46,9 +46,9 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     _tabController.addListener(_handleTabChange);
     _loadUserData();
     _loadThemePreference();
-    _setupLocalNotifications();  // New: Init local notifs here
+    _setupLocalNotifications();  
     _setupFCM();
-    _loadUnreadCount();  // New: Load initial unread count
+    _loadUnreadCount();  
   }
 
   @override
@@ -634,7 +634,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       String title;
       switch (_selectedIndex) {
         case 1:
-          title = 'Threads';
+          title = 'RoundTable';
           break;
         case 3:
           title = 'Alerts';
@@ -698,7 +698,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
       case 1:
         return ThreadsScreen();
       case 3:
-        return NotificationsPage(onUnreadChanged: _setUnreadCount);  // Updated callback
+        return NotificationsPage(onUnreadChanged: _setUnreadCount); 
       case 4:
         return const SizedBox();
       default:
@@ -747,7 +747,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _navButton(Icons.home_rounded, "Home", 0, colorScheme),
-                    _navButton(Icons.article, "Threads", 1, colorScheme),
+                    _navButton(Icons.article, "Round ", 1, colorScheme),
                     const SizedBox(width: 60),
                     _navButton(Icons.notifications_outlined, "Alerts", 3, colorScheme),
                     _navButton(Icons.settings_outlined, "Settings", 4, colorScheme),
