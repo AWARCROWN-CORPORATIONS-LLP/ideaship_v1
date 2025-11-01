@@ -600,6 +600,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
 
     if (_selectedIndex == 0) {
       return AppBar(
+        automaticallyImplyLeading: false,
         elevation: 0.4,
         backgroundColor: colorScheme.surface,
         title: Text(
@@ -646,6 +647,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
           title = 'Ideaship';
       }
       return AppBar(
+        automaticallyImplyLeading: false,
         title: Text(title, style: TextStyle(color: colorScheme.onSurface)),
         backgroundColor: colorScheme.surface,
         elevation: 0.4,

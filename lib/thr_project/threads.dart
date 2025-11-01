@@ -9,7 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shimmer/shimmer.dart'; 
-import 'package:lottie/lottie.dart'; // Add lottie: ^3.1.2 to pubspec.yaml for Lottie animations
+import 'package:lottie/lottie.dart'; 
 
 class Thread {
   final int id;
@@ -39,19 +39,37 @@ class Thread {
   });
 
   factory Thread.fromJson(Map<String, dynamic> json) {
-    return Thread(
-      id: json['thread_id'],
-      title: json['title'],
-      body: json['body'],
-      category: json['category_name'],
-      creator: json['creator_username'] ?? '',
-      creatorRole: json['creator_role'] ?? '',
-      inspiredCount: json['inspired_count'],
-      commentCount: json['comment_count'],
-      collabCount: json['collab_count'],
-      tags: List<String>.from(json['tags'] ?? []),
-      createdAt: DateTime.parse(json['created_at']),
-    );
+    try {
+      return Thread(
+        id: json['thread_id'] ?? 0,
+        title: json['title'] ?? '',
+        body: json['body'] ?? '',
+        category: json['category_name'] ?? '',
+        creator: json['creator_username'] ?? '',
+        creatorRole: json['creator_role'] ?? '',
+        inspiredCount: json['inspired_count'] ?? 0,
+        commentCount: json['comment_count'] ?? 0,
+        collabCount: json['collab_count'] ?? 0,
+        tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
+        createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+      );
+    } catch (e) {
+      debugPrint('Error parsing Thread from JSON: $e');
+     
+      return Thread(
+        id: 0,
+        title: 'Error Loading Thread',
+        body: 'Failed to load thread details.',
+        category: 'Error',
+        creator: 'Unknown',
+        creatorRole: '',
+        inspiredCount: 0,
+        commentCount: 0,
+        collabCount: 0,
+        tags: [],
+        createdAt: DateTime.now(),
+      );
+    }
   }
 }
 
@@ -73,17 +91,36 @@ class Comment {
   });
 
   factory Comment.fromJson(Map<String, dynamic> json, Map<int, List<Map<String, dynamic>>> commentMap) {
-    final id = json['comment_id'];
-    final repliesJson = commentMap[id] ?? [];
-    final replies = repliesJson.map((r) => Comment.fromJson(r, commentMap)).toList();
-    return Comment(
-      id: id,
-      parentId: json['parent_comment_id'],
-      body: json['comment_body'],
-      commenter: json['commenter_username'] ?? '',
-      createdAt: DateTime.parse(json['created_at']),
-      replies: replies,
-    );
+    try {
+      final id = json['comment_id'] ?? 0;
+      final repliesJson = commentMap[id] ?? [];
+      final replies = <Comment>[];
+      for (final r in repliesJson) {
+        try {
+          replies.add(Comment.fromJson(r, commentMap));
+        } catch (e) {
+          debugPrint('Error parsing reply comment: $e');
+        }
+      }
+      return Comment(
+        id: id,
+        parentId: json['parent_comment_id'],
+        body: json['comment_body'] ?? '',
+        commenter: json['commenter_username'] ?? '',
+        createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+        replies: replies,
+      );
+    } catch (e) {
+      debugPrint('Error parsing Comment from JSON: $e');
+      // Return a default comment to prevent crashes
+      return Comment(
+        id: 0,
+        body: 'Error loading comment.',
+        commenter: 'Unknown',
+        createdAt: DateTime.now(),
+        replies: [],
+      );
+    }
   }
 }
 
@@ -142,7 +179,7 @@ class AnimatedRoundTableIcon extends StatefulWidget {
 
   const AnimatedRoundTableIcon({
     super.key,
-    this.size = 24.0,
+    this.size = 54.0,
     this.color = Colors.blue,
   });
 
@@ -244,7 +281,9 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen> with Ticker
           PageView(
             controller: _pageController,
             onPageChanged: (index) {
-              setState(() => currentPage = index);
+              if (mounted) {
+                setState(() => currentPage = index);
+              }
               _tableController.reset();
               _chairsController.reset();
               _tableController.forward().then((_) => _chairsController.forward());
@@ -329,13 +368,22 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen> with Ticker
             right: 20,
             child: FloatingActionButton(
               onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setBool('hasSeenOnboarding', true);
-                if (context.mounted) {
-                  Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(builder: (context) => ThreadsScreen()),
-                );
+                try {
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setBool('hasSeenOnboarding', true);
+                  if (context.mounted) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (context) => ThreadsScreen()),
+                    );
+                  }
+                } catch (e) {
+                  debugPrint('Error saving onboarding preference: $e');
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Error completing onboarding: $e')),
+                    );
+                  }
                 }
               },
               child: Icon(Icons.arrow_forward),
@@ -387,20 +435,35 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
   }
 
   Future<void> _checkOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    final hasSeen = prefs.getBool('hasSeenOnboarding') ?? false;
-    if (!hasSeen && mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => OnboardingTourScreen()),
-      );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final hasSeen = prefs.getBool('hasSeenOnboarding') ?? false;
+      if (!hasSeen && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => OnboardingTourScreen()),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error checking onboarding: $e');
     }
   }
 
   Future<void> _initializeData() async {
-    await _loadUsernameAndUserId();
-    await _setupFCM();
-    await _fetchThreads();
+    try {
+      await _loadUsernameAndUserId();
+      await _setupFCM();
+      await _fetchThreads();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          hasError = true;
+          errorMessage = _getErrorMessage(e);
+        });
+        _showError(errorMessage ?? 'Initialization failed');
+      }
+    }
   }
 
   Future<void> _loadUsernameAndUserId() async {
@@ -414,6 +477,9 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
       if (mounted) setState(() {});
     } catch (e) {
       debugPrint('Error loading username and user ID: $e');
+      if (mounted) {
+        _showError('Failed to load user info: $e');
+      }
     }
   }
 
@@ -453,44 +519,45 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
   }
 
   Future<void> _setupFCM() async {
-    final fcm = FirebaseMessaging.instance;
-    NotificationSettings settings = await fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    print('User granted permission: ${settings.authorizationStatus}');
+    try {
+      final fcm = FirebaseMessaging.instance;
+      NotificationSettings settings = await fcm.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      debugPrint('User granted permission: ${settings.authorizationStatus}');
 
-    // Get token and send to backend
-    String? token = await fcm.getToken();
-    if (token != null && username != null) {
-      try {
+      // Get token and send to backend
+      String? token = await fcm.getToken();
+      if (token != null && username != null) {
         await http.post(
           Uri.parse('https://server.awarcrown.com/threads/update_token'),
           headers: {'Content-Type': 'application/json'},
           body: json.encode({'username': username, 'token': token}),
         ).timeout(Duration(seconds: 10));
-      } catch (e) {
-        print('Failed to update FCM token: $e');
       }
-    }
 
-    // Foreground message handling
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Got foreground message: ${message.notification?.title}');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${message.notification?.title}: ${message.notification?.body}'),
-            action: SnackBarAction(
-              label: 'Refresh',
-              onPressed: () => _fetchThreads(),
+      // Foreground message handling
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        debugPrint('Got foreground message: ${message.notification?.title}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${message.notification?.title}: ${message.notification?.body}'),
+              action: SnackBarAction(
+                label: 'Refresh',
+                onPressed: () => _fetchThreads(),
+              ),
+              backgroundColor: Colors.blue,
             ),
-            backgroundColor: Colors.blue,
-          ),
-        );
-      }
-    });
+          );
+        }
+      });
+    } catch (e) {
+      debugPrint('Error setting up FCM: $e');
+      // Non-critical, continue without FCM
+    }
   }
 
   String _getErrorMessage(dynamic e) {
@@ -531,20 +598,31 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
 
   Future<void> _fetchThreads() async {
     if (username == null || username!.isEmpty) return;
-    setState(() {
-      isLoading = true;
-      hasError = false;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+        hasError = false;
+      });
+    }
     try {
       final uri = Uri.parse('https://server.awarcrown.com/threads/list?sort=$sort&limit=20&offset=0');
       final response = await http.get(uri).timeout(Duration(seconds: 10));
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        final newThreads = data.map((json) => Thread.fromJson(json)).toList();
-        setState(() {
-          threads = newThreads;
-          isLoading = false;
-        });
+        final newThreads = <Thread>[];
+        for (final jsonItem in data) {
+          try {
+            newThreads.add(Thread.fromJson(jsonItem));
+          } catch (e) {
+            debugPrint('Error parsing thread: $e');
+          }
+        }
+        if (mounted) {
+          setState(() {
+            threads = newThreads;
+            isLoading = false;
+          });
+        }
         // Staggered animation for new threads
         _slideAnimations = List.generate(threads.length, (index) => 
           Tween<double>(begin: -1.0, end: 0.0).animate(
@@ -559,15 +637,15 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
         throw Exception('Server error: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        hasError = true;
-        errorMessage = 'Failed to fetch roundtables: $e';
-      });
       if (mounted) {
+        setState(() {
+          isLoading = false;
+          hasError = true;
+          errorMessage = 'Failed to fetch roundtables: ${_getErrorMessage(e)}';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load roundtables: $e'),
+            content: Text('Failed to load roundtables: ${_getErrorMessage(e)}'),
             action: SnackBarAction(label: 'Retry', onPressed: _fetchThreads),
           ),
         );
@@ -611,6 +689,7 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
             await _fetchThreads();
           }
         } catch (parseError) {
+          debugPrint('Error parsing create response: $parseError');
           await _fetchThreads();
         }
         if (mounted) Navigator.pop(context);
@@ -619,7 +698,7 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
       }
     } catch (e) {
       if (mounted) {
-        _showError('Failed to create roundtable: $e');
+        _showError('Failed to create roundtable: ${_getErrorMessage(e)}');
       }
     }
   }
@@ -656,7 +735,7 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
       thread.inspiredCount = oldCount;
       if (mounted) setState(() {});
       if (mounted) {
-        _showError('Failed to toggle inspire: $e');
+        _showError('Failed to toggle inspire: ${_getErrorMessage(e)}');
       }
     }
   }
@@ -696,7 +775,7 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
       thread.collabCount = oldCount;
       if (mounted) setState(() {});
       if (mounted) {
-        _showError('Failed to join discussion: $e');
+        _showError('Failed to join discussion: ${_getErrorMessage(e)}');
       }
     }
   }
@@ -709,7 +788,9 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
         builder: (BuildContext context, StateSetter setDialogState) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             Timer(const Duration(milliseconds: 2000), () {
-              Navigator.of(dialogContext).pop();
+              if (dialogContext.mounted) {
+                Navigator.of(dialogContext).pop();
+              }
             });
           });
           return Dialog(
@@ -729,6 +810,12 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
                     'assets/chair_pull.json', // Assume you have a Lottie file for chair animation
                     width: 300,
                     height: 200,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 300,
+                      height: 200,
+                      color: Colors.grey[300],
+                      child: Icon(Icons.error, color: Colors.grey),
+                    ),
                   ),
                 ),
                 // Confetti (simple particle simulation or use confetti package)
@@ -976,11 +1063,9 @@ class _ThreadsScreenState extends State<ThreadsScreen> with TickerProviderStateM
                               animation: slideAnimation,
                               builder: (context, child) {
                                 return Transform.translate(
-                                  // ignore: unnecessary_null_comparison
-                                  offset: slideAnimation != null ? Offset(slideAnimation.value * 100, 0) : Offset.zero,
+                                  offset: Offset(slideAnimation.value * 100, 0),
                                   child: Opacity(
-                                    // ignore: unnecessary_null_comparison
-                                    opacity: slideAnimation != null ? (slideAnimation.value + 1.0).clamp(0.0, 1.0) : 1.0,
+                                    opacity: (slideAnimation.value + 1.0).clamp(0.0, 1.0),
                                     child: Hero(
                                       tag: 'thread_${thread.id}', // For smooth navigation animation
                                       child: Card(
@@ -1210,44 +1295,67 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
   }
 
   Future<void> _loadComments() async {
-    setState(() {
-      isLoading = true;
-      hasError = false;
-    });
+    if (widget.username.isEmpty) {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          hasError = true;
+          errorMessage = 'Please log in to view comments';
+        });
+        _showError('Please log in to view comments');
+      }
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+        hasError = false;
+      });
+    }
     try {
-      final response = await http.get(
-        Uri.parse('https://server.awarcrown.com/threads/comments?id=${widget.thread.id}')
-      ).timeout(Duration(seconds: 10));
+      final uri = Uri.parse('https://server.awarcrown.com/threads/comments?id=${widget.thread.id}&username=${Uri.encodeComponent(widget.username)}');
+      final response = await http.get(uri).timeout(Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final commentList = data['comments'] as List;
+        final commentList = data['comments'] as List<dynamic>? ?? [];
         final commentMap = <int, List<Map<String, dynamic>>>{};
         for (var c in commentList) {
-          final parentId = c['parent_comment_id'] as int?;
-          if (parentId != null) {
-            commentMap.putIfAbsent(parentId, () => []).add(c);
+          if (c is Map<String, dynamic>) {
+            final parentId = c['parent_comment_id'] as int?;
+            if (parentId != null) {
+              commentMap.putIfAbsent(parentId, () => []).add(c);
+            }
           }
         }
-        setState(() {
-          comments = commentList
-              .where((c) => c['parent_comment_id'] == null)
-              .map((c) => Comment.fromJson(c, commentMap))
-              .toList();
-          isLoading = false;
-        });
+        final topLevelComments = <Comment>[];
+        for (final c in commentList) {
+          if (c is Map<String, dynamic> && c['parent_comment_id'] == null) {
+            try {
+              topLevelComments.add(Comment.fromJson(c, commentMap));
+            } catch (e) {
+              debugPrint('Error parsing top-level comment: $e');
+            }
+          }
+        }
+        if (mounted) {
+          setState(() {
+            comments = topLevelComments;
+            isLoading = false;
+          });
+        }
       } else {
         throw Exception('Failed to load comments: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        hasError = true;
-        errorMessage = 'Failed to load comments: $e';
-      });
       if (mounted) {
+        setState(() {
+          isLoading = false;
+          hasError = true;
+          errorMessage = 'Failed to load comments: ${_getErrorMessage(e)}';
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to load comments: $e'),
+            content: Text('Failed to load comments: ${_getErrorMessage(e)}'),
             action: SnackBarAction(label: 'Retry', onPressed: _loadComments),
           ),
         );
@@ -1255,12 +1363,40 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
     }
   }
 
+  String _getErrorMessage(dynamic e) {
+    if (e is SocketException) {
+      return 'No internet connection. Please check your connection and try again.';
+    } else if (e is TimeoutException) {
+      return 'Request timed out. Please check your connection and try again.';
+    } else if (e is http.ClientException) {
+      return 'Network error occurred. Please try again.';
+    } else {
+      return 'An unexpected error occurred. Please try again.';
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.error,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _addComment(String body, {int? parentId}) async {
     if (widget.username.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Please log in to comment')),
-        );
+        _showError('Please log in to comment');
+      }
+      return;
+    }
+    if (body.isEmpty) {
+      if (mounted) {
+        _showError('Comment cannot be empty');
       }
       return;
     }
@@ -1283,9 +1419,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to add comment: $e')),
-        );
+        _showError('Failed to add comment: ${_getErrorMessage(e)}');
       }
     }
   }
@@ -1312,9 +1446,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
           // Keep optimistic update
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Joined the roundtable!')),
-          );
+          _showSuccess('Joined the roundtable!');
         }
       } else {
         throw Exception('Failed to join roundtable: ${response.statusCode}');
@@ -1323,9 +1455,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
       widget.thread.collabCount = oldCount;
       if (mounted) setState(() {});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to join roundtable: $e')),
-        );
+        _showError('Failed to join roundtable: ${_getErrorMessage(e)}');
       }
     }
   }
@@ -1352,9 +1482,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
           // Keep optimistic update
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Inspired by this discussion!')),
-          );
+          _showSuccess('Inspired by this discussion!');
         }
       } else {
         throw Exception('Failed to toggle inspire: ${response.statusCode}');
@@ -1363,11 +1491,21 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
       widget.thread.inspiredCount = oldCount;
       if (mounted) setState(() {});
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to toggle inspire: $e')),
-        );
+        _showError('Failed to toggle inspire: ${_getErrorMessage(e)}');
       }
     }
+  }
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.primary,
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Widget _buildCircularCommentLayout() {
@@ -1393,9 +1531,11 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
 
     return GestureDetector(
       onPanUpdate: (details) {
-        setState(() {
-          _rotationAngle += details.delta.dx / 100;
-        });
+        if (mounted) {
+          setState(() {
+            _rotationAngle += details.delta.dx / 100;
+          });
+        }
       },
       child: SizedBox(
         height: 500,
@@ -1465,14 +1605,8 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
                 ),
               );
             }),
-            // Replies as spokes (simplified: show count or mini previews outward)
-            ...comments.expand((comment) => comment.replies.map((reply) {
-              // Position replies further out; for brevity, add as small badges
-              return Positioned(
-                // Calculate position based on parent angle + offset
-                child: Container(), // Placeholder for reply spokes
-              );
-            })),
+            // Placeholder for replies - extend as needed (e.g., smaller inner ring)
+            // For now, empty to avoid errors; implement nested positioning if required
           ],
         ),
       ),
@@ -1625,7 +1759,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> with TickerProv
                     ),
                     _buildCommentsSection(),
                     SizedBox(height: 16),
-                    if (!isLoading && !hasError)
+                    if (!isLoading && !hasError && widget.username.isNotEmpty)
                       Card(
                         child: Padding(
                           padding: EdgeInsets.all(16),

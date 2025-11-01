@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:io';  // For Platform.isAndroid
+import 'dart:io';  
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -8,41 +8,35 @@ import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';  // New import
-
-// Import your screens
 import 'auth/auth_log_reg.dart';
 import 'role_selection/role.dart';
 import 'dashboard.dart';
 import 'feed/posts.dart';
 import 'thr_project/threads.dart';
-
-// Background message handler (updated to show local notification if possible)
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint('Handling background message: ${message.messageId}');
   debugPrint('Message data: ${message.data}');
 
-  // Show local notification in background (FCM already shows system one, but this customizes)
+  
   await _showLocalNotification(message);
 }
 
-// Global navigator key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// Local notifications plugin
+
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
-// Initialize local notifications
 Future<void> _initializeLocalNotifications() async {
   const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');  // Or 'notification_icon' if custom
+      AndroidInitializationSettings('@mipmap/ic_launcher');  
 
   const DarwinInitializationSettings initializationSettingsIOS =
       DarwinInitializationSettings(
     requestAlertPermission: true,
     requestBadgePermission: true,
     requestSoundPermission: true,
-    onDidReceiveLocalNotification: null,  // Deprecated in iOS 10+
+    onDidReceiveLocalNotification: null,  
   );
 
   const InitializationSettings initializationSettings =
@@ -54,20 +48,20 @@ Future<void> _initializeLocalNotifications() async {
   await flutterLocalNotificationsPlugin.initialize(
     initializationSettings,
     onDidReceiveNotificationResponse: (NotificationResponse response) {
-      // Handle tap on local notification (pass to FCM handler for navigation)
+   
       final data = response.payload != null ? json.decode(response.payload!) : <String, dynamic>{};
-      _handleNotificationTap(data);  // Global handler for taps
+      _handleNotificationTap(data); 
     },
   );
 
-  // Create Android channel for high-priority notifications (like WhatsApp)
+ 
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'high_importance_channel',  // Matches manifest meta-data
-    'High Importance Notifications',  // Title
-    description: 'Your app notifications like WhatsApp',
+    'high_importance_channel', 
+    'High Importance Notifications', 
+    description: 'Your app notifications',
     importance: Importance.max,
     playSound: true,
-    sound: RawResourceAndroidNotificationSound('default'),  // Or custom .mp3 in res/raw
+    sound: RawResourceAndroidNotificationSound('default'), 
   );
 
   if (Platform.isAndroid) {
@@ -77,21 +71,20 @@ Future<void> _initializeLocalNotifications() async {
   }
 }
 
-// Global tap handler (for local/FCM consistency)
+
 void _handleNotificationTap(Map<String, dynamic> data) {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (navigatorKey.currentContext != null) {
       final threadId = int.tryParse(data['thread_id'] ?? '');
       if (threadId != null) {
-        // Navigate to thread (implement _fetchAndNavigateToThread here or call from dashboard)
+       
         debugPrint('Navigating to thread: $threadId');
       }
-      // Add similar for post_id
+    
     }
   });
 }
 
-// Show local notification (used in handlers)
 Future<void> _showLocalNotification(RemoteMessage message) async {
   const AndroidNotificationDetails androidPlatformChannelSpecifics =
       AndroidNotificationDetails(
@@ -101,7 +94,7 @@ Future<void> _showLocalNotification(RemoteMessage message) async {
     importance: Importance.max,
     priority: Priority.high,
     showWhen: false,
-    icon: '@drawable/ic_notification',  // Custom icon
+    icon: '@drawable/ic_notification',  
   );
 
   const DarwinNotificationDetails iOSPlatformChannelSpecifics =
@@ -120,11 +113,11 @@ Future<void> _showLocalNotification(RemoteMessage message) async {
   final body = message.notification?.body ?? message.data['body'] ?? '';
 
   await flutterLocalNotificationsPlugin.show(
-    0,  // ID
+    0, 
     title,
     body,
     platformChannelSpecifics,
-    payload: json.encode(message.data),  // For tap handling
+    payload: json.encode(message.data),  
   );
 }
 
@@ -132,7 +125,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  await _initializeLocalNotifications();  // New: Init local notifs
+  await _initializeLocalNotifications();  
   runApp(const MyApp());
 }
 
@@ -152,7 +145,7 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _loadUsername();
     _initDeepLinks();
-    // FCM setup moved to dashboard; local init done in main
+   
   }
 
   Future<void> _loadUsername() async {

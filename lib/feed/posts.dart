@@ -1,3 +1,4 @@
+// ignore_for_file: unused_local_variable
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -8,12 +9,77 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import 'publicprofile.dart';
+class ExpandedText extends StatefulWidget {
+  final String text;
+  final TextStyle style;
+  final int maxLines;
+  const ExpandedText({
+    super.key,
+    required this.text,
+    required this.style,
+    this.maxLines = 3,
+  });
+  @override
+  State<ExpandedText> createState() => _ExpandedTextState();
+}
+class _ExpandedTextState extends State<ExpandedText> {
+  bool _isExpanded = false;
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textPainter = TextPainter(
+          text: TextSpan(text: widget.text, style: widget.style),
+          maxLines: widget.maxLines,
+          textDirection: TextDirection.ltr,
+        )..layout(maxWidth: constraints.maxWidth);
+        final isOverflow = textPainter.didExceedMaxLines;
+        if (!isOverflow) {
+          return Text(widget.text, style: widget.style);
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedCrossFade(
+              firstChild: Text(
+                widget.text,
+                style: widget.style,
+                maxLines: widget.maxLines,
+                overflow: TextOverflow.ellipsis,
+              ),
+              secondChild: Text(widget.text, style: widget.style),
+              crossFadeState: _isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 300),
+            ),
+            const SizedBox(height: 4),
+            GestureDetector(
+              onTap: () => setState(() => _isExpanded = !_isExpanded),
+              child: Text(
+                _isExpanded ? 'Read less' : 'Read more',
+                style: TextStyle(
+                  color: colorScheme.primary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
 class Skeleton extends StatefulWidget {
   final double height;
   final double width;
   final String type;
-  const Skeleton(
-      {super.key, this.height = 20, this.width = 20, this.type = 'square'});
+  const Skeleton({
+    super.key,
+    this.height = 20,
+    this.width = 20,
+    this.type = 'square',
+  });
   @override
   State<Skeleton> createState() => _SkeletonState();
 }
@@ -24,11 +90,10 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
   void initState() {
     super.initState();
     _controller = AnimationController(
-        duration: const Duration(milliseconds: 1500), vsync: this);
-    gradientPosition = Tween<double>(
-      begin: -3,
-      end: 10,
-    ).animate(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    gradientPosition = Tween<double>(begin: -3, end: 10).animate(
       CurvedAnimation(parent: _controller, curve: Curves.linear),
     )..addListener(() {
         if (mounted) setState(() {});
@@ -42,21 +107,22 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
   }
   @override
   Widget build(BuildContext context) {
-    final brightness = Theme.of(context).brightness;
-    final isDark = brightness == Brightness.dark;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: widget.width,
       height: widget.height,
       decoration: BoxDecoration(
-          borderRadius: widget.type == 'circle'
-              ? BorderRadius.circular(50)
-              : BorderRadius.circular(4),
-          gradient: LinearGradient(
-              begin: Alignment(gradientPosition.value, 0.0),
-              end: const Alignment(-1.0, 0.0),
-              colors: isDark
-                  ? const [Colors.white10, Colors.white24, Colors.white10]
-                  : const [Colors.grey, Colors.grey, Colors.grey])),
+        borderRadius: widget.type == 'circle'
+            ? BorderRadius.circular(50)
+            : BorderRadius.circular(4),
+        gradient: LinearGradient(
+          begin: Alignment(gradientPosition.value, 0.0),
+          end: const Alignment(-1.0, 0.0),
+          colors: isDark
+              ? const [Colors.white10, Colors.white24, Colors.white10]
+              : const [Colors.grey, Colors.grey, Colors.grey],
+        ),
+      ),
     );
   }
 }
@@ -65,10 +131,9 @@ class PostSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final screenWidth = MediaQuery.of(context).size.width - 32;
     return Card(
       elevation: 2,
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       color: colorScheme.surface,
       child: Column(
@@ -103,16 +168,12 @@ class PostSkeleton extends StatelessWidget {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: AspectRatio(
-              aspectRatio: 1.0,
-              child: Container(
-                width: screenWidth,
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+          AspectRatio(
+            aspectRatio: 1.0,
+            child: Container(
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
           ),
@@ -185,6 +246,7 @@ class CommentItem extends StatelessWidget {
   final int postId;
   final Function(int, String) onReply;
   final Function(int, int) onLike;
+  final Function(String)? onProfileTap;
   const CommentItem({
     super.key,
     required this.comment,
@@ -192,25 +254,30 @@ class CommentItem extends StatelessWidget {
     required this.postId,
     required this.onReply,
     required this.onLike,
+    this.onProfileTap,
   });
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isLiked = comment['current_reaction'] != null;
     final leftPadding = 16.0 + (depth * 24.0);
+    final username = comment['username'] ?? 'Unknown';
     return Padding(
       padding: EdgeInsets.only(left: leftPadding, top: 12.0, bottom: 12.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundImage: comment['profile_picture'] != null
-                ? NetworkImage('https://server.awarcrown.com/accessprofile/uploads/${comment['profile_picture']}')
-                : null,
-            child: comment['profile_picture'] == null
-                ? Icon(Icons.person, size: 18, color: colorScheme.onSurfaceVariant)
-                : null,
+          GestureDetector(
+            onTap: onProfileTap != null ? () => onProfileTap!(username) : null,
+            child: CircleAvatar(
+              radius: 18,
+              backgroundImage: comment['profile_picture'] != null
+                  ? NetworkImage('https://server.awarcrown.com/accessprofile/uploads/${comment['profile_picture']}')
+                  : null,
+              child: comment['profile_picture'] == null
+                  ? Icon(Icons.person, size: 18, color: colorScheme.onSurfaceVariant)
+                  : null,
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -219,11 +286,14 @@ class CommentItem extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text(
-                      comment['username'] ?? 'Unknown',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                    GestureDetector(
+                      onTap: onProfileTap != null ? () => onProfileTap!(username) : null,
+                      child: Text(
+                        username,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -243,7 +313,12 @@ class CommentItem extends StatelessWidget {
                   child: Row(
                     children: [
                       GestureDetector(
-                        onTap: () => onLike(comment['comment_id'], postId),
+                        onTap: () {
+                          final id = int.tryParse(comment['comment_id'].toString()) ?? 0;
+                          if (id > 0) {
+                            onLike(id, postId);
+                          }
+                        },
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -265,7 +340,12 @@ class CommentItem extends StatelessWidget {
                       ),
                       const SizedBox(width: 16),
                       GestureDetector(
-                        onTap: () => onReply(comment['comment_id'], comment['username'] ?? ''),
+                        onTap: () {
+                          final id = int.tryParse(comment['comment_id'].toString()) ?? 0;
+                          if (id > 0) {
+                            onReply(id, comment['username'] ?? '');
+                          }
+                        },
                         child: Text(
                           'Reply',
                           style: TextStyle(
@@ -335,18 +415,31 @@ class _CommentsPageState extends State<CommentsPage> {
   int? replyToCommentId;
   String replyToUsername = '';
   final Map<int, bool> commentIsReacting = {};
+  final ValueNotifier<bool> _refreshNotifier = ValueNotifier(false);
   @override
   void initState() {
     super.initState();
     post = widget.post;
     _username = widget.username;
     _userId = widget.userId;
-    comments = widget.comments;
+    comments = List.from(widget.comments); // Copy to avoid mutation
     _initializeUserId();
     _processLikeQueue();
     if (comments.isEmpty) {
       _fetchComments();
     }
+  }
+  List<dynamic> _parseComments(List<dynamic> rawComments) {
+    return rawComments.map((c) {
+      final comment = Map<String, dynamic>.from(c);
+      // Parse key numeric fields to int; fallback to 0 if invalid
+      comment['comment_id'] = int.tryParse(comment['comment_id'].toString()) ?? 0;
+      comment['like_count'] = int.tryParse(comment['like_count'].toString()) ?? 0;
+      comment['user_id'] = int.tryParse(comment['user_id'].toString()) ?? 0;
+      // Add more fields if needed (e.g., 'parent_comment_id')
+      comment['parent_comment_id'] = int.tryParse(comment['parent_comment_id'].toString());
+      return comment;
+    }).toList();
   }
   Future<void> _initializeUserId() async {
     if (_userId == null || _userId == 0) {
@@ -391,6 +484,7 @@ class _CommentsPageState extends State<CommentsPage> {
   void dispose() {
     commentController.dispose();
     focusNode.dispose();
+    _refreshNotifier.dispose();
     super.dispose();
   }
   Future<void> _queueLikeAction(Map<String, dynamic> actionMap) async {
@@ -493,13 +587,12 @@ class _CommentsPageState extends State<CommentsPage> {
     if (mounted) setState(() => commentLoading = true);
     try {
       final url = 'https://server.awarcrown.com/feed/fetch_comments?post_id=${post['post_id']}&username=${Uri.encodeComponent(_username)}';
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
-          setState(() => comments = data['comments'] ?? []);
+          setState(() => comments = _parseComments(data['comments'] ?? []));
+          _refreshNotifier.value = !_refreshNotifier.value; // Trigger rebuild for nested lists
         }
       } else {
         throw http.ClientException('Server error: ${response.statusCode}');
@@ -522,19 +615,22 @@ class _CommentsPageState extends State<CommentsPage> {
       }
     }
     if (commentIsReacting[commentId] ?? false) return;
-    final commentIndex = comments.indexWhere((c) => c['comment_id'] == commentId);
+    final commentIndex = comments.indexWhere((c) => int.tryParse(c['comment_id'].toString()) == commentId);
     if (commentIndex == -1) return;
-    setState(() => commentIsReacting[commentId] = true);
     final comment = comments[commentIndex];
     final oldLiked = comment['current_reaction'] != null;
     final oldCount = comment['like_count'] ?? 0;
     final newLiked = !oldLiked;
     final newCount = oldCount + (newLiked ? 1 : -1);
-    setState(() {
-      comments[commentIndex]['current_reaction'] = newLiked ? 'like' : null;
-      comments[commentIndex]['like_count'] = newCount;
-    });
     final action = newLiked ? 'like' : 'unlike';
+    // Optimistic update
+    if (mounted) {
+      setState(() {
+        comments[commentIndex]['current_reaction'] = newLiked ? 'like' : null;
+        comments[commentIndex]['like_count'] = newCount;
+      });
+    }
+    setState(() => commentIsReacting[commentId] = true);
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/comment_reaction'),
@@ -562,10 +658,12 @@ class _CommentsPageState extends State<CommentsPage> {
         await _queueLikeAction({'type': 'comment', 'id': commentId, 'action': action});
         _showSuccess('Like action queued offline');
       } else {
-        setState(() {
-          comments[commentIndex]['current_reaction'] = oldLiked ? 'like' : null;
-          comments[commentIndex]['like_count'] = oldCount;
-        });
+        if (mounted) {
+          setState(() {
+            comments[commentIndex]['current_reaction'] = oldLiked ? 'like' : null;
+            comments[commentIndex]['like_count'] = oldCount;
+          });
+        }
         _showError('Failed to ${newLiked ? 'like' : 'unlike'} comment: ${_getErrorMessage(e)}');
       }
     } finally {
@@ -589,7 +687,11 @@ class _CommentsPageState extends State<CommentsPage> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && data['status'] == 'success' && mounted) {
-          comments.insert(0, data);
+          setState(() {
+            final newComment = _parseComments([data])[0]; // Parse just this one
+            comments.insert(0, newComment);
+            _refreshNotifier.value = !_refreshNotifier.value;
+          });
           commentController.clear();
           setState(() {
             replyToCommentId = null;
@@ -609,7 +711,7 @@ class _CommentsPageState extends State<CommentsPage> {
       _showError('Failed to post comment: ${_getErrorMessage(e)}');
     }
   }
-  void _navigateToProfile(String username, int userId) {
+  void _navigateToProfile(String username) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -621,9 +723,9 @@ class _CommentsPageState extends State<CommentsPage> {
     (comment as Map<String, dynamic>)['_depth'] = depth;
     flat.add(comment);
     final children = comments
-        .where((c) => c['parent_comment_id'] == comment['comment_id'])
+        .where((c) => int.tryParse(c['parent_comment_id'].toString()) == int.tryParse(comment['comment_id'].toString()))
         .toList()
-        ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
+      ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
     for (var child in children) {
       _addCommentsToFlat(flat, child, depth + 1);
     }
@@ -650,42 +752,49 @@ class _CommentsPageState extends State<CommentsPage> {
     }
     final flatComments = <dynamic>[];
     final mainComments = allComments
-        .where((c) => c['parent_comment_id'] == null)
+        .where((c) => int.tryParse(c['parent_comment_id'].toString()) == null)
         .toList()
-        ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
+      ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
     for (var main in mainComments) {
       _addCommentsToFlat(flatComments, main, 0);
     }
-    return ListView.separated(
-      physics: const BouncingScrollPhysics(),
-      shrinkWrap: false,
-      cacheExtent: 1000.0,
-      itemCount: flatComments.length,
-      separatorBuilder: (context, index) {
-        final depth = flatComments[index]['_depth'] as int;
-        return Divider(
-          height: 1,
-          indent: 16.0 + (depth * 24.0),
-          color: Theme.of(context).colorScheme.outline,
-        );
-      },
-      itemBuilder: (context, index) {
-        final comment = flatComments[index];
-        final depth = comment['_depth'] as int;
-        return CommentItem(
-          comment: comment,
-          depth: depth,
-          postId: post['post_id'],
-          onReply: (parentId, username) {
-            setState(() {
-              replyToCommentId = parentId;
-              replyToUsername = username;
-            });
-            focusNode.requestFocus();
-          },
-          onLike: (commentId, postId) => _toggleCommentReaction(commentId),
-        );
-      },
+    return ValueListenableBuilder<bool>(
+      valueListenable: _refreshNotifier,
+      builder: (context, _, __) => ListView.separated(
+        physics: const BouncingScrollPhysics(),
+        shrinkWrap: false,
+        cacheExtent: 1000.0,
+        itemCount: flatComments.length,
+        separatorBuilder: (context, index) {
+          final depth = flatComments[index]['_depth'] as int;
+          return Divider(
+            height: 1,
+            indent: 16.0 + (depth * 24.0),
+            color: Theme.of(context).colorScheme.outline,
+          );
+        },
+        itemBuilder: (context, index) {
+          final comment = flatComments[index];
+          final depth = comment['_depth'] as int;
+          return RepaintBoundary(
+            child: CommentItem(
+              key: ValueKey(comment['comment_id']),
+              comment: comment,
+              depth: depth,
+              postId: post['post_id'],
+              onReply: (parentId, username) {
+                setState(() {
+                  replyToCommentId = parentId;
+                  replyToUsername = username;
+                });
+                focusNode.requestFocus();
+              },
+              onLike: (commentId, postId) => _toggleCommentReaction(commentId),
+              onProfileTap: _navigateToProfile,
+            ),
+          );
+        },
+      ),
     );
   }
   String _formatTime(String? timeString) {
@@ -697,7 +806,7 @@ class _CommentsPageState extends State<CommentsPage> {
       if (diff.inDays > 365) {
         return '${(diff.inDays / 365).floor()}y ago';
       } else if (diff.inDays > 30) {
-        return '${(diff.inDays / 30).floor()}mo ago';
+          return '${(diff.inDays / 30).floor()}mo ago';
       } else if (diff.inDays > 0) {
         return '${diff.inDays}d ago';
       } else if (diff.inHours > 0) {
@@ -714,7 +823,6 @@ class _CommentsPageState extends State<CommentsPage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    // ignore: unused_local_variable
     final postId = post['post_id'];
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -802,16 +910,12 @@ class _CommentsPageState extends State<CommentsPage> {
                       ),
                       filled: true,
                       fillColor: colorScheme.surfaceContainerHighest,
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     ),
                     onSubmitted: (value) {
                       final trimmed = value.trim();
                       if (trimmed.isNotEmpty) {
-                        _postComment(
-                          trimmed,
-                          parentCommentId: replyToCommentId,
-                        );
+                        _postComment(trimmed, parentCommentId: replyToCommentId);
                       }
                     },
                     maxLines: null,
@@ -829,21 +933,12 @@ class _CommentsPageState extends State<CommentsPage> {
                       borderRadius: BorderRadius.circular(24),
                       child: InkWell(
                         onTap: isEnabled
-                            ? () {
-                                _postComment(
-                                  text,
-                                  parentCommentId: replyToCommentId,
-                                );
-                              }
+                            ? () => _postComment(text, parentCommentId: replyToCommentId)
                             : null,
                         borderRadius: BorderRadius.circular(24),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          child: Icon(
-                            Icons.send,
-                            color: Colors.white,
-                            size: 20,
-                          ),
+                        child: const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Icon(Icons.send, color: Colors.white, size: 20),
                         ),
                       ),
                     );
@@ -860,7 +955,7 @@ class _CommentsPageState extends State<CommentsPage> {
 class PostsPage extends StatefulWidget {
   const PostsPage({super.key});
   @override
-  _PostsPageState createState() => _PostsPageState();
+  State<PostsPage> createState() => _PostsPageState();
 }
 class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   List<dynamic> posts = [];
@@ -871,15 +966,19 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   Map<int, List<dynamic>> commentsMap = {};
   Map<int, bool> isLikingMap = {};
-  Map<int, AnimationController> likeAnimationControllers = {};
-  Map<int, bool> showHeartOverlay = {};
-  Map<int, AnimationController> heartOverlayControllers = {};
-  Map<int, bool> isFetchingComments = {};
+  final Map<int, AnimationController> likeAnimationControllers = {};
+  final Map<int, bool> showHeartOverlay = {};
+  final Map<int, AnimationController> heartOverlayControllers = {};
+  final Map<int, bool> isFetchingComments = {};
   String _username = '';
   int? _userId;
   Timer? _scrollDebounceTimer;
-  Map<int, bool> isFollowingMap = {};
-  Map<int, bool> isProcessingFollow = {};
+  final Map<int, bool> isFollowingMap = {};
+  final Map<int, bool> isProcessingFollow = {};
+  final Map<int, bool> isSavingMap = {};
+  final ValueNotifier<bool> _refreshNotifier = ValueNotifier(false);
+  Set<int> _savedPosts = {};
+  final Map<int, bool> isReportingMap = {}; // Track reporting state to prevent spam
   @override
   void initState() {
     super.initState();
@@ -888,6 +987,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   }
   Future<void> _initializeData() async {
     await _loadUsername();
+    await _loadSavedPosts();
     await _processLikeQueue();
     await _loadPostsFromCache();
     await _updateFollowStatuses();
@@ -897,13 +997,40 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   void dispose() {
     _scrollController.dispose();
     _scrollDebounceTimer?.cancel();
-    for (var c in likeAnimationControllers.values) {
-      c.dispose();
+    for (final controller in likeAnimationControllers.values) {
+      controller.dispose();
     }
-    for (var c in heartOverlayControllers.values) {
-      c.dispose();
+    for (final controller in heartOverlayControllers.values) {
+      controller.dispose();
     }
+    _refreshNotifier.dispose();
     super.dispose();
+  }
+  double _getAspectRatio(dynamic post) {
+    final w = (post['image_width'] ?? 1).toDouble();
+    final h = (post['image_height'] ?? 1).toDouble();
+    return w > 0 ? h / w : 1.0;
+  }
+  Future<void> _loadSavedPosts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedStr = prefs.getString('saved_posts');
+      if (savedStr != null) {
+        final List<dynamic> savedList = json.decode(savedStr);
+        _savedPosts = savedList.map((e) => int.tryParse(e.toString()) ?? 0).where((id) => id > 0).toSet();
+      }
+    } catch (e) {
+      debugPrint('Error loading saved posts: $e');
+    }
+  }
+  Future<void> _saveSavedPosts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedList = _savedPosts.map((id) => id).toList();
+      await prefs.setString('saved_posts', json.encode(savedList));
+    } catch (e) {
+      debugPrint('Error saving saved posts: $e');
+    }
   }
   Future<void> _queueLikeAction(Map<String, dynamic> actionMap) async {
     final prefs = await SharedPreferences.getInstance();
@@ -966,6 +1093,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
+  int? _parseInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    return int.tryParse(value.toString());
+  }
   Future<bool> _getIsFollowing(int followedId) async {
     if (_userId == null) return false;
     try {
@@ -986,22 +1118,24 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   Future<void> _updateFollowStatuses() async {
     if (_userId == null || posts.isEmpty) return;
     final uniqueFollowedIds = posts
-        .where((p) => (p['user_id'] as int?) != _userId)
-        .map((p) => p['user_id'] as int)
+        .where((p) => _parseInt(p['user_id']) != _userId)
+        .map((p) => _parseInt(p['user_id'])!)
+        .where((id) => id > 0)
         .toSet();
     if (uniqueFollowedIds.isEmpty) return;
     final futures = uniqueFollowedIds.map((id) => _getIsFollowing(id));
     final results = await Future.wait(futures);
     int idx = 0;
     bool hasChanges = false;
-    for (var id in uniqueFollowedIds) {
+    for (final id in uniqueFollowedIds) {
       final isFollow = results[idx++];
       final current = isFollowingMap[id] ?? false;
       if (current != isFollow) {
         hasChanges = true;
         isFollowingMap[id] = isFollow;
         for (var post in posts) {
-          if (post['user_id'] == id) {
+          final postId = _parseInt(post['user_id']);
+          if (postId == id) {
             post['is_following'] = isFollow;
           }
         }
@@ -1060,11 +1194,17 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       final int? timestamp = prefs.getInt('cache_timestamp');
       if (cachedPostsJson != null && timestamp != null) {
         final cacheAge = DateTime.now().millisecondsSinceEpoch - timestamp;
-        if (cacheAge < 3600000) {
+        if (cacheAge < 3600000) { // 1 hour
           final parsedPosts = json.decode(cachedPostsJson);
           if (parsedPosts is List && mounted) {
             setState(() {
               posts = parsedPosts.cast<dynamic>();
+              for (var post in posts) {
+                final postId = _parseInt(post['post_id']);
+                if (postId != null && _savedPosts.contains(postId)) {
+                  post['is_saved'] = true;
+                }
+              }
             });
           }
         }
@@ -1126,9 +1266,8 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   void _onScroll() {
     _scrollDebounceTimer?.cancel();
     _scrollDebounceTimer = Timer(const Duration(milliseconds: 200), () {
-      if (_scrollController.hasClients &&
-          _scrollController.position.pixels >=
-              _scrollController.position.maxScrollExtent - 300) {
+      if (!_scrollController.hasClients) return;
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
         if (hasMore && !isLoading && !networkError) {
           _fetchMorePosts();
         }
@@ -1138,15 +1277,13 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   Future<Map<String, dynamic>?> _fetchPostsData({int? cursorId}) async {
     if (_username.isEmpty) return null;
     try {
-      final params = {'username': _username};
+      final params = <String, String>{'username': _username};
       if (cursorId != null) params['cursorId'] = cursorId.toString();
       final queryString = params.entries
           .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
           .join('&');
       final url = 'https://server.awarcrown.com/feed/fetch_posts?$queryString';
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 20));
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));
       if (response.statusCode == 200) {
         final parsed = json.decode(response.body);
         if (parsed is Map<String, dynamic>) {
@@ -1172,17 +1309,27 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
           networkError = false;
           final newPosts = data['posts'] ?? [];
           if (cursorId == null) {
-            posts = newPosts;
+            posts = List.from(newPosts);
           } else {
-            final postsToAdd = newPosts.where((newPost) =>
-                !posts.any((existing) => existing['post_id'] == newPost['post_id'])).toList();
+            final postsToAdd = newPosts.where((newPost) {
+              final existingIds = posts.map((existing) => _parseInt(existing['post_id']) ?? 0).toSet();
+              final newPostId = _parseInt(newPost['post_id']) ?? 0;
+              return !existingIds.contains(newPostId);
+            }).toList();
             posts.addAll(postsToAdd);
           }
-          nextCursorId = data['nextCursorId'];
+          for (var post in posts) {
+            final postId = _parseInt(post['post_id']);
+            if (postId != null && _savedPosts.contains(postId)) {
+              post['is_saved'] = true;
+            }
+          }
+          nextCursorId = _parseInt(data['nextCursorId']);
           hasMore = nextCursorId != null;
         });
         await _savePostsToCache();
         await _updateFollowStatuses();
+        _refreshNotifier.value = !_refreshNotifier.value;
       }
     } catch (e) {
       if (mounted) {
@@ -1209,22 +1356,30 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       await _fetchPosts();
       return;
     }
-    final oldFirstId = posts[0]['post_id'] as int;
+    final oldFirstId = _parseInt(posts[0]['post_id']) ?? 0;
     try {
       final data = await _fetchPostsData();
       if (data == null || !mounted) return;
       setState(() => networkError = false);
       final newPosts = data['posts'] ?? [];
-      final newOnes = newPosts
-          .where((p) => (p['post_id'] as int) > oldFirstId)
-          .toList();
+      final newOnes = newPosts.where((p) {
+        final pId = _parseInt(p['post_id']) ?? 0;
+        return pId > oldFirstId;
+      }).toList();
       if (newOnes.isNotEmpty && mounted) {
         setState(() {
           posts.insertAll(0, newOnes);
+          for (var post in newOnes) {
+            final postId = _parseInt(post['post_id']);
+            if (postId != null && _savedPosts.contains(postId)) {
+              post['is_saved'] = true;
+            }
+          }
         });
         await _savePostsToCache();
         await _updateFollowStatuses();
         _showSuccess('${newOnes.length} new post${newOnes.length > 1 ? 's' : ''} loaded');
+        _refreshNotifier.value = !_refreshNotifier.value;
       }
     } catch (e) {
       if (mounted) {
@@ -1248,6 +1403,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     final oldCount = posts[index]['like_count'] ?? 0;
     final newLiked = !oldLiked;
     final optimisticCount = oldCount + (newLiked ? 1 : -1);
+    // Optimistic update
     if (mounted) {
       setState(() {
         posts[index]['is_liked'] = newLiked;
@@ -1262,9 +1418,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
           vsync: this,
         ),
       );
+      if (iconController.isAnimating) {
+        iconController.stop();
+      }
       iconController.forward().then((_) => iconController.reverse());
-      final hasImage = posts[index]['media_url'] != null &&
-          posts[index]['media_url'].isNotEmpty;
+      final hasImage = posts[index]['media_url'] != null && posts[index]['media_url'].isNotEmpty;
       if (hasImage && mounted) {
         setState(() => showHeartOverlay[postId] = true);
         final overlayController = AnimationController(
@@ -1274,9 +1432,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         heartOverlayControllers[postId] = overlayController;
         overlayController.forward().then((_) {
           if (mounted) {
-            setState(() {
-              showHeartOverlay[postId] = false;
-            });
+            setState(() => showHeartOverlay[postId] = false);
           }
           overlayController.dispose();
           heartOverlayControllers.remove(postId);
@@ -1315,8 +1471,8 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
             posts[index]['is_liked'] = oldLiked;
             posts[index]['like_count'] = oldCount;
           });
-          _showError('Failed to ${newLiked ? 'like' : 'unlike'} post: ${_getErrorMessage(e)}');
         }
+        _showError('Failed to ${newLiked ? 'like' : 'unlike'} post: ${_getErrorMessage(e)}');
       }
     } finally {
       if (mounted) {
@@ -1326,11 +1482,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   }
   Future<void> _fetchComments(int postId) async {
     if (_username.isEmpty) return;
+    if (isFetchingComments[postId] ?? false) return;
+    setState(() => isFetchingComments[postId] = true);
     try {
       final url = 'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username)}';
-      final response = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 10));
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -1342,6 +1498,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     } catch (e) {
       if (mounted) {
         _showError(_getErrorMessage(e));
+      }
+    } finally {
+      if (mounted) {
+        setState(() => isFetchingComments[postId] = false);
       }
     }
   }
@@ -1358,9 +1518,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     setState(() => isProcessingFollow[followedUserId] = true);
     final oldFollowing = isFollowingMap[followedUserId] ?? false;
     final newFollowing = !oldFollowing;
-    // Update local state for all posts by this user
+    // Optimistic update
     for (var i = 0; i < posts.length; i++) {
-      if (posts[i]['user_id'] == followedUserId) {
+      final postUserId = _parseInt(posts[i]['user_id']);
+      if (postUserId == followedUserId) {
         posts[i]['is_following'] = newFollowing;
       }
     }
@@ -1385,9 +1546,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      // Revert local changes on error
+      // Revert on error
       for (var i = 0; i < posts.length; i++) {
-        if (posts[i]['user_id'] == followedUserId) {
+        final postUserId = _parseInt(posts[i]['user_id']);
+        if (postUserId == followedUserId) {
           posts[i]['is_following'] = oldFollowing;
         }
       }
@@ -1398,6 +1560,59 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       if (mounted) {
         setState(() => isProcessingFollow[followedUserId] = false);
       }
+    }
+  }
+  Future<void> _reportPost(int postId, String reason) async {
+    if (_username.isEmpty || (isReportingMap[postId] ?? false)) return;
+    setState(() => isReportingMap[postId] = true);
+    final uri = Uri.parse('https://server.awarcrown.com/feed/report_posts');
+    final bodyData = jsonEncode({
+      'post_id': postId,
+      'username': _username,
+      'reason': reason,
+    });
+    try {
+      final response = await http
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+            body: bodyData,
+          )
+          .timeout(const Duration(seconds: 10));
+      debugPrint('Report Response: ${response.statusCode} -> ${response.body}');
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map<String, dynamic> && data['status'] == 'success') {
+          _showSuccess(
+            'Post reported for "$reason". Thank you for helping keep the community safe.',
+          );
+        } else {
+          _showError(data['message'] ?? 'Failed to report post. Please try again.');
+        }
+      } else if (response.statusCode == 429) {
+        _showError('You have already reported this post recently. Please wait before reporting again.');
+      } else if (response.statusCode == 404) {
+        _showError('Post not found or already removed.');
+      } else if (response.statusCode == 400) {
+        _showError('Invalid report data. Please check and try again.');
+      } else if (response.statusCode >= 500) {
+        _showError('Server error. Please try again later.');
+      } else {
+        _showError('Unexpected server response (${response.statusCode}).');
+      }
+    } on TimeoutException {
+      _showError('Request timed out. Please try again.');
+    } on SocketException {
+      _showError('No internet connection. Please check your connection and try again.');
+    } on FormatException {
+      _showError('Invalid response format from server.');
+    } catch (e) {
+      _showError('Unexpected error while reporting: $e');
+    } finally {
+      if (mounted) setState(() => isReportingMap[postId] = false);
     }
   }
   Future<void> _sharePost(int postId) async {
@@ -1434,8 +1649,6 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (BuildContext context) {
-        // ignore: unused_local_variable
-        final colorScheme = Theme.of(context).colorScheme;
         return Container(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -1494,7 +1707,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   }
   Future<void> _shareToInstagram(String shareUrl) async {
     await Share.share(shareUrl, subject: 'Check this post on Awarcrown');
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
   }
   Future<void> _deletePost(int postId) async {
     if (_username.isEmpty) return;
@@ -1524,8 +1737,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
       ).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200 && mounted) {
-        setState(() => posts.removeWhere((p) => p['post_id'] == postId));
+        setState(() => posts.removeWhere((p) => _parseInt(p['post_id']) == postId));
         await _savePostsToCache();
+        _savedPosts.remove(postId);
+        await _saveSavedPosts();
         _showSuccess('Post deleted successfully');
       } else {
         throw http.ClientException('Server error: ${response.statusCode}');
@@ -1534,8 +1749,33 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       _showError('Failed to delete post: ${_getErrorMessage(e)}');
     }
   }
-  Future<void> _savePost(int postId) async {
-    if (_username.isEmpty) return;
+  Future<void> _toggleSave(int postId, int index) async {
+    if (!mounted) return;
+    if (_userId == null || _userId == 0) {
+      await _fetchUserId();
+      if (!mounted || _userId == null || _userId == 0) {
+        _showError('User not authenticated. Please log in again.');
+        return;
+      }
+    }
+    if (isSavingMap[postId] ?? false) return;
+    setState(() => isSavingMap[postId] = true);
+    final post = posts[index];
+    final oldSaved = post['is_saved'] ?? false;
+    final newSaved = !oldSaved;
+    // Update local cache
+    if (newSaved) {
+      _savedPosts.add(postId);
+    } else {
+      _savedPosts.remove(postId);
+    }
+    await _saveSavedPosts();
+    // Optimistic update
+    if (mounted) {
+      setState(() {
+        posts[index]['is_saved'] = newSaved;
+      });
+    }
     try {
       final response = await http.post(
         Uri.parse('https://server.awarcrown.com/feed/save_post'),
@@ -1545,16 +1785,37 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
-          _showSuccess(data['saved'] == true ? 'Post saved!' : 'Post unsaved');
+          final serverSaved = data['saved'] ?? newSaved;
+          setState(() {
+            posts[index]['is_saved'] = serverSaved;
+          });
+          // Sync local cache with server
+          if (serverSaved) {
+            _savedPosts.add(postId);
+          } else {
+            _savedPosts.remove(postId);
+          }
+          await _saveSavedPosts();
+          _showSuccess(serverSaved ? 'Post saved!' : 'Post unsaved');
         }
       } else {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
     } catch (e) {
-      _showError('Failed to save post: ${_getErrorMessage(e)}');
+      // Revert on error, but keep local cache for offline
+      if (mounted) {
+        setState(() {
+          posts[index]['is_saved'] = oldSaved;
+        });
+      }
+      _showError('Failed to ${newSaved ? 'save' : 'unsave'} post: ${_getErrorMessage(e)}');
+    } finally {
+      if (mounted) {
+        setState(() => isSavingMap[postId] = false);
+      }
     }
   }
-  void _navigateToProfile(String username, int userId) {
+  void _navigateToProfile(String username) {
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1564,7 +1825,64 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   }
   bool _isOwnPost(int postId, int index) {
     if (_userId == null || _userId == 0) return false;
-    return posts[index]['user_id'] == _userId;
+    final postUserId = _parseInt(posts[index]['user_id']);
+    return postUserId == _userId;
+  }
+  void _showImageViewer(String imageUrl) {
+    showGeneralDialog(
+      context: context,
+      barrierLabel: 'Image Viewer',
+      barrierDismissible: true,
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 150),
+      pageBuilder: (context, animation1, animation2) {
+        return Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Stack(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.of(context).pop(),
+                child: Container(
+                  color: Colors.black,
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: Center(
+                    child: InteractiveViewer(
+                      panEnabled: true,
+                      boundaryMargin: const EdgeInsets.all(20.0),
+                      minScale: 0.8,
+                      maxScale: 4.0,
+                      child: CachedNetworkImage(
+                        imageUrl: imageUrl,
+                        fit: BoxFit.contain,
+                        placeholder: (context, url) => const Center(
+                          child: CircularProgressIndicator(color: Colors.white),
+                        ),
+                        errorWidget: (context, url, error) => const Icon(
+                          Icons.error,
+                          color: Colors.white,
+                          size: 50,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: MediaQuery.of(context).padding.top + 10,
+                right: 20,
+                child: SafeArea(
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
   Widget _buildEmptyState() {
     final colorScheme = Theme.of(context).colorScheme;
@@ -1630,189 +1948,179 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
-  Widget _buildList() {
-    if (posts.isEmpty) {
-      if (isLoading) {
-        return ListView.builder(
-          physics: const BouncingScrollPhysics(),
-          cacheExtent: 1000.0,
-          itemCount: 5,
-          itemBuilder: (context, index) => const PostSkeleton(),
-        );
-      } else if (networkError) {
-        return _buildErrorState();
-      } else {
-        return _buildEmptyState();
-      }
-    }
-    return ListView.builder(
-      physics: const BouncingScrollPhysics(),
-      controller: _scrollController,
-      cacheExtent: 1000.0,
-      itemCount: posts.length + (isLoading && hasMore ? 1 : 0),
-      itemBuilder: (context, index) {
-        if (index == posts.length) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: PostSkeleton(),
-          );
-        }
-        final post = posts[index];
-        final postId = post['post_id'];
-        final colorScheme = Theme.of(context).colorScheme;
-        final imageUrl = post['media_url'] != null && post['media_url'].isNotEmpty
-            ? 'https://server.awarcrown.com${post['media_url']}'
-            : null;
-        final isLiked = post['is_liked'] ?? false;
-        final isLiking = isLikingMap[postId] ?? false;
-        final isFetchingComment = isFetchingComments[postId] ?? false;
-        final iconAnimation = likeAnimationControllers[postId] ??
-            const AlwaysStoppedAnimation(1.0);
-        final overlayAnimation = heartOverlayControllers[postId] ??
-            const AlwaysStoppedAnimation(0.0);
-        final isFollowing = isFollowingMap[post['user_id']] ?? (post['is_following'] ?? false);
-        final isProcessing = isProcessingFollow[post['user_id']] ?? false;
-        const double aspectRatio = 1.0;
-        final screenWidth = MediaQuery.of(context).size.width - 32;
-        return Card(
-          elevation: 2,
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          color: colorScheme.surface,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () => _navigateToProfile(
-                          post['username'] ?? '', post['user_id'] ?? 0),
-                      child: CircleAvatar(
-                        radius: 20,
-                        backgroundImage: post['profile_picture'] != null
-                            ? NetworkImage(
-                                'https://server.awarcrown.com/accessprofile/uploads/${post['profile_picture']}')
-                            : null,
-                        child: post['profile_picture'] == null
-                            ? Icon(Icons.person, color: colorScheme.onSurfaceVariant)
-                            : null,
-                      ),
+  Widget _buildPostItem(int index) {
+    final post = posts[index];
+    final postId = _parseInt(post['post_id']) ?? 0;
+    final colorScheme = Theme.of(context).colorScheme;
+    final imageUrl = post['media_url'] != null && post['media_url'].isNotEmpty
+        ? 'https://server.awarcrown.com${post['media_url']}'
+        : null;
+    final isLiked = post['is_liked'] ?? false;
+    final isLiking = isLikingMap[postId] ?? false;
+    final isFetchingComment = isFetchingComments[postId] ?? false;
+    final isSaved = post['is_saved'] ?? _savedPosts.contains(postId);
+    final isSaving = isSavingMap[postId] ?? false;
+    final isReporting = isReportingMap[postId] ?? false;
+    final iconAnimation = likeAnimationControllers[postId] ?? const AlwaysStoppedAnimation(1.0);
+    final overlayAnimation = heartOverlayControllers[postId] ?? const AlwaysStoppedAnimation(0.0);
+    final userId = _parseInt(post['user_id']) ?? 0;
+    final isFollowing = isFollowingMap[userId] ?? (post['is_following'] ?? false);
+    final isProcessing = isProcessingFollow[userId] ?? false;
+    final aspectRatio = _getAspectRatio(post);
+    final screenWidth = MediaQuery.of(context).size.width;
+    return RepaintBoundary(
+      child: Card(
+        elevation: 2,
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        color: colorScheme.surface,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => _navigateToProfile(post['username'] ?? ''),
+                    child: CircleAvatar(
+                      radius: 20,
+                      backgroundImage: post['profile_picture'] != null
+                          ? NetworkImage('https://server.awarcrown.com/accessprofile/uploads/${post['profile_picture']}')
+                          : null,
+                      child: post['profile_picture'] == null
+                          ? Icon(Icons.person, color: colorScheme.onSurfaceVariant)
+                          : null,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          GestureDetector(
-                            onTap: () => _navigateToProfile(
-                                post['username'] ?? '', post['user_id'] ?? 0),
-                            child: Text(
-                              post['username'] ?? 'Unknown',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                            ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GestureDetector(
+                          onTap: () => _navigateToProfile(post['username'] ?? ''),
+                          child: Text(
+                            post['username'] ?? 'Unknown',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                           ),
-                          Text(
-                            _formatTime(post['created_at']),
-                            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
+                        ),
+                        Text(
+                          _formatTime(post['created_at']),
+                          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
                     ),
-                    if (!_isOwnPost(postId, index) && !isFollowing)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: ElevatedButton(
-                          onPressed: isProcessing
-                              ? null
-                              : () => _toggleFollow(post['user_id'], index),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            minimumSize: const Size(80, 32),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          child: isProcessing
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                )
-                              : const Text(
-                                  'Follow',
-                                  style: TextStyle(fontSize: 12),
+                  ),
+                  if (!_isOwnPost(postId, index) && !isFollowing)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8.0),
+                      child: ElevatedButton(
+                        onPressed: isProcessing ? null : () => _toggleFollow(userId, index),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          minimumSize: const Size(80, 32),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                        child: isProcessing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                 ),
-                        ),
+                              )
+                            : const Text('Follow', style: TextStyle(fontSize: 12)),
                       ),
-                    if (_isOwnPost(postId, index))
-                      PopupMenuButton<String>(
-                        onSelected: (value) {
-                          if (value == 'delete') {
-                            _deletePost(postId);
-                          }
-                        },
-                        itemBuilder: (context) => [
-                          PopupMenuItem(
-                            value: 'delete',
-                            child: Row(
-                              children: [
-                                Icon(Icons.delete_outline, size: 20, color: Colors.red),
-                                const SizedBox(width: 8),
-                                const Text('Delete', style: TextStyle(color: Colors.red)),
-                              ],
-                            ),
+                    ),
+                  if (!_isOwnPost(postId, index))
+                    PopupMenuButton<String>(
+                      enabled: !isReporting,
+                      onSelected: (value) {
+                        if (value == 'report') {
+                          _showReportDialog(postId);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'report',
+                          child: Row(
+                            children: [
+                              Icon(Icons.flag_outlined, size: 20, color: Colors.orange),
+                              const SizedBox(width: 8),
+                              const Text('Report', style: TextStyle(color: Colors.orange)),
+                            ],
                           ),
-                        ],
-                        icon: Icon(Icons.more_vert, size: 20, color: colorScheme.onSurfaceVariant),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8)),
-                      ),
-                  ],
-                ),
-              ),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onDoubleTap: () => _toggleLike(postId, index),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (post['content'] != null && post['content'].isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        child: Text(
-                          post['content'],
-                          style: TextStyle(fontSize: 14, height: 1.4, color: colorScheme.onSurface),
                         ),
+                      ],
+                      icon: Icon(Icons.more_vert, size: 20, color: colorScheme.onSurfaceVariant),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                  if (_isOwnPost(postId, index))
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'delete') {
+                          _deletePost(postId);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          value: 'delete',
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                              const SizedBox(width: 8),
+                              const Text('Delete', style: TextStyle(color: Colors.red)),
+                            ],
+                          ),
+                        ),
+                      ],
+                      icon: Icon(Icons.more_vert, size: 20, color: colorScheme.onSurfaceVariant),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onDoubleTap: () => _toggleLike(postId, index),
+              onLongPress: imageUrl != null ? () => _showImageViewer(imageUrl) : null,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (post['content'] != null && post['content'].isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: ExpandedText(
+                        text: post['content'] as String,
+                        style: TextStyle(fontSize: 14, height: 1.4, color: colorScheme.onSurface),
+                        maxLines: 3,
                       ),
-                    if (imageUrl != null)
-                      Stack(
-                        children: [
-                          Container(
-                            margin: const EdgeInsets.symmetric(horizontal: 16),
-                            child: AspectRatio(
-                              aspectRatio: aspectRatio,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
+                    ),
+                  if (imageUrl != null)
+                    Stack(
+                      children: [
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.symmetric(horizontal: 16),
+                          child: AspectRatio(
+                            aspectRatio: aspectRatio,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(12),
+                              child: InteractiveViewer(
+                                boundaryMargin: const EdgeInsets.all(20),
+                                minScale: 0.5,
+                                maxScale: 4.0,
                                 child: CachedNetworkImage(
+                                  key: ValueKey(imageUrl),
                                   imageUrl: imageUrl,
                                   fit: BoxFit.cover,
-                                  memCacheWidth: (screenWidth * MediaQuery.of(context).devicePixelRatio).round(),
-                                  memCacheHeight: (screenWidth * aspectRatio * MediaQuery.of(context).devicePixelRatio).round(),
-                                  maxWidthDiskCache: (screenWidth * MediaQuery.of(context).devicePixelRatio).round(),
-                                  maxHeightDiskCache: (screenWidth * aspectRatio * MediaQuery.of(context).devicePixelRatio).round(),
                                   fadeInDuration: const Duration(milliseconds: 200),
                                   fadeOutDuration: const Duration(milliseconds: 200),
-                                  placeholder: (context, url) => const Skeleton(
-                                    height: double.infinity,
-                                    width: double.infinity,
+                                  placeholder: (context, url) => Container(
+                                    color: colorScheme.surfaceContainerHighest,
+                                    child: const Skeleton(height: double.infinity, width: double.infinity),
                                   ),
                                   errorWidget: (context, url, error) => Container(
                                     decoration: BoxDecoration(
@@ -1829,189 +2137,264 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                               ),
                             ),
                           ),
-                          if (showHeartOverlay[postId] ?? false)
-                            Positioned.fill(
-                              child: AnimatedBuilder(
-                                animation: overlayAnimation,
-                                builder: (context, child) {
-                                  final scale = Curves.easeOut.transform(
-                                      overlayAnimation.value) * 1.5;
-                                  final opacity = 1.0 - (overlayAnimation.value * 0.8);
-                                  return Transform.scale(
-                                    scale: scale * (showHeartOverlay[postId] == true ? 1.0 : 0.0),
-                                    alignment: Alignment.center,
-                                    child: Opacity(
-                                      opacity: opacity,
-                                      child: const Icon(
-                                        Icons.favorite,
-                                        size: 100,
-                                        color: Colors.red,
+                        ),
+                        if (showHeartOverlay[postId] ?? false)
+                          Positioned.fill(
+                            child: AnimatedBuilder(
+                              animation: overlayAnimation,
+                              builder: (context, child) {
+                                final scale = Curves.easeOut.transform(overlayAnimation.value) * 1.5;
+                                final opacity = 1.0 - (overlayAnimation.value * 0.8);
+                                return Transform.scale(
+                                  scale: scale,
+                                  alignment: Alignment.center,
+                                  child: Opacity(
+                                    opacity: opacity,
+                                    child: const Icon(Icons.favorite, size: 100, color: Colors.red),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              color: colorScheme.surface,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      InkWell(
+                        onTap: () => _toggleLike(postId, index),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              isLiking
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                                      ),
+                                    )
+                                  : AnimatedBuilder(
+                                      animation: iconAnimation,
+                                      builder: (context, child) {
+                                        final scale = 1.0 + (0.4 * iconAnimation.value);
+                                        return Transform.scale(
+                                          scale: scale,
+                                          child: Icon(
+                                            isLiked ? Icons.favorite : Icons.favorite_border,
+                                            size: 24,
+                                            color: isLiked ? Colors.red : colorScheme.onSurface,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${post['like_count'] ?? 0}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: isLiked ? Colors.red : colorScheme.onSurface,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      InkWell(
+                        onTap: isFetchingComment
+                            ? null
+                            : () async {
+                                await _fetchComments(postId);
+                                if (mounted) {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => CommentsPage(
+                                        post: post,
+                                        comments: commentsMap[postId] ?? [],
+                                        username: _username,
+                                        userId: _userId,
                                       ),
                                     ),
                                   );
-                                },
+                                }
+                              },
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              isFetchingComment
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                      ),
+                                    )
+                                  : Icon(Icons.mode_comment_outlined, size: 24, color: colorScheme.onSurface),
+                              const SizedBox(width: 6),
+                              Text(
+                                '${post['comment_count'] ?? 0}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurface,
+                                ),
                               ),
-                            ),
-                        ],
+                            ],
+                          ),
+                        ),
                       ),
-                  ],
-                ),
+                      const SizedBox(width: 12),
+                      InkWell(
+                        onTap: () => _sharePost(postId),
+                        borderRadius: BorderRadius.circular(20),
+                        child: const Padding(
+                          padding: EdgeInsets.all(12),
+                          child: Icon(Icons.share_outlined, size: 24),
+                        ),
+                      ),
+                      const Spacer(),
+                      InkWell(
+                        onTap: isSaving ? null : () => _toggleSave(postId, index),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: isSaving
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                  ),
+                                )
+                              : Icon(
+                                  isSaved ? Icons.bookmark : Icons.bookmark_border,
+                                  size: 24,
+                                  color: isSaved ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-              const SizedBox(height: 12),
-              Container(
-                color: colorScheme.surface,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        InkWell(
-                          onTap: () => _toggleLike(postId, index),
-                          borderRadius: BorderRadius.circular(20),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                isLiking
-                                    ? const SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                              Colors.red),
-                                        ),
-                                      )
-                                    : AnimatedBuilder(
-                                        animation: iconAnimation,
-                                        builder: (context, child) {
-                                          final scale = 1.0 + (0.4 * iconAnimation.value);
-                                          return Transform.scale(
-                                            scale: scale,
-                                            child: Icon(
-                                              isLiked
-                                                  ? Icons.favorite
-                                                  : Icons.favorite_border,
-                                              size: 24,
-                                              color: isLiked ? Colors.red : colorScheme.onSurface,
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '${post['like_count'] ?? 0}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: isLiked ? Colors.red : colorScheme.onSurface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        InkWell(
-                          onTap: isFetchingComment
-                              ? null
-                              : () async {
-                                  if (isFetchingComments[postId] ?? false) return;
-                                  setState(() => isFetchingComments[postId] = true);
-                                  try {
-                                    await _fetchComments(postId);
-                                    if (mounted) {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => CommentsPage(
-                                            post: post,
-                                            comments: commentsMap[postId] ?? [],
-                                            username: _username,
-                                            userId: _userId,
-                                          ),
-                                        ),
-                                      );
-                                    }
-                                  } finally {
-                                    if (mounted) {
-                                      setState(() => isFetchingComments[postId] = false);
-                                    }
-                                  }
-                                },
-                          borderRadius: BorderRadius.circular(20),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                isFetchingComment
-                                    ? const SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(
-                                              Colors.blue),
-                                        ),
-                                      )
-                                    : Icon(
-                                        Icons.mode_comment_outlined,
-                                        size: 24,
-                                        color: colorScheme.onSurface,
-                                      ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  '${post['comment_count'] ?? 0}',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: colorScheme.onSurface,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        InkWell(
-                          onTap: () => _sharePost(postId),
-                          borderRadius: BorderRadius.circular(20),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Icon(
-                              Icons.share_outlined,
-                              size: 24,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        InkWell(
-                          onTap: () => _savePost(postId),
-                          borderRadius: BorderRadius.circular(20),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Icon(
-                              Icons.bookmark_border,
-                              size: 24,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  void _showReportDialog(int postId) {
+    final List<String> reasons = [
+      'Spam or misleading',
+      'Harassment or hate speech',
+      'Inappropriate content',
+      'Intellectual property violation',
+      'Other',
+    ];
+    String? selectedReason;
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Report Post'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Please select a reason:'),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: selectedReason,
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
                 ),
+                items: reasons.map((reason) {
+                  return DropdownMenuItem<String>(
+                    value: reason,
+                    child: Text(reason),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setDialogState(() {
+                    selectedReason = value;
+                  });
+                },
               ),
             ],
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: selectedReason != null
+                  ? () {
+                      Navigator.pop(context);
+                      _reportPost(postId, selectedReason!);
+                    }
+                  : null,
+              style: TextButton.styleFrom(foregroundColor: Colors.orange),
+              child: const Text('Report'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  Widget _buildList() {
+    if (posts.isEmpty) {
+      if (isLoading) {
+        return ListView.builder(
+          physics: const BouncingScrollPhysics(),
+          cacheExtent: 1000.0,
+          itemCount: 5,
+          itemBuilder: (context, index) => const PostSkeleton(),
         );
-      },
+      } else if (networkError) {
+        return _buildErrorState();
+      } else {
+        return _buildEmptyState();
+      }
+    }
+    return ValueListenableBuilder<bool>(
+      valueListenable: _refreshNotifier,
+      builder: (context, _, __) => ListView.builder(
+        physics: const BouncingScrollPhysics(),
+        controller: _scrollController,
+        cacheExtent: 1000.0,
+        itemCount: posts.length + (isLoading && hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == posts.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: PostSkeleton(),
+            );
+          }
+          return _buildPostItem(index);
+        },
+      ),
     );
   }
   @override
@@ -2032,9 +2415,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: colorScheme.errorContainer,
-                    border: Border(
-                      bottom: BorderSide(color: colorScheme.error, width: 1),
-                    ),
+                    border: Border(bottom: BorderSide(color: colorScheme.error, width: 1)),
                   ),
                   child: Row(
                     children: [
@@ -2069,7 +2450,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       if (diff.inDays > 365) {
         return '${(diff.inDays / 365).floor()}y ago';
       } else if (diff.inDays > 30) {
-        return '${(diff.inDays / 30).floor()}mo ago';
+          return '${(diff.inDays / 30).floor()}mo ago';
       } else if (diff.inDays > 0) {
         return '${diff.inDays}d ago';
       } else if (diff.inHours > 0) {

@@ -1,4 +1,3 @@
-// createpost.dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -6,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+// ignore: depend_on_referenced_packages
 import 'package:flutter_test/flutter_test.dart';
 
 class CreatePostPage extends StatefulWidget {
@@ -91,14 +91,11 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
     );
   }
 
-  // Image picking relying on image_picker's internal permission handling
+  // Image picking without compression for HD upload
   Future<void> _pickImage(ImageSource source) async {
     try {
       final XFile? pickedImage = await _picker.pickImage(
         source: source,
-        maxWidth: 1080,
-        maxHeight: 1080,
-        imageQuality: 85,
       );
 
       if (pickedImage != null) {
@@ -226,7 +223,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
     }
   }
 
-  // Preview widget with animation
+  // Preview widget with animation, full width and higher preview
   Widget _buildImagePreview() {
     if (_image == null) return const SizedBox.shrink();
 
@@ -238,13 +235,12 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
             borderRadius: BorderRadius.circular(12),
             child: Image.file(
               _image!,
-              height: 200,
               width: double.infinity,
-              fit: BoxFit.cover,
+              fit: BoxFit.fitWidth,
               errorBuilder: (context, error, stackTrace) {
                 debugPrint('Image preview error: $error');
                 return Container(
-                  height: 200,
+                  height: 300,
                   color: Colors.grey[300],
                   child: const Icon(Icons.broken_image, size: 100, color: Colors.grey),
                 );

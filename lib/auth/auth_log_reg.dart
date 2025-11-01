@@ -826,251 +826,255 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Colors.white,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black87 : Colors.black,
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "Awarcrown Auth",
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.wifi,
-              color: _isConnected
-                  ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.white)
-                  : Colors.grey,
-              size: 24,
-              semanticLabel: _isConnected ? 'Connected to network' : 'No network connection',
-            ),
-          ],
-        ),
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.grey,
-          tabs: const [
-            Tab(text: "Login"),
-            Tab(text: "Register"),
-          ],
-        ),
-      ),
-      body: Stack(
-        children: [
-          if (!_isConnected)
-            Banner(
-              message: "Offline: Please connect to a network",
-              location: BannerLocation.topEnd,
-              color: Colors.red,
-            ),
-          TabBarView(
-            controller: _tabController,
+    return WillPopScope(
+      onWillPop: () async => false, // Prevents back button and gesture from popping the route
+      child: Scaffold(
+        backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[900] : Colors.white,
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black87 : Colors.black,
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 20),
-                    FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Icon(
-                        Icons.lock_outline_rounded,
-                        size: 80,
-                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
-                        semanticLabel: 'Login icon',
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _buildTextField(
-                      controller: _loginUserController,
-                      label: "Username or Email",
-                      error: _loginUserError,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _loginPassController,
-                      label: "Password",
-                      obscure: _loginObscure,
-                      error: _loginPassError,
-                      suffixIcon: _loginObscure ? Icons.visibility : Icons.visibility_off,
-                      onSuffixPressed: () => setState(() => _loginObscure = !_loginObscure),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        TextButton(
-                          onPressed: _isLoading ? null : _showForgotPasswordDialog,
-                          style: TextButton.styleFrom(
-                            tapTargetSize: MaterialTapTargetSize.padded,
-                          ),
-                          child: Text(
-                            "Forgot Password?",
-                            style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _login,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                        foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 5,
-                      ),
-                      child: _isLoading
-                          ? SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              "Login",
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                              semanticsLabel: 'Login button',
-                            ),
-                    ),
-                  ],
+              Text(
+                "Awarcrown Auth",
+                style: TextStyle(
+                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.white,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 20),
-                    FadeTransition(
-                      opacity: _fadeAnimation,
-                      child: Icon(
-                        Icons.person_add_outlined,
-                        size: 80,
-                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
-                        semanticLabel: 'Register icon',
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    _buildTextField(
-                      controller: _regUserController,
-                      label: "Username",
-                      error: _regUserError,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _regEmailController,
-                      label: "Email",
-                      error: _regEmailError,
-                      keyboardType: TextInputType.emailAddress,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _regPassController,
-                      label: "Password",
-                      obscure: _regObscure,
-                      error: _regPassError,
-                      suffixIcon: _regObscure ? Icons.visibility : Icons.visibility_off,
-                      onSuffixPressed: () => setState(() => _regObscure = !_regObscure),
-                    ),
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: _passwordStrength,
-                      backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[700] : Colors.grey[300],
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                      ),
-                      semanticsLabel: 'Password strength indicator',
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      "Password Strength: ${_passwordStrength < 0.4 ? 'Weak' : _passwordStrength < 0.7 ? 'Medium' : 'Strong'}",
-                      style: TextStyle(
-                        color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      semanticsLabel: 'Password strength: ${_passwordStrength < 0.4 ? 'Weak' : _passwordStrength < 0.7 ? 'Medium' : 'Strong'}',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      controller: _regConfirmPassController,
-                      label: "Confirm Password",
-                      obscure: _regConfirmObscure,
-                      error: _regConfirmPassError,
-                      suffixIcon: _regConfirmObscure ? Icons.visibility : Icons.visibility_off,
-                      onSuffixPressed: () => setState(() => _regConfirmObscure = !_regConfirmObscure),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _agreeToTerms,
-                          onChanged: _isLoading ? null : (value) => setState(() => _agreeToTerms = value!),
-                          checkColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
-                          activeColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                          semanticLabel: 'Agree to terms checkbox',
-                        ),
-                        Expanded(
-                          child: Text(
-                            "I agree to the Terms of Service and Privacy Policy",
-                            style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _register,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-                        foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        elevation: 5,
-                      ),
-                      child: _isLoading
-                          ? SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : const Text(
-                              "Register",
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                              semanticsLabel: 'Register button',
-                            ),
-                    ),
-                  ],
-                ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.wifi,
+                color: _isConnected
+                    ? (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.white)
+                    : Colors.grey,
+                size: 24,
+                semanticLabel: _isConnected ? 'Connected to network' : 'No network connection',
               ),
             ],
           ),
-          if (_isLoading)
-            Container(
-              // ignore: deprecated_member_use
-              color: Colors.black.withOpacity(0.3),
-              child: Center(
-                child: CircularProgressIndicator(
-                  color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.white,
+          bottom: TabBar(
+            controller: _tabController,
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.grey,
+            tabs: const [
+              Tab(text: "Login"),
+              Tab(text: "Register"),
+            ],
+          ),
+        ),
+        body: Stack(
+          children: [
+            if (!_isConnected)
+              Banner(
+                message: "Offline: Please connect to a network",
+                location: BannerLocation.topEnd,
+                color: Colors.red,
+              ),
+            TabBarView(
+              controller: _tabController,
+              children: [
+                SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 20),
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Icon(
+                          Icons.lock_outline_rounded,
+                          size: 80,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+                          semanticLabel: 'Login icon',
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildTextField(
+                        controller: _loginUserController,
+                        label: "Username or Email",
+                        error: _loginUserError,
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _loginPassController,
+                        label: "Password",
+                        obscure: _loginObscure,
+                        error: _loginPassError,
+                        suffixIcon: _loginObscure ? Icons.visibility : Icons.visibility_off,
+                        onSuffixPressed: () => setState(() => _loginObscure = !_loginObscure),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: _isLoading ? null : _showForgotPasswordDialog,
+                            style: TextButton.styleFrom(
+                              tapTargetSize: MaterialTapTargetSize.padded,
+                            ),
+                            child: Text(
+                              "Forgot Password?",
+                              style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 5,
+                        ),
+                        child: _isLoading
+                            ? SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                "Login",
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                semanticsLabel: 'Login button',
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+                SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const SizedBox(height: 20),
+                      FadeTransition(
+                        opacity: _fadeAnimation,
+                        child: Icon(
+                          Icons.person_add_outlined,
+                          size: 80,
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white70 : Colors.black54,
+                          semanticLabel: 'Register icon',
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      _buildTextField(
+                        controller: _regUserController,
+                        label: "Username",
+                        error: _regUserError,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _regEmailController,
+                        label: "Email",
+                        error: _regEmailError,
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _regPassController,
+                        label: "Password",
+                        obscure: _regObscure,
+                        error: _regPassError,
+                        suffixIcon: _regObscure ? Icons.visibility : Icons.visibility_off,
+                        onSuffixPressed: () => setState(() => _regObscure = !_regObscure),
+                      ),
+                      const SizedBox(height: 8),
+                      LinearProgressIndicator(
+                        value: _passwordStrength,
+                        backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.grey[700] : Colors.grey[300],
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                        ),
+                        semanticsLabel: 'Password strength indicator',
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        "Password Strength: ${_passwordStrength < 0.4 ? 'Weak' : _passwordStrength < 0.7 ? 'Medium' : 'Strong'}",
+                        style: TextStyle(
+                          color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        semanticsLabel: 'Password strength: ${_passwordStrength < 0.4 ? 'Weak' : _passwordStrength < 0.7 ? 'Medium' : 'Strong'}',
+                      ),
+                      const SizedBox(height: 16),
+                      _buildTextField(
+                        controller: _regConfirmPassController,
+                        label: "Confirm Password",
+                        obscure: _regConfirmObscure,
+                        error: _regConfirmPassError,
+                        suffixIcon: _regConfirmObscure ? Icons.visibility : Icons.visibility_off,
+                        onSuffixPressed: () => setState(() => _regConfirmObscure = !_regConfirmObscure),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _agreeToTerms,
+                            onChanged: _isLoading ? null : (value) => setState(() => _agreeToTerms = value!),
+                            checkColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+                            activeColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                            semanticLabel: 'Agree to terms checkbox',
+                          ),
+                          Expanded(
+                            child: Text(
+                              "I agree to the Terms of Service and Privacy Policy",
+                              style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _register,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+                          foregroundColor: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 5,
+                        ),
+                        child: _isLoading
+                            ? SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  color: Theme.of(context).brightness == Brightness.dark ? Colors.black : Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Text(
+                                "Register",
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                                semanticsLabel: 'Register button',
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (_isLoading)
+              Container(
+                // ignore: deprecated_member_use
+                color: Colors.black.withOpacity(0.3),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.white,
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

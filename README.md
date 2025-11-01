@@ -6,7 +6,7 @@ A new **Flutter project** under **Awarcrown Corporations LLP** — building the 
 
 ## 📱 App Screenshots  
 
-<p align="center">
+<!-- <p align="center">
   <img src="ideaship_images/1.jpg" alt="Screenshot 1" width="280"/>
   <img src="ideaship_images/2.jpg" alt="Screenshot 2" width="280"/>
   <img src="ideaship_images/3.jpg" alt="Screenshot 3" width="280"/>
@@ -17,7 +17,7 @@ A new **Flutter project** under **Awarcrown Corporations LLP** — building the 
   <img src="ideaship_images/8.jpg" alt="Screenshot 8" width="280"/>
   <img src="ideaship_images/9.jpg" alt="Screenshot 9" width="280"/>
    <img src="ideaship_images/10.jpg" alt="Screenshot 10" width="280"/>
-</p>
+</p> -->
 
 ---
 
