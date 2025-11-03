@@ -8,6 +8,7 @@ import 'package:ideaship/feed/posts.dart'; // For CommentsPage
 import 'package:ideaship/feed/startups.dart';
 import 'package:ideaship/jobs/job_drawer.dart';
 import 'package:ideaship/settings/usersettings.dart';
+import 'package:ideaship/thr_project/thread_details.dart';
 import 'package:ideaship/user/userprofile.dart';
 import 'package:ideaship/thr_project/threads.dart';
 import 'package:shared_preferences/shared_preferences.dart';

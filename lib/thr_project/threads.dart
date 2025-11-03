@@ -6,11 +6,14 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:ideaship/thr_project/thread_details.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:lottie/lottie.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+
 
 class Thread {
   final int id;
@@ -27,6 +30,8 @@ class Thread {
   bool isInspiredByMe;
   final String visibility;
   final String? inviteCode;
+  final bool isFromCache;
+
   Thread({
     required this.id,
     required this.title,
@@ -42,8 +47,46 @@ class Thread {
     required this.isInspiredByMe,
     required this.visibility,
     this.inviteCode,
+    this.isFromCache = false,
   });
-  factory Thread.fromJson(Map<String, dynamic> json) {
+
+  Thread copyWith({
+    int? id,
+    String? title,
+    String? body,
+    String? category,
+    String? creator,
+    String? creatorRole,
+    int? inspiredCount,
+    int? commentCount,
+    int? collabCount,
+    List<String>? tags,
+    DateTime? createdAt,
+    bool? isInspiredByMe,
+    String? visibility,
+    String? inviteCode,
+    bool? isFromCache,
+  }) {
+    return Thread(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      category: category ?? this.category,
+      creator: creator ?? this.creator,
+      creatorRole: creatorRole ?? this.creatorRole,
+      inspiredCount: inspiredCount ?? this.inspiredCount,
+      commentCount: commentCount ?? this.commentCount,
+      collabCount: collabCount ?? this.collabCount,
+      tags: tags ?? this.tags,
+      createdAt: createdAt ?? this.createdAt,
+      isInspiredByMe: isInspiredByMe ?? this.isInspiredByMe,
+      visibility: visibility ?? this.visibility,
+      inviteCode: inviteCode ?? this.inviteCode,
+      isFromCache: isFromCache ?? this.isFromCache,
+    );
+  }
+
+  factory Thread.fromJson(Map<String, dynamic> json, {bool isFromCache = false}) {
     try {
       return Thread(
         id: json['thread_id'] ?? 0,
@@ -61,6 +104,7 @@ class Thread {
         isInspiredByMe: json['user_has_inspired'] ?? false,
         visibility: json['visibility'] ?? 'public',
         inviteCode: json['invite_code'],
+        isFromCache: isFromCache,
       );
     } catch (e) {
       debugPrint('Error parsing Thread from JSON: $e');
@@ -78,6 +122,7 @@ class Thread {
         createdAt: DateTime.now(),
         isInspiredByMe: false,
         visibility: 'public',
+        isFromCache: isFromCache,
       );
     }
   }
@@ -90,6 +135,8 @@ class Comment {
   final String commenter;
   final DateTime createdAt;
   final List<Comment> replies;
+  final bool isFromCache;
+
   Comment({
     required this.id,
     this.parentId,
@@ -97,16 +144,18 @@ class Comment {
     required this.commenter,
     required this.createdAt,
     this.replies = const [],
+    this.isFromCache = false,
   });
+
   factory Comment.fromJson(
-      Map<String, dynamic> json, Map<int, List<Map<String, dynamic>>> commentMap) {
+      Map<String, dynamic> json, Map<int, List<Map<String, dynamic>>> commentMap, {bool isFromCache = false}) {
     try {
       final id = json['comment_id'] ?? 0;
       final repliesJson = commentMap[id] ?? [];
       final replies = <Comment>[];
       for (final r in repliesJson) {
         try {
-          replies.add(Comment.fromJson(r, commentMap));
+          replies.add(Comment.fromJson(r, commentMap, isFromCache: isFromCache));
         } catch (e) {
           debugPrint('Error parsing reply comment: $e');
         }
@@ -119,6 +168,7 @@ class Comment {
         createdAt:
             DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
         replies: replies,
+        isFromCache: isFromCache,
       );
     } catch (e) {
       debugPrint('Error parsing Comment from JSON: $e');
@@ -128,6 +178,7 @@ class Comment {
         commenter: 'Unknown',
         createdAt: DateTime.now(),
         replies: [],
+        isFromCache: isFromCache,
       );
     }
   }
@@ -146,6 +197,7 @@ class RoundTablePainter extends CustomPainter {
     canvas.translate(-center.dx, -center.dy);
     // Draw round table
     final tablePaint = Paint()
+      // ignore: deprecated_member_use
       ..color = Colors.blue.withOpacity(0.3)
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, tableRadius, tablePaint);
@@ -403,46 +455,58 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
   bool isMyView = false;
-  List<Thread> threads = [];
+  // Discover
+  List<Thread> discoverThreads = [];
   List<Thread> searchResults = [];
+  int discoverOffset = 0;
+  bool discoverLoading = true;
+  bool discoverHasError = false;
+  String? discoverErrorMessage;
+  bool discoverLoadingMore = false;
+  bool discoverHasReachedMax = false;
+  List<Animation<double>> discoverSlideAnimations = [];
+  DateTime? _discoverLastFetchTime;
+  // My
+  List<Thread> myThreads = [];
+  int myOffset = 0;
+  bool myLoading = false;
+  bool myHasError = false;
+  String? myErrorMessage;
+  bool myLoadingMore = false;
+  bool myHasReachedMax = false;
+  List<Animation<double>> mySlideAnimations = [];
+  DateTime? _myLastFetchTime;
+  // Shared
   String? username;
   int? userId;
   String sort = 'recent';
-  bool isLoading = true;
-  bool hasError = false;
-  String? errorMessage;
-  bool isLoadingMore = false;
-  int offset = 0;
   final int limit = 20;
-  final ScrollController _scrollController = ScrollController();
+  final ScrollController _discoverScrollController = ScrollController();
+  final ScrollController _myScrollController = ScrollController();
   late AnimationController _animationController;
   late AnimationController _staggerController;
   late Animation<double> _fadeAnimation;
-  List<Animation<double>> _slideAnimations = [];
-  Timer? _scrollDebounceTimer;
+  Timer? _discoverScrollDebounceTimer;
+  Timer? _myScrollDebounceTimer;
   Timer? _retryTimer;
+  Timer? _autoUpdateTimer;
   int _retryCount = 0;
   static const int _maxRetries = 3;
   static const Duration _retryBaseDelay = Duration(seconds: 2);
+  static const Duration _autoUpdateInterval = Duration(minutes: 2);
   http.Client? _httpClient;
-  bool _hasReachedMax = false;
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
-  Map<int, Thread> _threadCache = {};
-  DateTime? _lastFetchTime;
+  final Map<int, Thread> _threadCache = {};
   static const Duration _cacheValidDuration = Duration(minutes: 5);
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  bool _isOnline = false;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      if (_tabController.indexIsChanging) {
-        setState(() {
-          isMyView = _tabController.index == 1;
-        });
-        _fetchThreads(reset: true);
-      }
-    });
+    _tabController.addListener(_onTabChanged);
     _httpClient = http.Client();
     _checkOnboarding();
     _animationController = AnimationController(
@@ -458,40 +522,120 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     );
     _animationController.forward();
     _initializeData();
-    _setupScrollListener();
+    _setupScrollListeners();
+    _startAutoUpdate();
+    _initConnectivity();
   }
-  void _setupScrollListener() {
-    _scrollController.addListener(_onScroll);
+
+  void _onTabChanged() {
+    if (_tabController.index != _tabController.previousIndex) {
+      final newIsMyView = _tabController.index == 1;
+      if (newIsMyView != isMyView) {
+        setState(() {
+          isMyView = newIsMyView;
+        });
+        _loadTabDataIfNeeded(newIsMyView);
+      }
+    }
   }
-  void _onScroll() {
-    _scrollDebounceTimer?.cancel();
-    _scrollDebounceTimer = Timer(const Duration(milliseconds: 300), () {
-      if (!_scrollController.hasClients) return;
-      final position = _scrollController.position;
+
+  void _loadTabDataIfNeeded(bool isMy) {
+    final isEmpty = isMy ? myThreads.isEmpty : discoverThreads.isEmpty;
+    if (isEmpty) {
+      _fetchThreads(reset: true, isMy: isMy);
+    }
+  }
+
+  Future<void> _initConnectivity() async {
+    final connectivity = Connectivity();
+    final results = await connectivity.checkConnectivity();
+    _isOnline = results.any((result) => result != ConnectivityResult.none);
+    if (mounted) setState(() {});
+    _connectivitySubscription = connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+      final wasOnline = _isOnline;
+      _isOnline = results.any((result) => result != ConnectivityResult.none);
+      if (mounted && _isOnline && !wasOnline) {
+        _fetchThreads(reset: true, isMy: false);
+        _fetchThreads(reset: true, isMy: true);
+      }
+    });
+  }
+
+  bool get isOnline => _isOnline;
+
+  Future<bool> _isDeviceOnline() async {
+    try {
+      final connectivity = Connectivity();
+      final results = await connectivity.checkConnectivity();
+      return results.any((result) => result != ConnectivityResult.none);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  void _startAutoUpdate() {
+    _autoUpdateTimer = Timer.periodic(_autoUpdateInterval, (timer) async {
+      if (mounted && isOnline) {
+        await Future.wait([
+          _fetchThreads(reset: true, isMy: false),
+          _fetchThreads(reset: true, isMy: true),
+        ]);
+      }
+    });
+  }
+
+  void _setupScrollListeners() {
+    _discoverScrollController.addListener(_onDiscoverScroll);
+    _myScrollController.addListener(_onMyScroll);
+  }
+
+  void _onDiscoverScroll() {
+    _discoverScrollDebounceTimer?.cancel();
+    _discoverScrollDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!_discoverScrollController.hasClients) return;
+      final position = _discoverScrollController.position;
       if (position.pixels >= position.maxScrollExtent - 200) {
-        if (!isLoadingMore && !hasError && !_hasReachedMax) {
+        if (!discoverLoadingMore && !discoverHasError && !discoverHasReachedMax) {
           if (_isSearching) {
             _searchMoreThreads(_searchController.text);
           } else {
-            _fetchMoreThreads();
+            _fetchMoreThreads(isMy: false);
           }
         }
       }
     });
   }
+
+  void _onMyScroll() {
+    _myScrollDebounceTimer?.cancel();
+    _myScrollDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      if (!_myScrollController.hasClients) return;
+      final position = _myScrollController.position;
+      if (position.pixels >= position.maxScrollExtent - 200) {
+        if (!myLoadingMore && !myHasError && !myHasReachedMax) {
+          _fetchMoreThreads(isMy: true);
+        }
+      }
+    });
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
-    _scrollDebounceTimer?.cancel();
+    _discoverScrollDebounceTimer?.cancel();
+    _myScrollDebounceTimer?.cancel();
     _retryTimer?.cancel();
-    _scrollController.removeListener(_onScroll);
-    _scrollController.dispose();
+    _autoUpdateTimer?.cancel();
+    _connectivitySubscription?.cancel();
+    _discoverScrollController.dispose();
+    _myScrollController.dispose();
     _animationController.dispose();
     _staggerController.dispose();
     _tabController.dispose();
     _httpClient?.close();
     super.dispose();
   }
+
   Future<void> _checkOnboarding() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -506,22 +650,27 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       debugPrint('Error checking onboarding: $e');
     }
   }
+
   Future<void> _initializeData() async {
     try {
       await _loadUsernameAndUserId();
       await _setupFCM();
-      await _fetchThreads(reset: true);
+      await Future.wait([
+        _fetchThreads(reset: true, isMy: false),
+        _fetchThreads(reset: true, isMy: true),
+      ]);
     } catch (e) {
       if (mounted) {
         setState(() {
-          isLoading = false;
-          hasError = true;
-          errorMessage = _getErrorMessage(e);
+          discoverLoading = false;
+          discoverHasError = true;
+          discoverErrorMessage = _getErrorMessage(e);
         });
-        _showError(errorMessage ?? 'Initialization failed');
+        _showError(discoverErrorMessage ?? 'Initialization failed');
       }
     }
   }
+
   Future<void> _loadUsernameAndUserId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -538,6 +687,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
   }
+
   Future<void> _fetchUserId() async {
     if (username == null || username!.isEmpty) return;
     try {
@@ -573,6 +723,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       _showError(_getErrorMessage(e));
     }
   }
+
   Future<void> _setupFCM() async {
     try {
       await Firebase.initializeApp();
@@ -591,7 +742,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
           body: json.encode({'username': username, 'token': token}),
         ).timeout(const Duration(seconds: 10));
       }
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
         debugPrint('Got foreground message: ${message.notification?.title}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -600,17 +751,24 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                   '${message.notification?.title}: ${message.notification?.body}'),
               action: SnackBarAction(
                 label: 'Refresh',
-                onPressed: () => _fetchThreads(reset: true),
+                onPressed: () {
+                  _fetchThreads(reset: true, isMy: false);
+                  _fetchThreads(reset: true, isMy: true);
+                },
               ),
               backgroundColor: Colors.blue,
             ),
           );
+          if (isOnline) {
+            _fetchThreads(reset: true, isMy: false);
+          }
         }
       });
     } catch (e) {
       debugPrint('Error setting up FCM: $e');
     }
   }
+
   String _getErrorMessage(dynamic e) {
     if (e is SocketException) {
       return 'No internet connection. Please check your connection and try again.';
@@ -622,6 +780,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       return 'An unexpected error occurred. Please try again.';
     }
   }
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -633,6 +792,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
+
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -644,210 +804,326 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
+
   Future<String?> _getThreadCode(int threadId) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('code_$threadId');
   }
+
   Future<void> _setThreadCode(int threadId, String code) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('code_$threadId', code);
   }
-  Future<void> _fetchThreads({bool reset = false}) async {
+
+  Future<void> _fetchThreads({bool reset = false, required bool isMy}) async {
     if (username == null || username!.isEmpty) return;
+    final bool online = await _isDeviceOnline();
+    bool useCacheOnly = !online;
+    DateTime? lastFetchTime = isMy ? _myLastFetchTime : _discoverLastFetchTime;
     if (!reset &&
-        _lastFetchTime != null &&
-        DateTime.now().difference(_lastFetchTime!) < _cacheValidDuration) {
+        lastFetchTime != null &&
+        DateTime.now().difference(lastFetchTime) < _cacheValidDuration &&
+        !online) {
+      if (mounted) {
+        setState(() {
+          if (isMy) {
+            myLoading = false;
+            myLoadingMore = false;
+          } else {
+            discoverLoading = false;
+            discoverLoadingMore = false;
+          }
+        });
+      }
       return;
     }
-    if (reset) {
-      offset = 0;
-      threads.clear();
-      isLoadingMore = false;
-      _hasReachedMax = false;
-      _retryCount = 0;
-    }
+    // Set loading states
     if (mounted) {
       setState(() {
         if (reset) {
-          isLoading = true;
-          hasError = false;
-          errorMessage = null;
+          if (isMy) {
+            myLoading = true;
+            myHasError = false;
+            myErrorMessage = null;
+          } else {
+            discoverLoading = true;
+            discoverHasError = false;
+            discoverErrorMessage = null;
+          }
         } else {
-          isLoadingMore = true;
+          if (isMy) myLoadingMore = true;
+          else discoverLoadingMore = true;
         }
       });
     }
-    try {
-      String uriStr = 'https://server.awarcrown.com/threads/list?sort=$sort&limit=$limit&offset=$offset';
-      if (isMyView) {
-        uriStr += '&username=${Uri.encodeComponent(username!)}';
-      }
-      final uri = Uri.parse(uriStr);
-      final response = await (_httpClient ?? http.Client())
-          .get(uri)
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        final newThreads = <Thread>[];
-        for (final jsonItem in data) {
-          try {
-            final thread = Thread.fromJson(jsonItem);
-            newThreads.add(thread);
-            _threadCache[thread.id] = thread;
-          } catch (e) {
-            debugPrint('Error parsing thread: $e');
-          }
-        }
-        final prefs = await SharedPreferences.getInstance();
-        for (final thread in newThreads) {
-          thread.isInspiredByMe = prefs.getBool('inspired_${thread.id}') ?? false;
-          if (isMyView) {
-            thread.isInspiredByMe = true; // Assume creator has inspired their own
-          }
-        }
-        if (mounted) {
-          setState(() {
-            if (reset) {
-              threads = newThreads;
-              isLoading = false;
-            } else {
-              threads.addAll(newThreads);
-              isLoadingMore = false;
-            }
-            offset += newThreads.length;
-            _hasReachedMax = newThreads.length < limit;
-            _lastFetchTime = DateTime.now();
-            _retryCount = 0;
-          });
-        }
-        if (newThreads.isNotEmpty) {
-          final startIndex = reset ? 0 : threads.length - newThreads.length;
-          final newAnimations = List.generate(
-              newThreads.length,
-              (index) => Tween<double>(begin: -1.0, end: 0.0).animate(
-                    CurvedAnimation(
-                      parent: _staggerController,
-                      curve: Interval((startIndex + index) * 0.05, 1.0,
-                          curve: Curves.elasticOut),
-                    ),
-                  ));
-          if (reset) {
-            _slideAnimations = newAnimations;
-          } else {
-            _slideAnimations.addAll(newAnimations);
-          }
-          _staggerController.forward(from: 0.0);
-        }
-      } else if (response.statusCode == 404) {
-        if (mounted) {
-          setState(() {
-            _hasReachedMax = true;
-            isLoadingMore = false;
-            if (reset) isLoading = false;
-          });
-        }
+    // Get target vars
+    List<Thread> targetThreads = isMy ? myThreads : discoverThreads;
+    int targetOffset = isMy ? myOffset : discoverOffset;
+    List<Animation<double>> targetAnimations = isMy ? mySlideAnimations : discoverSlideAnimations;
+    if (reset) {
+      targetOffset = 0;
+      if (useCacheOnly) {
+        targetThreads = targetThreads.where((t) => !t.isFromCache).toList();
       } else {
-        throw Exception(
-            'Server error: ${response.statusCode} - ${response.body}');
+        targetThreads.clear();
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          if (reset) {
-            isLoading = false;
-            hasError = true;
-            errorMessage = 'Failed to fetch roundtables: ${_getErrorMessage(e)}';
-          } else {
-            isLoadingMore = false;
-          }
-        });
-        if (reset) {
-          _scheduleRetry(() => _fetchThreads(reset: true));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content:
-                  Text('Failed to load roundtables: ${_getErrorMessage(e)}'),
-              action: SnackBarAction(
-                label: 'Retry Now',
-                onPressed: () {
-                  _retryCount = 0;
-                  _fetchThreads(reset: true);
-                },
-              ),
-            ),
-          );
-        } else {
-          _showError('Failed to load more roundtables: ${_getErrorMessage(e)}');
+      targetAnimations.clear();
+      if (isMy) {
+        myLoadingMore = false;
+        myHasReachedMax = false;
+        myOffset = 0;
+      } else {
+        discoverLoadingMore = false;
+        discoverHasReachedMax = false;
+        discoverOffset = 0;
+      }
+      _retryCount = 0;
+    }
+    List<Thread> newThreads = [];
+    bool fetchSuccess = false;
+    if (!useCacheOnly) {
+      try {
+        String uriStr = 'https://server.awarcrown.com/threads/list?sort=$sort&limit=$limit&offset=$targetOffset';
+        if (isMy) {
+          uriStr += '&username=${Uri.encodeComponent(username!)}';
         }
+        final uri = Uri.parse(uriStr);
+        final response = await (_httpClient ?? http.Client())
+            .get(uri)
+            .timeout(const Duration(seconds: 15));
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body);
+          for (final jsonItem in data) {
+            try {
+              final thread = Thread.fromJson(jsonItem, isFromCache: false);
+              newThreads.add(thread);
+              _threadCache[thread.id] = thread;
+              lastFetchTime = DateTime.now();
+            } catch (e) {
+              debugPrint('Error parsing thread: $e');
+            }
+          }
+          fetchSuccess = true;
+        } else if (response.statusCode == 404) {
+          if (isMy) myHasReachedMax = true;
+          else discoverHasReachedMax = true;
+        } else {
+          throw Exception('Server error: ${response.statusCode} - ${response.body}');
+        }
+      } catch (e) {
+        debugPrint('Fetch error: $e');
+        useCacheOnly = true;
       }
     }
-  }
-  Future<void> _searchThreads(String query, {bool reset = false}) async {
-    if (isMyView) return; // Search only in discover
-    if (reset) {
-      offset = 0;
-      searchResults.clear();
-      isLoadingMore = false;
-      _hasReachedMax = false;
+    if (useCacheOnly || !fetchSuccess) {
+      final cachedKeys = _threadCache.keys.skip(targetOffset).take(limit).toList();
+      for (final key in cachedKeys) {
+        final cachedThread = _threadCache[key];
+        if (cachedThread != null) {
+          newThreads.add(cachedThread.copyWith(isFromCache: true));
+        }
+      }
+      if (newThreads.isEmpty && reset) {
+        if (mounted) {
+          setState(() {
+            if (isMy) {
+              myLoading = false;
+              myHasError = true;
+              myErrorMessage = 'No cached data available. Please connect to internet.';
+            } else {
+              discoverLoading = false;
+              discoverHasError = true;
+              discoverErrorMessage = 'No cached data available. Please connect to internet.';
+            }
+          });
+        }
+        return;
+      }
+    }
+    final prefs = await SharedPreferences.getInstance();
+    for (final thread in newThreads) {
+      thread.isInspiredByMe = prefs.getBool('inspired_${thread.id}') ?? false;
+      if (isMy) {
+        thread.isInspiredByMe = true;
+      }
     }
     if (mounted) {
       setState(() {
-        isLoading = true;
+        if (reset) {
+          if (isMy) {
+            myThreads = newThreads;
+            myLoading = false;
+          } else {
+            discoverThreads = newThreads;
+            discoverLoading = false;
+          }
+        } else {
+          if (isMy) {
+            myThreads.addAll(newThreads);
+            myLoadingMore = false;
+          } else {
+            discoverThreads.addAll(newThreads);
+            discoverLoadingMore = false;
+          }
+        }
+        if (isMy) {
+          myOffset += newThreads.length;
+          myHasReachedMax = newThreads.length < limit;
+        } else {
+          discoverOffset += newThreads.length;
+          discoverHasReachedMax = newThreads.length < limit;
+        }
+        _retryCount = 0;
+      });
+    }
+    if (newThreads.isNotEmpty) {
+      final startIndex = reset ? 0 : targetThreads.length - newThreads.length;
+      final newAnimations = List.generate(newThreads.length, (index) {
+        final beginValue = ((startIndex + index) * 0.05).clamp(0.0, 0.95);
+        return Tween<double>(begin: -1.0, end: 0.0).animate(
+          CurvedAnimation(
+            parent: _staggerController,
+            curve: Interval(beginValue, 1.0, curve: Curves.elasticOut),
+          ),
+        );
+      });
+      if (isMy) {
+        if (reset) mySlideAnimations = newAnimations;
+        else mySlideAnimations.addAll(newAnimations);
+      } else {
+        if (reset) discoverSlideAnimations = newAnimations;
+        else discoverSlideAnimations.addAll(newAnimations);
+      }
+      _staggerController.forward(from: 0.0);
+    }
+    if (useCacheOnly && newThreads.isNotEmpty && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Showing cached data. Syncing when online.'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+    if (isMy) _myLastFetchTime = lastFetchTime;
+    else _discoverLastFetchTime = lastFetchTime;
+  }
+
+  Future<void> _fetchMoreThreads({required bool isMy}) async {
+    await _fetchThreads(reset: false, isMy: isMy);
+  }
+
+  Future<void> _searchThreads(String query, {bool reset = false}) async {
+    if (isMyView) return;
+    final bool online = await _isDeviceOnline();
+    bool useCacheOnly = !online;
+    if (reset) {
+      discoverOffset = 0;
+      if (useCacheOnly) {
+        searchResults = searchResults.where((t) => !t.isFromCache).toList();
+      } else {
+        searchResults.clear();
+      }
+      discoverSlideAnimations.clear();
+      discoverLoadingMore = false;
+      discoverHasReachedMax = false;
+    }
+    if (mounted) {
+      setState(() {
+        discoverLoading = true;
         _isSearching = true;
       });
     }
-    try {
-      final uri = Uri.parse(
-          'https://server.awarcrown.com/threads/search?query=${Uri.encodeComponent(query)}&limit=$limit&offset=$offset');
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
-      if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
-        final newThreads = <Thread>[];
-        for (final jsonItem in data) {
-          try {
-            final thread = Thread.fromJson(jsonItem);
-            newThreads.add(thread);
-          } catch (e) {
-            debugPrint('Error parsing search thread: $e');
+    List<Thread> newThreads = [];
+    bool fetchSuccess = false;
+    if (!useCacheOnly) {
+      try {
+        final uri = Uri.parse(
+            'https://server.awarcrown.com/threads/search?query=${Uri.encodeComponent(query)}&limit=$limit&offset=$discoverOffset');
+        final response = await http.get(uri).timeout(const Duration(seconds: 15));
+        if (response.statusCode == 200) {
+          final List<dynamic> data = json.decode(response.body);
+          for (final jsonItem in data) {
+            try {
+              final thread = Thread.fromJson(jsonItem, isFromCache: false);
+              newThreads.add(thread);
+              _threadCache[thread.id] = thread;
+            } catch (e) {
+              debugPrint('Error parsing search thread: $e');
+            }
           }
+          fetchSuccess = true;
+        } else {
+          throw Exception('Search error: ${response.statusCode}');
         }
-        final prefs = await SharedPreferences.getInstance();
-        for (final thread in newThreads) {
-          thread.isInspiredByMe = prefs.getBool('inspired_${thread.id}') ?? false;
-        }
-        if (mounted) {
-          setState(() {
-            searchResults = reset ? newThreads : [...searchResults, ...newThreads];
-            isLoading = false;
-            offset += newThreads.length;
-            _hasReachedMax = newThreads.length < limit;
-          });
-        }
-      } else {
-        throw Exception('Search error: ${response.statusCode}');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-        _showError('Search failed: ${_getErrorMessage(e)}');
+      } catch (e) {
+        debugPrint('Search error: $e');
+        useCacheOnly = true;
       }
     }
+    if (useCacheOnly || !fetchSuccess) {
+      final cachedThreads = _threadCache.values
+          .where((t) => t.title.toLowerCase().contains(query.toLowerCase()) ||
+              t.body.toLowerCase().contains(query.toLowerCase()))
+          .skip(discoverOffset)
+          .take(limit)
+          .toList();
+      newThreads = cachedThreads.map((t) => t.copyWith(isFromCache: true)).toList();
+    }
+    final prefs = await SharedPreferences.getInstance();
+    for (final thread in newThreads) {
+      thread.isInspiredByMe = prefs.getBool('inspired_${thread.id}') ?? false;
+    }
+    if (mounted) {
+      setState(() {
+        searchResults = reset ? newThreads : [...searchResults, ...newThreads];
+        discoverLoading = false;
+        discoverOffset += newThreads.length;
+        discoverHasReachedMax = newThreads.length < limit;
+      });
+    }
+    if (newThreads.isNotEmpty) {
+      final startIndex = reset ? 0 : searchResults.length - newThreads.length;
+      final newAnimations = List.generate(newThreads.length, (index) {
+        final beginValue = ((startIndex + index) * 0.05).clamp(0.0, 0.95);
+        return Tween<double>(begin: -1.0, end: 0.0).animate(
+          CurvedAnimation(
+            parent: _staggerController,
+            curve: Interval(beginValue, 1.0, curve: Curves.elasticOut),
+          ),
+        );
+      });
+      if (reset) discoverSlideAnimations = newAnimations;
+      else discoverSlideAnimations.addAll(newAnimations);
+      _staggerController.forward(from: 0.0);
+    }
+    if (useCacheOnly && newThreads.isNotEmpty && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Search results from cache. Connect for fresh data.'),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
+
   Future<void> _searchMoreThreads(String query) async {
     await _searchThreads(query, reset: false);
   }
-  void _onSearchChanged(String query) {
+
+  // CORRECTED: Changed from `void` to `Future<void> async` and added `await`
+  Future<void> _onSearchChanged(String query) async {
     if (query.isEmpty) {
       setState(() {
         _isSearching = false;
         searchResults.clear();
       });
     } else {
-      _searchThreads(query, reset: true);
+      await _searchThreads(query, reset: true); // Added await
     }
   }
+
   void _clearSearch() {
     _searchController.clear();
     setState(() {
@@ -855,6 +1131,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       searchResults.clear();
     });
   }
+
   Future<void> _joinWithCode() async {
     final TextEditingController codeController = TextEditingController();
     showDialog(
@@ -886,14 +1163,20 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
+
   Future<void> _joinPrivateThread(String code) async {
+    final bool online = await _isDeviceOnline();
+    if (!online) {
+      _showError('Please connect to internet to join private thread.');
+      return;
+    }
     try {
       final response = await http.get(
         Uri.parse('https://server.awarcrown.com/threads/join-by-code?code=${Uri.encodeComponent(code)}'),
       ).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final thread = Thread.fromJson(data);
+        final thread = Thread.fromJson(data, isFromCache: false);
         await _setThreadCode(thread.id, code);
         if (mounted) {
           Navigator.push(
@@ -914,14 +1197,15 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       _showError('Failed to join: $_getErrorMessage(e)');
     }
   }
+
   void _scheduleRetry(Future<void> Function() retryFunction) {
     if (_retryCount >= _maxRetries) return;
     _retryTimer?.cancel();
     _retryCount++;
-    final delay =
-        _retryBaseDelay * (1 << (_retryCount - 1));
-    _retryTimer = Timer(delay, () {
-      if (mounted && !isLoading && !isLoadingMore) {
+    final delay = _retryBaseDelay * (1 << (_retryCount - 1));
+    _retryTimer = Timer(delay, () async {
+      final bool online = await _isDeviceOnline();
+      if (mounted && online) {
         retryFunction();
       }
     });
@@ -934,11 +1218,14 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       );
     }
   }
-  Future<void> _fetchMoreThreads() async {
-    await _fetchThreads(reset: false);
-  }
+
   Future<void> _createThread(
       String title, String body, String category, List<String> tags, String visibility) async {
+    final bool online = await _isDeviceOnline();
+    if (!online) {
+      _showError('Please connect to internet to create a roundtable.');
+      return;
+    }
     if (userId == null || userId == 0 || username == null || username!.isEmpty) {
       if (mounted) {
         _showError('Please wait to create a roundtable');
@@ -979,9 +1266,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             isInspiredByMe: true,
             visibility: visibility,
             inviteCode: inviteCode,
+            isFromCache: false,
           );
           final prefs = await SharedPreferences.getInstance();
           await prefs.setBool('inspired_$newId', true);
+          _threadCache[newId] = newThread;
           if (visibility == 'private' && inviteCode != null) {
             await _setThreadCode(newId, inviteCode);
             _showPrivateThreadDialog(title, inviteCode);
@@ -990,15 +1279,18 @@ class _ThreadsScreenState extends State<ThreadsScreen>
           }
           if (mounted) {
             setState(() {
-              threads.insert(0, newThread);
+              discoverThreads.insert(0, newThread);
+              if (isMyView) myThreads.insert(0, newThread);
             });
           }
           if (isMyView) {
-            // If in my view, refresh to ensure consistency
-            _fetchThreads(reset: true);
+            _fetchThreads(reset: true, isMy: true);
+          } else {
+            _fetchThreads(reset: true, isMy: false);
           }
         } else {
-          await _fetchThreads(reset: true);
+          _fetchThreads(reset: true, isMy: false);
+          _fetchThreads(reset: true, isMy: true);
         }
         if (mounted) Navigator.pop(context);
       } else {
@@ -1010,6 +1302,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
   }
+
   void _showPrivateThreadDialog(String title, String code) {
     showDialog(
       context: context,
@@ -1048,11 +1341,18 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
+
   Future<void> _toggleInspire(int threadId) async {
+    final bool online = await _isDeviceOnline();
+    if (!online) {
+      _showError('Please connect to internet to update inspiration.');
+      return;
+    }
     if (username == null || username!.isEmpty) return;
-    final threadIndex = threads.indexWhere((t) => t.id == threadId);
+    List<Thread> targetList = isMyView ? myThreads : discoverThreads;
+    final threadIndex = targetList.indexWhere((t) => t.id == threadId);
     if (threadIndex == -1) return;
-    final thread = threads[threadIndex];
+    final thread = targetList[threadIndex];
     final oldCount = thread.inspiredCount;
     final oldInspired = thread.isInspiredByMe;
     final newInspired = !oldInspired;
@@ -1078,15 +1378,19 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         if (data['success'] == true) {
           if (data.containsKey('inspired_count')) {
             thread.inspiredCount = data['inspired_count'];
+            _threadCache[threadId]?.inspiredCount = data['inspired_count'];
           }
           if (data.containsKey('user_has_inspired')) {
             thread.isInspiredByMe = data['user_has_inspired'] as bool;
+            _threadCache[threadId]?.isInspiredByMe = data['user_has_inspired'] as bool;
           }
           await prefs.setBool('inspired_$threadId', thread.isInspiredByMe);
           _showSuccess(data['message'] ?? (newInspired ? 'Inspired this discussion!' : 'Uninspired.'));
         } else {
           thread.isInspiredByMe = oldInspired;
           thread.inspiredCount = oldCount;
+          _threadCache[threadId]?.isInspiredByMe = oldInspired;
+          _threadCache[threadId]?.inspiredCount = oldCount;
           await prefs.setBool('inspired_$threadId', oldInspired);
           if (mounted) setState(() {});
           _showSuccess(data['message'] ?? 'No change');
@@ -1097,6 +1401,8 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     } catch (e) {
       thread.isInspiredByMe = oldInspired;
       thread.inspiredCount = oldCount;
+      _threadCache[threadId]?.isInspiredByMe = oldInspired;
+      _threadCache[threadId]?.inspiredCount = oldCount;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('inspired_$threadId', oldInspired);
       if (mounted) setState(() {});
@@ -1105,13 +1411,21 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
   }
+
   Future<void> _sendCollab(int threadId, String message) async {
+    final bool online = await _isDeviceOnline();
+    if (!online) {
+      _showError('Please connect to internet to join collab.');
+      return;
+    }
     if (username == null || username!.isEmpty) return;
-    final threadIndex = threads.indexWhere((t) => t.id == threadId);
+    List<Thread> targetList = isMyView ? myThreads : discoverThreads;
+    final threadIndex = targetList.indexWhere((t) => t.id == threadId);
     if (threadIndex == -1) return;
-    final thread = threads[threadIndex];
+    final thread = targetList[threadIndex];
     final oldCount = thread.collabCount;
     thread.collabCount++;
+    _threadCache[threadId]?.collabCount = thread.collabCount;
     if (mounted) setState(() {});
     try {
       final code = await _getThreadCode(threadId);
@@ -1132,6 +1446,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
           if (data is Map<String, dynamic> &&
               data.containsKey('collab_count')) {
             thread.collabCount = data['collab_count'];
+            _threadCache[threadId]?.collabCount = data['collab_count'];
           }
         } catch (_) {
           // Keep optimistic update
@@ -1145,12 +1460,14 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     } catch (e) {
       thread.collabCount = oldCount;
+      _threadCache[threadId]?.collabCount = oldCount;
       if (mounted) setState(() {});
       if (mounted) {
         _showError('Failed to join discussion: ${_getErrorMessage(e)}');
       }
     }
   }
+
   void _showJoinAnimation(BuildContext context, int threadId) {
     showDialog(
       context: context,
@@ -1168,28 +1485,9 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             backgroundColor: Colors.transparent,
             child: Stack(
               children: [
-                // Central table
                 const Center(
                   child: AnimatedRoundTableIcon(size: 200),
                 ),
-                // Chair pull animation (using Lottie for simplicity; replace with Rive if preferred)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Lottie.asset(
-                    'assets/chair_pull.json', // TODO: Ensure this Lottie asset exists in your project
-                    width: 300,
-                    height: 200,
-                    errorBuilder: (context, error, stackTrace) => Container(
-                      width: 300,
-                      height: 200,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.error, color: Colors.grey),
-                    ),
-                  ),
-                ),
-                // Confetti (simple particle simulation or use confetti package)
                 Align(
                   alignment: Alignment.topCenter,
                   child: TweenAnimationBuilder<double>(
@@ -1209,112 +1507,227 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
+
   void _showCreateDialog() {
+    final formKey = GlobalKey<FormState>();
     final titleController = TextEditingController();
     final bodyController = TextEditingController();
     String selectedCategory = 'Idea';
     List<String> selectedTags = [];
     bool isPrivate = false;
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Row(children: const [
-            Icon(Icons.add, color: Colors.blue),
-            SizedBox(width: 8),
-            Text('Start Roundtable')
-          ]),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.9,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+          ),
+          child: Form(
+            key: formKey,
+            child: ListView(
+              controller: scrollController,
               children: [
-                TextField(
-                    controller: titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Topic Title',
-                      border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8)),
-                    )),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: bodyController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    labelText: 'Opening Thoughts',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                  ),
+                const SizedBox(height: 20),
+                const Center(
+                  child: AnimatedRoundTableIcon(size: 60, color: Colors.blue),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 20),
+                const Text(
+                  'Start a New Roundtable',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E3A5F),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const Text(
+                  'Gather ideas around the table',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF6B7280),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 30),
+                TextFormField(
+                  controller: titleController,
+                  decoration: InputDecoration(
+                    labelText: 'Topic Title *',
+                    hintText: 'What\'s the discussion about?',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.title),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a title';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: bodyController,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    labelText: 'Opening Thoughts *',
+                    hintText: 'Share your initial ideas...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.description),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please share your thoughts';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: selectedCategory,
-                  decoration: const InputDecoration(
-                      labelText: 'Theme', border: OutlineInputBorder()),
+                  decoration: InputDecoration(
+                    labelText: 'Theme *',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.category),
+                  ),
                   items: ['Idea', 'Problem', 'Build', 'Event', 'Collab']
                       .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                       .toList(),
-                  onChanged: (val) =>
-                      setDialogState(() => selectedCategory = val!),
+                  onChanged: (val) => setState(() => selectedCategory = val!),
+                  validator: (value) => value == null ? 'Select a theme' : null,
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 16),
                 SwitchListTile(
                   title: const Text('Private Discussion'),
                   subtitle: const Text('Require invite code to join'),
                   value: isPrivate,
-                  onChanged: (val) => setDialogState(() => isPrivate = val),
+                  onChanged: (val) => setState(() => isPrivate = val),
+                  secondary: const Icon(Icons.lock_outline),
+                  controlAffinity: ListTileControlAffinity.trailing,
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  onSubmitted: (val) {
-                    if (val.isNotEmpty) {
-                      setDialogState(() => selectedTags.add(val));
+                const SizedBox(height: 16),
+                TextFormField(
+                  onFieldSubmitted: (val) {
+                    if (val.isNotEmpty && !selectedTags.contains(val)) {
+                      setState(() => selectedTags.add(val));
                     }
                   },
-                  decoration: const InputDecoration(
-                    labelText: 'Add Topic Tag (Enter to add)',
-                    border: OutlineInputBorder(),
+                  decoration: InputDecoration(
+                    labelText: 'Add Tags (comma or enter to add)',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    prefixIcon: const Icon(Icons.tag),
+                    suffixIcon: selectedTags.isEmpty
+                        ? null
+                        : IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () => setState(() => selectedTags.clear()),
+                          ),
                   ),
                 ),
-                if (selectedTags.isNotEmpty)
+                if (selectedTags.isNotEmpty) ...[
+                  const SizedBox(height: 8),
                   Wrap(
-                    spacing: 4,
-                    children: selectedTags
-                        .map((t) => Chip(
-                              label: Text(t),
-                              onDeleted: () =>
-                                  setDialogState(() => selectedTags.remove(t)),
-                            ))
-                        .toList(),
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: selectedTags.map((t) => Chip(
+                      label: Text('#$t'),
+                      onDeleted: () => setState(() => selectedTags.remove(t)),
+                    )).toList(),
                   ),
+                ],
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: formKey.currentState!.validate()
+                        ? () => _createThread(
+                              titleController.text,
+                              bodyController.text,
+                              selectedCategory,
+                              selectedTags,
+                              isPrivate ? 'private' : 'public',
+                            )
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Start Discussion',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
               ],
             ),
           ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () => _createThread(titleController.text,
-                  bodyController.text, selectedCategory, selectedTags, isPrivate ? 'private' : 'public'),
-              child: const Text('Start Discussion'),
-            ),
-          ],
         ),
       ),
     );
   }
-  List<Thread> _getCurrentThreads() {
-    if (_isSearching) return searchResults;
-    return threads;
+
+  List<Thread> _getCurrentThreads(bool isDiscover) {
+    if (!isDiscover || !_isSearching) return isDiscover ? discoverThreads : myThreads;
+    return searchResults;
   }
+
+  bool _getCurrentLoading(bool isDiscover) {
+    if (!isDiscover || !_isSearching) return isDiscover ? discoverLoading : myLoading;
+    return discoverLoading;
+  }
+
+  bool _getCurrentHasError(bool isDiscover) {
+    if (!isDiscover || !_isSearching) return isDiscover ? discoverHasError : myHasError;
+    return discoverHasError;
+  }
+
+  String? _getCurrentErrorMessage(bool isDiscover) {
+    if (!isDiscover || !_isSearching) return isDiscover ? discoverErrorMessage : myErrorMessage;
+    return discoverErrorMessage;
+  }
+
+  bool _getCurrentLoadingMore(bool isDiscover) {
+    if (!isDiscover || !_isSearching) return isDiscover ? discoverLoadingMore : myLoadingMore;
+    return discoverLoadingMore;
+  }
+
+  bool _getCurrentHasReachedMax(bool isDiscover) {
+    if (!isDiscover || !_isSearching) return isDiscover ? discoverHasReachedMax : myHasReachedMax;
+    return discoverHasReachedMax;
+  }
+
+  List<Animation<double>> _getCurrentSlideAnimations(bool isDiscover) {
+    if (!isDiscover || !_isSearching) return isDiscover ? discoverSlideAnimations : mySlideAnimations;
+    return discoverSlideAnimations;
+  }
+
+  ScrollController _getCurrentScrollController(bool isDiscover) {
+    return isDiscover ? _discoverScrollController : _myScrollController;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final screenSize = MediaQuery.of(context).size;
-    final isTablet = screenSize.width > 600;
-    final isDesktop = screenSize.width > 1200;
-    final padding = isDesktop ? 24.0 : isTablet ? 16.0 : 12.0;
+    final padding = 12.0;
     if (username == null || username!.isEmpty) {
       return Scaffold(
         body: LayoutBuilder(
@@ -1364,13 +1777,12 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         ),
       );
     }
-    // Modern color palette
-    const primaryColor = Color(0xFF1E3A5F); // Deep navy blue
-    const secondaryColor = Color(0xFF2D5AA0); // Medium blue
-    const accentColor = Color(0xFF4A90E2); // Light blue
-    const surfaceColor = Color(0xFFF8F9FA); // Light gray
+    const primaryColor = Color(0xFF1E3A5F);
+    const secondaryColor = Color(0xFF2D5AA0);
+    const accentColor = Color(0xFF4A90E2);
+    const surfaceColor = Color(0xFFF8F9FA);
     const cardColor = Colors.white;
-    final currentThreads = _getCurrentThreads();
+    final bool usingCache = (isMyView ? myThreads : discoverThreads).any((t) => t.isFromCache);
     return Scaffold(
       backgroundColor: surfaceColor,
       appBar: AppBar(
@@ -1423,13 +1835,12 @@ class _ThreadsScreenState extends State<ThreadsScreen>
           if (!_isSearching && !isMyView) ...[
             PopupMenuButton<String>(
               icon: const Icon(Icons.sort, color: Colors.white),
-              shape:
-                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               onSelected: (value) {
                 setState(() {
                   sort = value;
                 });
-                _fetchThreads(reset: true);
+                _fetchThreads(reset: true, isMy: false);
               },
               itemBuilder: (context) => ['Recent', 'Trending', 'Innovative']
                   .map((s) => PopupMenuItem(
@@ -1457,364 +1868,45 @@ class _ThreadsScreenState extends State<ThreadsScreen>
           ),
         ],
       ),
-      body: TabBarView(
-        controller: _tabController,
+      body: Column(
         children: [
-          // Discover Tab
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final maxWidth =
-                  isDesktop ? 1200.0 : isTablet ? 800.0 : double.infinity;
-              return FadeTransition(
-                opacity: _fadeAnimation,
-                child: isLoading
-                    ? RefreshIndicator(
-                        onRefresh: () => _fetchThreads(reset: true),
-                        color: const Color(0xFF4A90E2),
-                        strokeWidth: 2.5,
-                        child: ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding:
-                              const EdgeInsets.only(bottom: 80), // Space for FAB
-                          itemCount: 5,
-                          itemBuilder: (context, index) => Shimmer.fromColors(
-                            baseColor: Colors.grey[300]!,
-                            highlightColor: Colors.grey[100]!,
-                            child: Card(
-                              margin: EdgeInsets.symmetric(
-                                horizontal: padding,
-                                vertical: 6,
-                              ),
-                              child: SizedBox(
-                                  height: 120,
-                                  child: Container(color: Colors.white)),
-                            ),
-                          ),
-                        ),
-                      )
-                    : hasError
-                        ? RefreshIndicator(
-                            onRefresh: _initializeData, // Retry full load
-                            color: Colors.blue,
-                            child: SingleChildScrollView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              child: Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(32),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.error_outline,
-                                          size: 80, color: Colors.red[300]),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        errorMessage ?? 'An unknown error occurred',
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(fontSize: 16),
-                                      ),
-                                      const SizedBox(height: 24),
-                                      ElevatedButton.icon(
-                                        onPressed: _initializeData,
-                                        icon: const Icon(Icons.refresh),
-                                        label: const Text('Retry'),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          )
-                        : currentThreads.isEmpty
-                            ? RefreshIndicator(
-                                onRefresh: () {
-                                  if (_isSearching) {
-                                    _onSearchChanged(_searchController.text);
-                                    return Future.value();
-                                  } else {
-                                    return _fetchThreads(reset: true);
-                                  }
-                                },
-                                color: Colors.blue,
-                                child: SingleChildScrollView(
-                                  physics: const AlwaysScrollableScrollPhysics(),
-                                  child: Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(32),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const AnimatedRoundTableIcon(
-                                              size: 80, color: Colors.grey),
-                                          const SizedBox(height: 16),
-                                          Text(
-                                            _isSearching ? 'No results found' : 'No roundtables yet',
-                                            style: const TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            _isSearching ? 'Try a different search term.' : 'Start the conversation!',
-                                            style: TextStyle(
-                                                fontSize: 16,
-                                                color: Colors.grey[600]),
-                                          ),
-                                          const SizedBox(height: 24),
-                                          ElevatedButton.icon(
-                                            onPressed: _isSearching ? _clearSearch : _showCreateDialog,
-                                            icon: const Icon(Icons.add),
-                                            label: Text(_isSearching ? 'Clear Search' : 'Start Roundtable'),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : RefreshIndicator(
-                                onRefresh: () {
-                                  if (_isSearching) {
-                                    _onSearchChanged(_searchController.text);
-                                    return Future.value();
-                                  } else {
-                                    return _fetchThreads(reset: true);
-                                  }
-                                },
-                                color: Colors.blue,
-                                child: Center(
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(maxWidth: maxWidth),
-                                    child: ListView.builder(
-                                        controller: _scrollController,
-                                        padding: EdgeInsets.fromLTRB(
-                                          padding,
-                                          padding,
-                                          padding,
-                                          padding +
-                                              80,
-                                        ),
-                                        itemCount: currentThreads.length +
-                                            (isLoadingMore ? 1 : 0),
-                                        itemBuilder: (context, index) {
-                                          if (index == currentThreads.length) {
-                                            return const Center(
-                                              child: Padding(
-                                                padding: EdgeInsets.all(16),
-                                                child: CircularProgressIndicator(),
-                                              ),
-                                            );
-                                          }
-                                          final thread = currentThreads[index];
-                                          final slideAnimation =
-                                              _slideAnimations.length > index
-                                                  ? _slideAnimations[index]
-                                                  : const AlwaysStoppedAnimation(
-                                                      0.0);
-                                          return AnimatedBuilder(
-                                            animation: slideAnimation,
-                                            builder: (context, child) {
-                                              // Mobile-optimized padding
-                                              final cardPadding = isDesktop
-                                                  ? 24.0
-                                                  : isTablet
-                                                      ? 20.0
-                                                      : 16.0;
-                                              return Transform.translate(
-                                                offset: Offset(
-                                                    slideAnimation.value * 100, 0),
-                                                child: Opacity(
-                                                  opacity: (slideAnimation.value +
-                                                          1.0)
-                                                      .clamp(0.0, 1.0),
-                                                  child: _buildThreadCard(
-                                                    thread,
-                                                    isDesktop,
-                                                    isTablet,
-                                                    cardPadding,
-                                                    username ?? '',
-                                                    cardColor,
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          );
-                                        }),
-                                  ),
-                                ),
-                              ),
-              );
-            },
-          ),
-          // My Roundtables Tab
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final maxWidth =
-                  isDesktop ? 1200.0 : isTablet ? 800.0 : double.infinity;
-              return FadeTransition(
-                opacity: _fadeAnimation,
-                child: isLoading
-                    ? RefreshIndicator(
-                        onRefresh: () => _fetchThreads(reset: true),
-                        color: const Color(0xFF4A90E2),
-                        strokeWidth: 2.5,
-                        child: ListView.builder(
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding:
-                              const EdgeInsets.only(bottom: 80), // Space for FAB
-                          itemCount: 5,
-                          itemBuilder: (context, index) => Shimmer.fromColors(
-                            baseColor: Colors.grey[300]!,
-                            highlightColor: Colors.grey[100]!,
-                            child: Card(
-                              margin: EdgeInsets.symmetric(
-                                horizontal: padding,
-                                vertical: 6,
-                              ),
-                              child: SizedBox(
-                                  height: 120,
-                                  child: Container(color: Colors.white)),
-                            ),
-                          ),
-                        ),
-                      )
-                    : hasError
-                        ? RefreshIndicator(
-                            onRefresh: _initializeData, // Retry full load
-                            color: Colors.blue,
-                            child: SingleChildScrollView(
-                              physics: const AlwaysScrollableScrollPhysics(),
-                              child: Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(32),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.error_outline,
-                                          size: 80, color: Colors.red[300]),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        errorMessage ?? 'An unknown error occurred',
-                                        textAlign: TextAlign.center,
-                                        style: const TextStyle(fontSize: 16),
-                                      ),
-                                      const SizedBox(height: 24),
-                                      ElevatedButton.icon(
-                                        onPressed: _initializeData,
-                                        icon: const Icon(Icons.refresh),
-                                        label: const Text('Retry'),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          )
-                        : currentThreads.isEmpty
-                            ? RefreshIndicator(
-                                onRefresh: () => _fetchThreads(reset: true),
-                                color: Colors.blue,
-                                child: SingleChildScrollView(
-                                  physics: const AlwaysScrollableScrollPhysics(),
-                                  child: Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(32),
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          const AnimatedRoundTableIcon(
-                                              size: 80, color: Colors.grey),
-                                          const SizedBox(height: 16),
-                                          const Text(
-                                            'No roundtables created yet',
-                                            style: TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.bold),
-                                          ),
-                                          const SizedBox(height: 8),
-                                          const Text(
-                                            'Start your first discussion!',
-                                            style: TextStyle(fontSize: 16,
-                                                color: Colors.grey),
-                                          ),
-                                          const SizedBox(height: 24),
-                                          ElevatedButton.icon(
-                                            onPressed: _showCreateDialog,
-                                            icon: const Icon(Icons.add),
-                                            label: const Text('Create Roundtable'),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              )
-                            : RefreshIndicator(
-                                onRefresh: () => _fetchThreads(reset: true),
-                                color: Colors.blue,
-                                child: Center(
-                                  child: ConstrainedBox(
-                                    constraints: BoxConstraints(maxWidth: maxWidth),
-                                    child: ListView.builder(
-                                        controller: _scrollController,
-                                        padding: EdgeInsets.fromLTRB(
-                                          padding,
-                                          padding,
-                                          padding,
-                                          padding +
-                                              80,
-                                        ),
-                                        itemCount: currentThreads.length +
-                                            (isLoadingMore ? 1 : 0),
-                                        itemBuilder: (context, index) {
-                                          if (index == currentThreads.length) {
-                                            return const Center(
-                                              child: Padding(
-                                                padding: EdgeInsets.all(16),
-                                                child: CircularProgressIndicator(),
-                                              ),
-                                            );
-                                          }
-                                          final thread = currentThreads[index];
-                                          final slideAnimation =
-                                              _slideAnimations.length > index
-                                                  ? _slideAnimations[index]
-                                                  : const AlwaysStoppedAnimation(
-                                                      0.0);
-                                          return AnimatedBuilder(
-                                            animation: slideAnimation,
-                                            builder: (context, child) {
-                                              // Mobile-optimized padding
-                                              final cardPadding = isDesktop
-                                                  ? 24.0
-                                                  : isTablet
-                                                      ? 20.0
-                                                      : 16.0;
-                                              return Transform.translate(
-                                                offset: Offset(
-                                                    slideAnimation.value * 100, 0),
-                                                child: Opacity(
-                                                  opacity: (slideAnimation.value +
-                                                          1.0)
-                                                      .clamp(0.0, 1.0),
-                                                  child: _buildThreadCard(
-                                                    thread,
-                                                    isDesktop,
-                                                    isTablet,
-                                                    cardPadding,
-                                                    username ?? '',
-                                                    cardColor,
-                                                    isMy: true,
-                                                  ),
-                                                ),
-                                              );
-                                            },
-                                          );
-                                        }),
-                                  ),
-                                ),
-                              ),
-              );
-            },
+          if (usingCache)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              color: Colors.orange.withOpacity(0.1),
+              child: const Text(
+                'Showing cached data. Pull to refresh for latest.',
+                style: TextStyle(color: Colors.orange, fontSize: 12),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // Discover Tab
+                FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: _buildTabContent(
+                    isDiscover: true,
+                    padding: padding,
+                    cardColor: cardColor,
+                    isMyView: isMyView,
+                  ),
+                ),
+                // My Roundtables Tab
+                FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: _buildTabContent(
+                    isDiscover: false,
+                    padding: padding,
+                    cardColor: cardColor,
+                    isMyView: isMyView,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1843,573 +1935,484 @@ class _ThreadsScreenState extends State<ThreadsScreen>
               ),
             )
           : null,
-      extendBody: true, // Allow FAB to extend over body for mobile
+      extendBody: true,
     );
   }
-  Widget _buildThreadCard(Thread thread, bool isDesktop, bool isTablet, double cardPadding, String currentUser, Color cardColor, {bool isMy = false}) {
-    return Hero(
-      tag: 'thread_${thread.id}', // For smooth navigation animation
-      child: Card(
-        margin: EdgeInsets.symmetric(
-          horizontal: isDesktop
-              ? 12
-              : isTablet
-                  ? 10
-                  : 8,
-          vertical: isDesktop
-              ? 12
-              : isTablet
-                  ? 8
-                  : 6,
-        ),
-        elevation: 0,
-        shape: RoundedRectangleBorder(
-            borderRadius:
-                BorderRadius.circular(
-                    isDesktop
-                        ? 20
-                        : 16)),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            borderRadius:
-                BorderRadius.circular(
-                    isDesktop
-                        ? 20
-                        : 16),
-            splashColor:
-                const Color(
-                        0xFF4A90E2)
-                    .withOpacity(0.1),
-            highlightColor:
-                const Color(
-                        0xFF4A90E2)
-                    .withOpacity(0.05),
-            onTap: () =>
-                Navigator.push(
-              context,
-              PageRouteBuilder(
-                pageBuilder: (context,
-                        animation,
-                        secondaryAnimation) =>
-                    ThreadDetailScreen(
-                  thread: thread,
-                  username:
-                      currentUser,
-                  userId: userId ?? 0,
+
+  Widget _buildTabContent({
+    required bool isDiscover,
+    required double padding,
+    required Color cardColor,
+    required bool isMyView,
+  }) {
+    final bool localIsSearching = !isDiscover && _isSearching;
+    final List<Thread> localThreads = _getCurrentThreads(isDiscover);
+    final bool localLoading = _getCurrentLoading(isDiscover);
+    final bool localHasError = _getCurrentHasError(isDiscover);
+    final String? localError = _getCurrentErrorMessage(isDiscover);
+    final bool localLoadingMore = _getCurrentLoadingMore(isDiscover);
+    final bool localHasReachedMax = _getCurrentHasReachedMax(isDiscover);
+    final List<Animation<double>> localSlideAnimations = _getCurrentSlideAnimations(isDiscover);
+    final ScrollController localScrollController = _getCurrentScrollController(isDiscover);
+    final bool localUsingCache = localThreads.any((t) => t.isFromCache);
+    
+    // CORRECTED: Changed type to `Future<void> Function()` and made function `async`
+    final Future<void> Function() onRefresh = () async {
+      if (localIsSearching) {
+        await _onSearchChanged(_searchController.text); // Added await
+        return;
+      }
+      await _fetchThreads(reset: true, isMy: !isDiscover); // Added await
+    };
+
+    return localLoading
+        ? RefreshIndicator(
+            // CORRECTED: Used the `onRefresh` variable for consistency
+            onRefresh: onRefresh,
+            color: const Color(0xFF4A90E2),
+            strokeWidth: 2.5,
+            child: ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.only(bottom: 80),
+              itemCount: 5,
+              itemBuilder: (context, index) => Shimmer.fromColors(
+                baseColor: Colors.grey[300]!,
+                highlightColor: Colors.grey[100]!,
+                child: Card(
+                  margin: EdgeInsets.symmetric(horizontal: padding, vertical: 6),
+                  child: SizedBox(height: 120, child: Container(color: Colors.white)),
                 ),
-                transitionDuration:
-                    const Duration(
-                        milliseconds:
-                            400),
-                reverseTransitionDuration:
-                    const Duration(
-                        milliseconds:
-                            300),
-                transitionsBuilder:
-                    (context,
-                        animation,
-                        secondaryAnimation,
-                        child) {
-                  return FadeTransition(
-                    opacity:
-                        animation,
-                    child:
-                        SlideTransition(
-                      position: Tween<Offset>(
-                        begin:
-                            const Offset(
-                                0.0,
-                                0.1),
-                        end: Offset
-                            .zero,
-                      ).animate(
-                          CurvedAnimation(
-                        parent:
-                            animation,
-                        curve: Curves
-                            .easeOutCubic,
-                      )),
-                      child: child,
-                    ),
-                  );
-                },
               ),
             ),
-            child: Container(
-              padding:
-                  EdgeInsets.all(
-                      cardPadding),
-              decoration:
-                  BoxDecoration(
-                borderRadius:
-                    BorderRadius
-                        .circular(isDesktop
-                            ? 20
-                            : 16),
-                color: cardColor,
-                border: Border.all(
-                  color:
-                      const Color(
-                          0xFFE5E9F0),
-                  width: 1,
+          )
+        : localHasError
+            ? RefreshIndicator(
+                onRefresh: () => _initializeData(),
+                color: Colors.blue,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline, size: 80, color: Colors.red[300]),
+                          const SizedBox(height: 16),
+                          Text(
+                            localError ?? 'An unknown error occurred',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 16),
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            onPressed: _initializeData,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Retry'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(
-                            0xFF1E3A5F)
-                        .withOpacity(
-                            0.08),
-                    blurRadius: 20,
-                    offset:
-                        const Offset(
-                            0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment:
-                    CrossAxisAlignment
-                        .start,
-                children: [
-                  Row(
-                    crossAxisAlignment:
-                        CrossAxisAlignment
-                            .start,
-                    children: [
-                      Container(
-                        padding:
-                            EdgeInsets.all(isDesktop
-                                ? 10
-                                : isTablet
-                                    ? 9
-                                    : 8),
-                        decoration:
-                            BoxDecoration(
-                          color:
-                              const Color(0xFF4A90E2)
-                                  .withOpacity(
-                                      0.1),
-                          borderRadius:
-                              BorderRadius.circular(
-                                  isDesktop
-                                      ? 14
-                                      : 12),
-                        ),
-                        child:
-                            AnimatedRoundTableIcon(
-                                size: isDesktop
-                                    ? 28
-                                    : isTablet
-                                        ? 26
-                                        : 24),
-                      ),
-                      SizedBox(
-                          width:
-                              isDesktop
-                                  ? 16
-                                  : isTablet
-                                      ? 14
-                                      : 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment:
-                              CrossAxisAlignment
-                                  .start,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    thread
-                                        .title,
-                                    style:
-                                        TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: isDesktop ? 20 : isTablet ? 18 : 17,
-                                      color:
-                                          const Color(0xFF1E3A5F),
-                                      height:
-                                          1.3,
-                                      letterSpacing:
-                                          -0.3,
-                                    ),
-                                  ),
-                                ),
-                                if (thread.visibility == 'private')
-                                  const Icon(Icons.lock, size: 16, color: Colors.grey),
-                              ],
-                            ),
-                            SizedBox(height: isDesktop ? 10 : isTablet ? 9 : 8),
-                            Text(
-                              thread
-                                  .body,
-                              maxLines:
-                                  isDesktop ? 4 : isTablet ? 3 : 3,
-                              overflow:
-                                  TextOverflow.ellipsis,
-                              style:
-                                  TextStyle(
-                                color:
-                                    const Color(0xFF6B7280),
-                                fontSize: isDesktop ? 15 : isTablet ? 14 : 14,
-                                height:
-                                    1.5,
+              )
+            : localThreads.isEmpty
+                ? RefreshIndicator(
+                    onRefresh: onRefresh,
+                    color: Colors.blue,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const AnimatedRoundTableIcon(size: 80, color: Colors.grey),
+                              const SizedBox(height: 16),
+                              Text(
+                                localIsSearching ? 'No results found' : (!isDiscover ? 'No roundtables created yet' : 'No roundtables yet'),
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(
-                      height:
-                          isDesktop
-                              ? 16
-                              : 14),
-                  Wrap(
-                    spacing: isDesktop
-                        ? 10
-                        : 6,
-                    runSpacing:
-                        isDesktop
-                            ? 10
-                            : 6,
-                    children: [
-                      Container(
-                        padding: EdgeInsets
-                            .symmetric(
-                          horizontal:
-                              isDesktop
-                                  ? 14
-                                  : 10,
-                          vertical:
-                              isDesktop
-                                  ? 6
-                                  : 4,
-                        ),
-                        decoration:
-                            BoxDecoration(
-                          color:
-                              const Color(0xFF4A90E2)
-                                  .withOpacity(
-                                      0.1),
-                          borderRadius:
-                              BorderRadius.circular(20),
-                          border:
-                              Border
-                                  .all(
-                            color:
-                                const Color(0xFF4A90E2).withOpacity(0.3),
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          thread
-                              .category,
-                          style:
-                              TextStyle(
-                            fontSize:
-                                isDesktop
-                                    ? 13
-                                    : 11,
-                            fontWeight:
-                                FontWeight.w600,
-                            color:
-                                const Color(0xFF2D5AA0),
-                          ),
-                        ),
-                      ),
-                      ...thread.tags
-                          .take(isDesktop
-                              ? 3
-                              : 2)
-                          .map((t) =>
-                              Container(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: isDesktop ? 12 : 8,
-                                  vertical: isDesktop ? 6 : 4,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF10B981).withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: const Color(0xFF10B981).withOpacity(0.3),
-                                    width: 1,
-                                  ),
-                                ),
-                                child:
-                                    Text(
-                                  '#$t',
-                                  style:
-                                      TextStyle(
-                                    fontSize: isDesktop ? 12 : 10,
-                                    fontWeight: FontWeight.w500,
-                                    color:
-                                        const Color(0xFF059669),
-                                  ),
-                                ),
-                              )),
-                      if (thread.tags
-                              .length >
-                          (isDesktop
-                              ? 3
-                              : 2))
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isDesktop ? 12 : 8,
-                            vertical: isDesktop ? 6 : 4,
-                          ),
-                          decoration:
-                              BoxDecoration(
-                            color: const Color(
-                                0xFFE5E9F0),
-                            borderRadius:
-                                BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            '+${thread.tags.length - (isDesktop ? 3 : 2)}',
-                            style:
-                                TextStyle(
-                              fontSize:
-                                  isDesktop ? 12 : 10,
-                              fontWeight:
-                                  FontWeight.w500,
-                              color:
-                                  const Color(0xFF6B7280),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (isMy && thread.visibility == 'private' && thread.inviteCode != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[100],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.grey[300]!),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                'Code: ${thread.inviteCode}',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                              const SizedBox(height: 8),
+                              Text(
+                                localIsSearching
+                                    ? 'Try a different search term.'
+                                    : (!isDiscover ? 'Start your first discussion!' : 'Start the conversation!'),
+                                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                               ),
-                            ),
-                            IconButton(
-                              icon: const Icon(Icons.copy, size: 16),
-                              onPressed: () {
-                                Clipboard.setData(ClipboardData(text: thread.inviteCode!));
-                                _showSuccess('Code copied!');
-                              },
-                            ),
-                          ],
+                              const SizedBox(height: 24),
+                              ElevatedButton.icon(
+                                onPressed: localIsSearching
+                                    ? _clearSearch
+                                    : (!isDiscover ? _showCreateDialog : _showCreateDialog),
+                                icon: const Icon(Icons.add),
+                                label: Text(localIsSearching
+                                    ? 'Clear Search'
+                                    : (!isDiscover ? 'Create Roundtable' : 'Start Roundtable')),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  SizedBox(
-                      height:
-                          isDesktop
-                              ? 16
-                              : 12),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons
-                            .person_outline,
-                        size:
-                            isDesktop
-                                ? 16
-                                : 14,
-                        color:
-                            const Color(
-                                0xFF9CA3AF),
-                      ),
-                      SizedBox(
-                          width:
-                              isDesktop
-                                  ? 6
-                                  : 4),
-                      Text(
-                        '${thread.creatorRole.isNotEmpty ? '${thread.creatorRole} • ' : ''}${thread.creator}',
-                        style:
-                            TextStyle(
-                          fontSize:
-                              isDesktop
-                                  ? 13
-                                  : 11,
-                          color:
-                              const Color(
-                                  0xFF6B7280),
-                          fontWeight:
-                              FontWeight
-                                  .w500,
-                        ),
-                      ),
-                      SizedBox(
-                          width:
-                              isDesktop
-                                  ? 12
-                                  : 8),
-                      Container(
-                        width: 4,
-                        height: 4,
-                        decoration:
-                            const BoxDecoration(
-                          color: Color(
-                              0xFFD1D5DB),
-                          shape:
-                              BoxShape
-                                  .circle,
-                        ),
-                      ),
-                      SizedBox(
-                          width:
-                              isDesktop
-                                  ? 12
-                                  : 8),
-                      Icon(
-                        Icons
-                            .calendar_today_outlined,
-                        size:
-                            isDesktop
-                                ? 14
-                                : 12,
-                        color:
-                            const Color(
-                                0xFF9CA3AF),
-                      ),
-                      SizedBox(
-                          width:
-                              isDesktop
-                                  ? 6
-                                  : 4),
-                      Text(
-                        thread
-                            .createdAt
-                            .toString()
-                            .split(
-                                ' ')[0],
-                        style:
-                            TextStyle(
-                          fontSize:
-                              isDesktop
-                                  ? 13
-                                  : 11,
-                          color:
-                              const Color(
-                                  0xFF6B7280),
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(
-                      height:
-                          isDesktop
-                              ? 16
-                              : 12),
-                  
-                  Padding(
-                    padding: EdgeInsets.only(
-                        top: isDesktop
-                            ? 4
-                            : isTablet
-                                ? 3
-                                : 2),
-                    child: Row(
-                      mainAxisAlignment:
-                          MainAxisAlignment
-                              .spaceEvenly,
-                      children: [
-                        Expanded(
-                          child:
-                              _ActionButton(
-                            icon: Icons
-                                .lightbulb_outline,
-                            label:
-                                '${thread.inspiredCount}',
-                            iconSize:
-                                isDesktop ? 24 : isTablet ? 22 : 20,
-                            fontSize:
-                                isDesktop ? 14 : 13,
-                            onTap: () =>
-                                _toggleInspire(thread.id),
-                          ),
-                        ),
-                        SizedBox(width: isDesktop ? 12 : isTablet ? 10 : 8),
-                        Expanded(
-                          child:
-                              _ActionButton(
-                            icon: Icons
-                                .comment_outlined,
-                            label:
-                                '${thread.commentCount}',
-                            iconSize:
-                                isDesktop ? 24 : isTablet ? 22 : 20,
-                            fontSize:
-                                isDesktop ? 14 : 13,
-                            onTap:
-                                () =>
-                                    Navigator.push(
-                              context,
-                              PageRouteBuilder(
-                                pageBuilder: (context, animation, secondaryAnimation) => ThreadDetailScreen(
-                                  thread: thread,
-                                  username: currentUser,
-                                  userId: userId ?? 0,
-                                ),
-                                transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                  return SlideTransition(
-                                    position: Tween<Offset>(
-                                      begin: const Offset(1.0, 0.0),
-                                      end: Offset.zero,
-                                    ).animate(CurvedAnimation(
-                                      parent: animation,
-                                      curve: Curves.easeInOut,
-                                    )),
-                                    child: child,
-                                  );
-                                },
-                              ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: onRefresh,
+                    color: Colors.blue,
+                    child: ListView.builder(
+                      controller: localScrollController,
+                      padding: EdgeInsets.fromLTRB(padding, padding, padding, padding + 80),
+                      itemCount: localThreads.length + (localLoadingMore ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == localThreads.length) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16),
+                              child: CircularProgressIndicator(),
                             ),
-                          ),
-                        ),
-                        SizedBox(width: isDesktop ? 12 : isTablet ? 10 : 8),
-                        Expanded(
-                          child:
-                              _ActionButton(
-                            icon: Icons
-                                .people_outline,
-                            label:
-                                '${thread.collabCount}',
-                            iconSize:
-                                isDesktop ? 24 : isTablet ? 22 : 20,
-                            fontSize:
-                                isDesktop ? 14 : 13,
-                            onTap: () =>
-                                _sendCollab(thread.id, 'Interested in discussing!'),
-                          ),
-                        ),
-                      ],
+                          );
+                        }
+                        final thread = localThreads[index];
+                        final slideAnimation = localSlideAnimations.length > index
+                            ? localSlideAnimations[index]
+                            : const AlwaysStoppedAnimation(0.0);
+                        return AnimatedBuilder(
+                          animation: slideAnimation,
+                          builder: (context, child) {
+                            final cardPadding = 16.0;
+                            return Transform.translate(
+                              offset: Offset(slideAnimation.value * 100, 0),
+                              child: Opacity(
+                                opacity: (slideAnimation.value + 1.0).clamp(0.0, 1.0),
+                                child: _buildThreadCard(
+                                  thread,
+                                  cardPadding,
+                                  username ?? '',
+                                  cardColor,
+                                  isMy: !isDiscover,
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
                     ),
-                  ),
-                ],
+                  );
+  }
+
+  Widget _buildThreadCard(Thread thread, double cardPadding, String currentUser, Color cardColor, {required bool isMy}) {
+    List<Widget> actionButtons = [
+      Expanded(
+        child: _ActionButton(
+          icon: Icons.comment_outlined,
+          label: '${thread.commentCount}',
+          iconSize: 20,
+          fontSize: 13,
+          onTap: () => Navigator.push(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) => ThreadDetailScreen(
+                thread: thread,
+                username: currentUser,
+                userId: userId ?? 0,
               ),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(1.0, 0.0),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeInOut,
+                  )),
+                  child: child,
+                );
+              },
             ),
           ),
         ),
       ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: _ActionButton(
+          icon: Icons.people_outline,
+          label: '${thread.collabCount}',
+          iconSize: 20,
+          fontSize: 13,
+          onTap: () => _sendCollab(thread.id, 'Interested in discussing!'),
+        ),
+      ),
+    ];
+    if (isMy) {
+      actionButtons.insert(0, Expanded(
+        child: _ActionButton(
+          icon: Icons.lightbulb_outline,
+          label: '${thread.inspiredCount}',
+          iconSize: 20,
+          fontSize: 13,
+          onTap: () => _toggleInspire(thread.id),
+        ),
+      ));
+      actionButtons.insert(1, const SizedBox(width: 8));
+    }
+    final cardWidget = Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          splashColor: const Color(0xFF4A90E2).withOpacity(0.1),
+          highlightColor: const Color(0xFF4A90E2).withOpacity(0.05),
+          onTap: () => Navigator.push(
+            context,
+            PageRouteBuilder(
+              pageBuilder: (context, animation, secondaryAnimation) => ThreadDetailScreen(
+                thread: thread,
+                username: currentUser,
+                userId: userId ?? 0,
+              ),
+              transitionDuration: const Duration(milliseconds: 400),
+              reverseTransitionDuration: const Duration(milliseconds: 300),
+              transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.0, 0.1),
+                      end: Offset.zero,
+                    ).animate(CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                    )),
+                    child: child,
+                  ),
+                );
+              },
+            ),
+          ),
+          child: Column(
+            children: [
+              Container(
+                padding: EdgeInsets.all(cardPadding),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  color: cardColor,
+                  border: Border.all(color: const Color(0xFFE5E9F0), width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF1E3A5F).withOpacity(0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4A90E2).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const AnimatedRoundTableIcon(size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      thread.title,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 17,
+                                        color: Color(0xFF1E3A5F),
+                                        height: 1.3,
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  if (thread.visibility == 'private')
+                                    const Icon(Icons.lock, size: 16, color: Colors.grey),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                thread.body,
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFF6B7280),
+                                  fontSize: 14,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4A90E2).withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(0xFF4A90E2).withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Text(
+                            thread.category,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF2D5AA0),
+                            ),
+                          ),
+                        ),
+                        ...thread.tags.take(2).map((t) => Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: const Color(0xFF10B981).withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Text(
+                                '#$t',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                  color: Color(0xFF059669),
+                                ),
+                              ),
+                            )),
+                        if (thread.tags.length > 2)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE5E9F0),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '+${thread.tags.length - 2}',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    if (isMy && thread.visibility == 'private' && thread.inviteCode != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.grey[300]!),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  'Code: ${thread.inviteCode}',
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.copy, size: 16),
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: thread.inviteCode!));
+                                  _showSuccess('Code copied!');
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(Icons.person_outline, size: 14, color: const Color(0xFF9CA3AF)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${thread.creatorRole.isNotEmpty ? '${thread.creatorRole} • ' : ''}${thread.creator}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF6B7280),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFD1D5DB),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.calendar_today_outlined, size: 12, color: const Color(0xFF9CA3AF)),
+                        const SizedBox(width: 4),
+                        Text(
+                          thread.createdAt.toString().split(' ')[0],
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: actionButtons,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (thread.isFromCache)
+                Positioned(
+                  bottom: 4,
+                  right: 8,
+                  child: Icon(Icons.cached, size: 12, color: Colors.grey),
+                ),
+            ],
+          ),
+        ),
+      ),
     );
+    return isMy
+        ? cardWidget
+        : Hero(tag: 'thread_${thread.id}', child: cardWidget);
   }
 }
 
-// --- No changes to this class ---
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -2428,33 +2431,22 @@ class _ActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final defaultIconColor = iconColor ?? const Color(0xFF6B7280);
-    final isDesktop = MediaQuery.of(context).size.width > 1200;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
         child: Container(
-          padding: EdgeInsets.symmetric(
-            horizontal: isDesktop ? 16 : 12,
-            vertical: isDesktop ? 10 : 8,
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           decoration: BoxDecoration(
             color: const Color(0xFFF3F4F6),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: const Color(0xFFE5E9F0),
-              width: 1,
-            ),
+            border: Border.all(color: const Color(0xFFE5E9F0), width: 1),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: iconSize ?? 18,
-                color: defaultIconColor,
-              ),
+              Icon(icon, size: iconSize ?? 18, color: defaultIconColor),
               SizedBox(width: iconSize != null && iconSize! > 20 ? 8 : 6),
               Text(
                 label,
@@ -2467,1226 +2459,6 @@ class _ActionButton extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class ThreadDetailScreen extends StatefulWidget {
-  final Thread thread;
-  final String username;
-  final int userId;
-  const ThreadDetailScreen({
-    super.key,
-    required this.thread,
-    required this.username,
-    required this.userId,
-  });
-  @override
-  _ThreadDetailScreenState createState() => _ThreadDetailScreenState();
-}
-
-class _ThreadDetailScreenState extends State<ThreadDetailScreen>
-    with TickerProviderStateMixin {
-  List<Comment> comments = [];
-  bool isLoading = true;
-  bool hasError = false;
-  String? errorMessage;
-  final TextEditingController _commentController = TextEditingController();
-  late AnimationController _detailAnimationController;
-  late Animation<double> _detailFadeAnimation;
-  late AnimationController _rotationController;
-  double _rotationAngle = 0.0;
-  final ScrollController _commentsScrollController = ScrollController();
-  bool isLoadingMoreComments = false;
-  int commentsOffset = 0;
-  final int commentsLimit = 20;
-  Timer? _commentsScrollDebounceTimer;
-  Timer? _commentsRetryTimer;
-  int _commentsRetryCount = 0;
-  static const int _commentsMaxRetries = 3;
-  http.Client? _commentsHttpClient;
-  bool _hasReachedMaxComments = false;
-  // --- New UI State ---
-  final Color _pageColor = const Color(0xFFFDFBF5); // Parchment paper color
-  final Color _cardColor = Colors.white;
-  final Color _primaryTextColor = const Color(0xFF1a2533);
-  final Color _secondaryTextColor = const Color(0xFF6B7280);
-  bool _isRoundtable = true; // Toggles between circle and list view
-  int? _replyToCommentId; // Tracks which comment we are replying to
-  final FocusNode _commentFocusNode = FocusNode();
-  @override
-  void initState() {
-    super.initState();
-    _commentsHttpClient = http.Client();
-    _detailAnimationController = AnimationController(
-      duration: const Duration(milliseconds: 600),
-      vsync: this,
-    );
-    _rotationController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-    _detailFadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _detailAnimationController, curve: Curves.easeInOut),
-    );
-    _detailAnimationController.forward();
-    _setupCommentsScrollListener();
-    _loadComments(reset: true);
-    _syncInspireStatus();
-  }
-  Future<void> _syncInspireStatus() async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'inspired_${widget.thread.id}';
-    if (prefs.containsKey(key)) {
-      widget.thread.isInspiredByMe = prefs.getBool(key) ?? false;
-      if (mounted) setState(() {});
-      return;
-    }
-    // Sync from server
-    try {
-      final code = await _getThreadCode(widget.thread.id);
-      final uri = Uri.parse('https://server.awarcrown.com/threads/inspire?id=${widget.thread.id}');
-      final body = json.encode({
-        'type': 'check',
-        'username': widget.username,
-        if (code != null) 'code': code,
-      });
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      ).timeout(const Duration(seconds: 5));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final bool inspired = data['user_has_inspired'] ?? false;
-        await prefs.setBool(key, inspired);
-        widget.thread.isInspiredByMe = inspired;
-        widget.thread.inspiredCount = data['inspired_count'] ?? widget.thread.inspiredCount;
-        if (mounted) setState(() {});
-      }
-    } catch (e) {
-      debugPrint('Failed to sync inspire status: $e');
-    }
-  }
-  Future<String?> _getThreadCode(int threadId) async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('code_$threadId');
-  }
-  Future<void> _setThreadCode(int threadId, String code) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('code_$threadId', code);
-  }
-  void _setupCommentsScrollListener() {
-    _commentsScrollController.addListener(_onCommentsScroll);
-  }
-  void _onCommentsScroll() {
-    _commentsScrollDebounceTimer?.cancel();
-    _commentsScrollDebounceTimer = Timer(const Duration(milliseconds: 300), () {
-      if (!_commentsScrollController.hasClients) return;
-      final position = _commentsScrollController.position;
-      if (position.pixels >= position.maxScrollExtent - 200) {
-        if (!isLoadingMoreComments && !hasError && !_hasReachedMaxComments) {
-          _loadMoreComments();
-        }
-      }
-    });
-  }
-  @override
-  void dispose() {
-    _commentsScrollDebounceTimer?.cancel();
-    _commentsRetryTimer?.cancel();
-    _commentsScrollController.removeListener(_onCommentsScroll);
-    _commentsScrollController.dispose();
-    _detailAnimationController.dispose();
-    _rotationController.dispose();
-    _commentController.dispose();
-    _commentsHttpClient?.close();
-    _commentFocusNode.dispose();
-    super.dispose();
-  }
-  Future<void> _loadComments({bool reset = false}) async {
-    if (widget.username.isEmpty) {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-          hasError = true;
-          errorMessage = 'Please log in to view comments';
-        });
-        _showError('Please log in to view comments');
-      }
-      return;
-    }
-    if (reset) {
-      commentsOffset = 0;
-      comments.clear();
-      isLoadingMoreComments = false;
-    }
-    if (mounted) {
-      setState(() {
-        if (reset) {
-          isLoading = true;
-          hasError = false;
-        } else {
-          isLoadingMoreComments = true;
-        }
-      });
-    }
-    try {
-      final code = await _getThreadCode(widget.thread.id);
-      final uri = Uri.parse(
-          'https://server.awarcrown.com/threads/comments?id=${widget.thread.id}&username=${Uri.encodeComponent(widget.username)}&limit=$commentsLimit&offset=$commentsOffset${code != null ? '&code=${Uri.encodeComponent(code)}' : ''}');
-      final response = await (_commentsHttpClient ?? http.Client())
-          .get(uri)
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final commentList = data['comments'] as List<dynamic>? ?? [];
-        final commentMap = <int, List<Map<String, dynamic>>>{};
-        for (var c in commentList) {
-          if (c is Map<String, dynamic>) {
-            final parentId = c['parent_comment_id'] as int?;
-            if (parentId != null) {
-              commentMap.putIfAbsent(parentId, () => []).add(c);
-            }
-          }
-        }
-        final topLevelComments = <Comment>[];
-        for (final c in commentList) {
-          if (c is Map<String, dynamic> && c['parent_comment_id'] == null) {
-            try {
-              topLevelComments.add(Comment.fromJson(c, commentMap));
-            } catch (e) {
-              debugPrint('Error parsing top-level comment: $e');
-            }
-          }
-        }
-        if (mounted) {
-          setState(() {
-            if (reset) {
-              comments = topLevelComments;
-              isLoading = false;
-            } else {
-              comments.addAll(topLevelComments);
-              isLoadingMoreComments = false;
-            }
-            commentsOffset += topLevelComments.length;
-            _hasReachedMaxComments = topLevelComments.length < commentsLimit;
-            _commentsRetryCount = 0;
-          });
-        }
-      } else if (response.statusCode == 403) {
-        _showError('Access denied. Invalid code for private thread.');
-      } else if (response.statusCode == 404) {
-        if (mounted) {
-          setState(() {
-            _hasReachedMaxComments = true;
-            isLoadingMoreComments = false;
-            if (reset) isLoading = false;
-          });
-        }
-      } else {
-        throw Exception(
-            'Failed to load comments: ${response.statusCode} - ${response.body}');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          if (reset) {
-            isLoading = false;
-            hasError = true;
-            errorMessage = 'Failed to load comments: ${_getErrorMessage(e)}';
-          } else {
-            isLoadingMoreComments = false;
-          }
-        });
-        if (reset) {
-          _scheduleCommentsRetry(() => _loadComments(reset: true));
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to load comments: ${_getErrorMessage(e)}'),
-              action: SnackBarAction(
-                label: 'Retry Now',
-                onPressed: () {
-                  _commentsRetryCount = 0;
-                  _loadComments(reset: true);
-                },
-              ),
-            ),
-          );
-        } else {
-          _showError('Failed to load more comments: ${_getErrorMessage(e)}');
-        }
-      }
-    }
-  }
-  void _scheduleCommentsRetry(Future<void> Function() retryFunction) {
-    if (_commentsRetryCount >= _commentsMaxRetries) return;
-    _commentsRetryTimer?.cancel();
-    _commentsRetryCount++;
-    final delay = Duration(seconds: 2) *
-        (1 << (_commentsRetryCount - 1)); // Exponential backoff
-    _commentsRetryTimer = Timer(delay, () {
-      if (mounted && !isLoading && !isLoadingMoreComments) {
-        retryFunction();
-      }
-    });
-  }
-  Future<void> _loadMoreComments() async {
-    await _loadComments(reset: false);
-  }
-  String _getErrorMessage(dynamic e) {
-    if (e is SocketException) {
-      return 'No internet connection. Please check your connection and try again.';
-    } else if (e is TimeoutException) {
-      return 'Request timed out. Please check your connection and try again.';
-    } else if (e is http.ClientException) {
-      return 'Network error occurred. Please try again.';
-    } else {
-      return 'An unexpected error occurred. Please try again.';
-    }
-  }
-  void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.error,
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-  // --- Modified to support replying to a specific parentId ---
-  Future<void> _addComment(String body, {int? parentId}) async {
-    if (widget.username.isEmpty) {
-      if (mounted) {
-        _showError('Please log in to comment');
-      }
-      return;
-    }
-    if (body.isEmpty) {
-      if (mounted) {
-        _showError('Comment cannot be empty');
-      }
-      return;
-    }
-    try {
-      final code = await _getThreadCode(widget.thread.id);
-      final bodyData = json.encode({
-        'body': body,
-        'parent_id': parentId ?? 0,
-        'username': widget.username,
-        if (code != null) 'code': code,
-      });
-      final uri = Uri.parse(
-          'https://server.awarcrown.com/threads/comments?id=${widget.thread.id}');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: bodyData,
-      ).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        _commentController.clear();
-        _commentFocusNode.unfocus();
-        setState(() {
-          _replyToCommentId = null;
-        });
-        await _loadComments(reset: true); // Refresh comments
-      } else {
-        throw Exception('Failed to add comment: ${response.statusCode}');
-      }
-    } catch (e) {
-      if (mounted) {
-        _showError('Failed to add comment: ${_getErrorMessage(e)}');
-      }
-    }
-  }
-  // --- New helper function for the new comment bar ---
-  void _submitComment() {
-    if (_commentController.text.isNotEmpty) {
-      _addComment(
-        _commentController.text,
-        parentId: _replyToCommentId,
-      );
-    }
-  }
-  // --- New helper function to handle reply-to ---
-  void _onReplyTapped(Comment comment) {
-    setState(() {
-      _replyToCommentId = comment.id;
-      _commentController.text = '@${comment.commenter} ';
-      _commentController.selection = TextSelection.fromPosition(
-          TextPosition(offset: _commentController.text.length));
-      _commentFocusNode.requestFocus();
-    });
-  }
-  Future<void> _sendCollab(int threadId, String message) async {
-    if (widget.username.isEmpty) return;
-    final oldCount = widget.thread.collabCount;
-    widget.thread.collabCount++;
-    if (mounted) setState(() {});
-    try {
-      final code = await _getThreadCode(threadId);
-      final bodyData = json.encode({
-        'message': message,
-        'username': widget.username,
-        if (code != null) 'code': code,
-      });
-      final uri = Uri.parse('https://server.awarcrown.com/threads/collab?id=$threadId');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: bodyData,
-      ).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        try {
-          final data = json.decode(response.body);
-          if (data is Map<String, dynamic> &&
-              data.containsKey('collab_count')) {
-            widget.thread.collabCount = data['collab_count'];
-          }
-        } catch (_) {
-          // Keep optimistic update
-        }
-        if (mounted) {
-          _showSuccess('Joined the roundtable!');
-        }
-      } else {
-        throw Exception('Failed to join roundtable: ${response.statusCode}');
-      }
-    } catch (e) {
-      widget.thread.collabCount = oldCount;
-      if (mounted) setState(() {});
-      if (mounted) {
-        _showError('Failed to join roundtable: ${_getErrorMessage(e)}');
-      }
-    }
-  }
-  Future<void> _toggleInspire(int threadId) async {
-    if (widget.username.isEmpty) return;
-    final oldCount = widget.thread.inspiredCount;
-    final oldInspired = widget.thread.isInspiredByMe;
-    // Toggle state optimistically
-    final newInspired = !oldInspired;
-    widget.thread.isInspiredByMe = newInspired;
-    widget.thread.inspiredCount += newInspired ? 1 : -1;
-    if (mounted) setState(() {});
-    try {
-      final code = await _getThreadCode(threadId);
-      final bodyData = json.encode({
-        'type': newInspired ? 'inspired' : 'uninspired',
-        'username': widget.username,
-        if (code != null) 'code': code,
-      });
-      final uri = Uri.parse('https://server.awarcrown.com/threads/inspire?id=$threadId');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: bodyData,
-      ).timeout(const Duration(seconds: 10));
-      final prefs = await SharedPreferences.getInstance();
-      final key = 'inspired_$threadId';
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          if (data.containsKey('inspired_count')) {
-            widget.thread.inspiredCount = data['inspired_count'];
-          }
-          if (data.containsKey('user_has_inspired')) {
-            widget.thread.isInspiredByMe = data['user_has_inspired'] as bool;
-          }
-          await prefs.setBool(key, widget.thread.isInspiredByMe);
-          _showSuccess(data['message'] ?? (newInspired ? 'Inspired by this discussion!' : 'Uninspired.'));
-        } else {
-          // Revert optimistic update
-          widget.thread.isInspiredByMe = oldInspired;
-          widget.thread.inspiredCount = oldCount;
-          await prefs.setBool(key, oldInspired);
-          if (mounted) setState(() {});
-          _showSuccess(data['message'] ?? 'No change');
-        }
-      } else {
-        throw Exception('Failed to toggle inspire: ${response.statusCode}');
-      }
-    } catch (e) {
-      // Revert optimistic update
-      widget.thread.isInspiredByMe = oldInspired;
-      widget.thread.inspiredCount = oldCount;
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('inspired_$threadId', oldInspired);
-      if (mounted) setState(() {});
-      if (mounted) {
-        _showError('Failed to toggle inspire: ${_getErrorMessage(e)}');
-      }
-    }
-  }
-  void _showSuccess(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        duration: const Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-  // --- This is your original cool circular layout, unmodified ---
-  Widget _buildCircularCommentLayout() {
-    final screenSize = MediaQuery.of(context).size;
-    final isTablet = screenSize.width > 600;
-    final isDesktop = screenSize.width > 1200;
-    // For scalability, cap the circular view to first 20 comments; show "View more" for rest
-    final displayComments = comments.take(20).toList();
-    final hasMore = comments.length > 20 || !_hasReachedMaxComments;
-    final ringRadius = isDesktop ? 160.0 : isTablet ? 140.0 : 120.0;
-    // --- FIX: Use LayoutBuilder for robust centering ---
-    return LayoutBuilder(builder: (context, constraints) {
-      final center = Offset(
-          constraints.maxWidth / 2, isDesktop ? 250.0 : isTablet ? 220.0 : 200.0);
-      return Column(
-        children: [
-          GestureDetector(
-            onPanUpdate: (details) {
-              if (mounted) {
-                setState(() {
-                  _rotationAngle += details.delta.dx / 100;
-                });
-              }
-            },
-            child: SizedBox(
-              height: isDesktop ? 600 : isTablet ? 550 : 500,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Central table
-                  const AnimatedRoundTableIcon(size: 100),
-                  // Comments in ring
-                  ...displayComments.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final comment = entry.value;
-                    final angle =
-                        (2 * pi / displayComments.length * index) + _rotationAngle;
-                    final x = center.dx + ringRadius * cos(angle);
-                    final y = center.dy + ringRadius * sin(angle);
-                    return Positioned(
-                      left: x - 80, // Adjust for card width
-                      top: y - 60, // Adjust for card height
-                      child: TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0.0, end: 1.0),
-                        duration: Duration(milliseconds: 600 + (index * 100)),
-                        builder: (context, value, child) {
-                          return Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.identity()
-                              ..setEntry(3, 2, 0.001) // Perspective for 3D-ish
-                              ..rotateY((1 - value) * pi / 4) // Flip in like cards
-                              ..rotateZ(angle),
-                            child: Opacity(
-                              opacity: value,
-                              child: Transform.translate(
-                                offset: Offset(
-                                    0, (1 - value) * 50), // Rise from bottom
-                                child: Card(
-                                  child: Container(
-                                    width: isDesktop
-                                        ? 200
-                                        : isTablet
-                                            ? 180
-                                            : 160,
-                                    padding: EdgeInsets.all(
-                                        isDesktop ? 12 : isTablet ? 10 : 8),
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            CircleAvatar(
-                                              radius: isDesktop
-                                                  ? 14
-                                                  : isTablet
-                                                      ? 12
-                                                      : 10,
-                                              backgroundColor:
-                                                  Colors.blue[100],
-                                              child: Text(
-                                                comment.commenter.isNotEmpty
-                                                    ? comment.commenter[0]
-                                                        .toUpperCase()
-                                                    : '?',
-                                                style: TextStyle(
-                                                  fontSize: isDesktop
-                                                      ? 14
-                                                      : isTablet
-                                                          ? 12
-                                                          : 10,
-                                                  color: Colors.blue,
-                                                ),
-                                              ),
-                                            ),
-                                            SizedBox(width: isDesktop ? 8 : 4),
-                                            Expanded(
-                                              child: Text(
-                                                comment.commenter,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: isDesktop
-                                                      ? 14
-                                                      : isTablet
-                                                          ? 13
-                                                          : 12,
-                                                ),
-                                                overflow: TextOverflow.ellipsis,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                        SizedBox(height: isDesktop ? 6 : 4),
-                                        Text(
-                                          comment.body,
-                                          style: TextStyle(
-                                              fontSize: isDesktop
-                                                  ? 13
-                                                  : isTablet
-                                                      ? 12
-                                                      : 11),
-                                          maxLines: isDesktop ? 4 : 3,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        if (comment.replies.isNotEmpty) ...[
-                                          SizedBox(height: isDesktop ? 6 : 4),
-                                          Text(
-                                            '${comment.replies.length} replies',
-                                            style: TextStyle(
-                                              fontSize: isDesktop
-                                                  ? 12
-                                                  : isTablet
-                                                      ? 11
-                                                      : 10,
-                                              color: Colors.grey,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ),
-          if (hasMore)
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: ElevatedButton.icon(
-                onPressed: _loadMoreComments,
-                icon: const Icon(Icons.expand_more),
-                label: const Text('View More Comments'),
-              ),
-            ),
-        ],
-      );
-    });
-  }
-  // --- New UI: A traditional list view for comments ---
-  Widget _buildLinearCommentLayout() {
-    return ListView.builder(
-      itemCount: comments.length + (isLoadingMoreComments ? 1 : 0),
-      controller: _commentsScrollController,
-      padding: EdgeInsets.zero,
-      physics: const NeverScrollableScrollPhysics(),
-      shrinkWrap: true,
-      itemBuilder: (context, index) {
-        if (index == comments.length) {
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(16.0),
-              child: CircularProgressIndicator(),
-            ),
-          );
-        }
-        final comment = comments[index];
-        return _CommentCard(
-          comment: comment,
-          onReply: _onReplyTapped,
-        );
-      },
-    );
-  }
-  // --- New UI: Main comments section with view toggle ---
-  Widget _buildCommentsSection() {
-    if (isLoading) {
-      return ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 3,
-        padding: EdgeInsets.zero,
-        itemBuilder: (context, index) => Shimmer.fromColors(
-          baseColor: Colors.grey[300]!,
-          highlightColor: Colors.grey[100]!,
-          child: Card(
-            margin: const EdgeInsets.symmetric(vertical: 4),
-            child:
-                SizedBox(height: 80, child: Container(color: Colors.white)),
-          ),
-        ),
-      );
-    } else if (hasError) {
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Center(
-          child: Column(
-            children: [
-              Icon(Icons.error_outline, size: 50, color: Colors.red[300]),
-              const SizedBox(height: 8),
-              Text(errorMessage ?? 'Failed to load comments'),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: () => _loadComments(reset: true),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    } else if (comments.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48.0),
-        child: Center(
-          child: Column(
-            children: [
-              AnimatedRoundTableIcon(size: 60, color: _secondaryTextColor),
-              const SizedBox(height: 16),
-              Text(
-                'Be the first to comment',
-                style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: _primaryTextColor),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Pull up a chair and share your thoughts!',
-                style: TextStyle(fontSize: 14, color: _secondaryTextColor),
-              ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      // --- New UI: AnimatedSwitcher to toggle views ---
-      return AnimatedSwitcher(
-        duration: const Duration(milliseconds: 400),
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
-        },
-        child: _isRoundtable
-            ? _buildCircularCommentLayout()
-            : _buildLinearCommentLayout(),
-      );
-    }
-  }
-  // --- New UI: Sticky comment input bar at the bottom ---
-  Widget _buildCommentInputBar() {
-    return Container(
-      padding: EdgeInsets.fromLTRB(16, 12, 16, 16 +
-          MediaQuery.of(context).padding.bottom), // Handle notch
-      decoration: BoxDecoration(
-        color: _cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, -4),
-          ),
-        ],
-        border: Border(
-          top: BorderSide(color: Colors.grey[200]!, width: 1),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: Colors.blue[100],
-            child: Text(
-              widget.username.isNotEmpty ? widget.username[0].toUpperCase() : '?',
-              style: const TextStyle(
-                  color: Colors.blue, fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: TextField(
-              controller: _commentController,
-              focusNode: _commentFocusNode,
-              textCapitalization: TextCapitalization.sentences,
-              minLines: 1,
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: _replyToCommentId == null
-                    ? 'Pull up a chair...'
-                    : 'Replying...',
-                hintStyle: TextStyle(color: _secondaryTextColor),
-                filled: true,
-                fillColor: Colors.grey[100],
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide.none,
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide:
-                      const BorderSide(color: Color(0xFF4A90E2), width: 2),
-                ),
-              ),
-              onSubmitted: (_) => _submitComment(),
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.send_rounded, color: Color(0xFF4A90E2)),
-            onPressed: _submitComment,
-          ),
-        ],
-      ),
-    );
-  }
-  // --- New UI: Helper for action buttons in the header ---
-  Widget _HeaderActionButton(
-      {required IconData icon,
-      required String label,
-      required Color color,
-      required VoidCallback onTap}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                  color: color, fontSize: 13, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  // --- New UI: Helper for creator info in the header ---
-  Widget _buildHeaderInfo(BuildContext context) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: Colors.white.withOpacity(0.3),
-          child: Text(
-            widget.thread.creator.isNotEmpty
-                ? widget.thread.creator[0].toUpperCase()
-                : '?',
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.thread.creator,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            Text(
-              '${widget.thread.creatorRole.isNotEmpty ? '${widget.thread.creatorRole} • ' : ''}${widget.thread.createdAt.toString().split(' ')[0]}',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.8),
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-        const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.3),
-              width: 1,
-            ),
-          ),
-          child: Text(
-            widget.thread.category.toUpperCase(),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-  // --- New UI: Helper for tags in the header ---
-  Widget _buildTags() {
-    if (widget.thread.tags.isEmpty) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 16.0),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: widget.thread.tags
-            .map((t) => Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '#$t',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.white,
-                    ),
-                  ),
-                ))
-            .toList(),
-      ),
-    );
-  }
-  @override
-  Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF1E3A5F);
-    const secondaryColor = Color(0xFF2D5AA0);
-    const accentColor = Color(0xFF4A90E2);
-    final bool isInspired = widget.thread.isInspiredByMe;
-    final Color inspireColor = isInspired ? const Color(0xFFF59E0B) : const Color(0xFF90F0C0);
-    return Scaffold(
-      // --- New UI: Page color and main Column layout ---
-      backgroundColor: _pageColor,
-      body: Column(
-        children: [
-          Expanded(
-            child: CustomScrollView(
-              slivers: [
-                SliverAppBar(
-                  expandedHeight: 450, // Made header larger for full content
-                  floating: false,
-                  pinned: true,
-                  elevation: 2,
-                  backgroundColor: primaryColor,
-                  flexibleSpace: FlexibleSpaceBar(
-                    titlePadding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    // title: const Row(
-                    // mainAxisSize: MainAxisSize.min,
-                    // children: [
-                    // AnimatedRoundTableIcon(size: 20, color: Colors.white),
-                    // SizedBox(width: 8),
-                    // Text(
-                    // 'Roundtable',
-                    // style: TextStyle(
-                    // fontSize: 16, fontWeight: FontWeight.w600),
-                    // ),
-                    // ],
-                    // ),
-                    background: Hero(
-                      tag: 'thread_${widget.thread.id}',
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [primaryColor, secondaryColor, accentColor],
-                            stops: [0.0, 0.6, 1.0],
-                          ),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(
-                              16, MediaQuery.of(context).padding.top + 56, 16,
-                              16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // --- New UI: All content moved to header ---
-                              _buildHeaderInfo(context),
-                              const SizedBox(height: 20),
-                              Text(
-                                widget.thread.title,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1.2,
-                                  letterSpacing: -0.5,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                widget.thread.body,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 16,
-                                  height: 1.6,
-                                ),
-                              ),
-                              _buildTags(),
-                              const Spacer(),
-                              // --- New UI: Action buttons are now in header ---
-                              Container(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 8),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    _HeaderActionButton(
-                                      icon: isInspired ? Icons.lightbulb : Icons.lightbulb_outline,
-                                      label: '${widget.thread.inspiredCount}',
-                                      color: inspireColor,
-                                      onTap: () =>
-                                          _toggleInspire(widget.thread.id),
-                                    ),
-                                    _HeaderActionButton(
-                                      icon: Icons.people_outline,
-                                      label: '${widget.thread.collabCount}',
-                                      color: const Color(0xFF81C7F5),
-                                      onTap: () => _sendCollab(
-                                          widget.thread.id,
-                                          'Interested in joining!'),
-                                    ),
-                                    _HeaderActionButton(
-                                      icon: Icons.comment_outlined,
-                                      label: '${widget.thread.commentCount}',
-                                      color: const Color(0xFF90F0C0),
-                                      onTap: () {
-                                        // Maybe scroll to comments?
-                                      },
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                // --- New UI: Discussion card with toggle ---
-                SliverToBoxAdapter(
-                  child: FadeTransition(
-                    opacity: _detailFadeAnimation,
-                    child: Container(
-                      margin: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: _cardColor,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 15,
-                            offset: const Offset(0, 5),
-                          )
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(20, 20, 12, 12),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Discussion',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w700,
-                                    color: _primaryTextColor,
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    _isRoundtable
-                                        ? Icons.view_list_rounded
-                                        : Icons.track_changes_rounded,
-                                    color: _secondaryTextColor,
-                                  ),
-                                  tooltip: _isRoundtable
-                                      ? 'Show List View'
-                                      : 'Show Roundtable View',
-                                  onPressed: () {
-                                    setState(() {
-                                      _isRoundtable = !_isRoundtable;
-                                    });
-                                  },
-                                ),
-                              ],
-                            ),
-                          ),
-                          _buildCommentsSection(),
-                          const SizedBox(height: 16),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // --- New UI: Sticky comment bar ---
-          if (!isLoading && !hasError && widget.username.isNotEmpty)
-            _buildCommentInputBar(),
-        ],
-      ),
-    );
-  }
-}
-// --- New UI: Card for List View comments ---
-class _CommentCard extends StatelessWidget {
-  final Comment comment;
-  final bool isReply;
-  final Function(Comment) onReply;
-  const _CommentCard({
-    required this.comment,
-    this.isReply = false,
-    required this.onReply,
-  });
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: isReply ? 32.0 : 16.0, // Indent replies
-        right: 16.0,
-        top: 12.0,
-        bottom: 4.0,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.blue[100],
-                child: Text(
-                  comment.commenter.isNotEmpty
-                      ? comment.commenter[0].toUpperCase()
-                      : '?',
-                  style: const TextStyle(
-                      color: Colors.blue, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      comment.commenter,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 15,
-                        color: Color(0xFF1a2533),
-                      ),
-                    ),
-                    Text(
-                      comment.createdAt.toString().split('.')[0],
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF6B7280),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding:
-                const EdgeInsets.only(left: 42.0, top: 8, bottom: 4),
-            child: Text(
-              comment.body, // Use _cardColor here
-              style: const TextStyle(
-                fontSize: 15,
-                color: Color(0xFF333D4B),
-                height: 1.5,
-              ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 30.0),
-            child: TextButton(
-              onPressed: () => onReply(comment),
-              child: const Text(
-                'Reply',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF4A90E2),
-                ),
-              ),
-            ),
-          ),
-        
-          if (comment.replies.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(left: 12.0, top: 8.0),
-              child: Container(
-                decoration: const BoxDecoration(
-                  border: Border(
-                    left: BorderSide(
-                      color: Color(0xFFE5E9F0),
-                      width: 2.0,
-                    ),
-                  ),
-                ),
-                child: Column(
-                  children: comment.replies
-                      .map((reply) => _CommentCard(
-                            comment: reply,
-                            isReply: true,
-                            onReply: onReply,
-                          ))
-                      .toList(),
-                ),
-              ),
-            ),
-        ],
       ),
     );
   }
