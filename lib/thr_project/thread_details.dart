@@ -69,7 +69,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
     _syncInspireStatus();
   }
   
-  // --- ADDED NAVIGATION FUNCTION ---
+  
   void _navigateToProfile(String username) {
     if (username.isEmpty) return;
     Navigator.push(
@@ -79,7 +79,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       ),
     );
   }
-  // --- END ---
+ 
 
   void _addCommentIds(Comment comment) {
     _loadedCommentIds.add(comment.id);

@@ -36,7 +36,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   String? _role;
   String? _major;
   bool _isLoading = true;
-  bool _isMessageActive = false;
+  //bool _isMessageActive = false;
   bool _isDarkMode = false;
   int _unreadCount = 0; 
 
@@ -510,11 +510,11 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
         );
       },
     ).then((_) {
-      if (mounted) {
-        setState(() {
-          _isMessageActive = false;
-        });
-      }
+      // if (mounted) {
+      //   setState(() {
+      //     _isMessageActive = false;
+      //   });
+      // }
     });
   }
 
@@ -522,13 +522,13 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     setState(() => _selectedIndex = 3);
   }
 
-  void _handleMessagePress() {
-    if (_isMessageActive) return;
-    setState(() {
-      _isMessageActive = true;
-    });
-    _showMessageDialog();
-  }
+  // void _handleMessagePress() {
+  //   if (_isMessageActive) return;
+  //   setState(() {
+  //     _isMessageActive = true;
+  //   });
+  //   _showMessageDialog();
+  // }
 
   void _handleSearchPress() {
     showSearch(
@@ -581,13 +581,13 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
           color: colorScheme.onSurface,
         ),
       ),
-      IconButton(
-        onPressed: _isMessageActive ? null : _handleMessagePress,
-        icon: Icon(
-          Icons.chat_bubble_outline,
-          color: _isMessageActive ? colorScheme.onSurfaceVariant : colorScheme.onSurface,
-        ),
-      ),
+      // IconButton(
+      //   onPressed: _isMessageActive ? null : _handleMessagePress,
+      //   icon: Icon(
+      //     Icons.chat_bubble_outline,
+      //     color: _isMessageActive ? colorScheme.onSurfaceVariant : colorScheme.onSurface,
+      //   ),
+      // ),
       IconButton(
         onPressed: () {
           Navigator.push(

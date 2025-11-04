@@ -1,4 +1,3 @@
-// File: lib/threads_screen.dart (modified)
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -14,8 +13,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:lottie/lottie.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'create_roundtable_dialog.dart'; 
-
+import 'create_roundtable_dialog.dart';
 class Thread {
   final int id;
   final String title;
@@ -459,6 +457,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
   static const Duration _cacheValidDuration = Duration(minutes: 5);
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isOnline = false;
+  final Set<int> _deletingThreadIds = <int>{};
   @override
   void initState() {
     super.initState();
@@ -1182,24 +1181,21 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         headers: {'Content-Type': 'application/json'},
         body: bodyData,
       ).timeout(const Duration(seconds: 10));
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         debugPrint('Create response: ${response.body}');
-        
+      
         // Check for 'success' key *and* 'thread_id' key
         if (data is Map<String, dynamic> && data['success'] == true && data.containsKey('thread_id')) {
-          
+        
           // --- THIS IS THE FIX ---
           // Safely parse the thread_id, which might be a String ("72") or int (72)
           final int? newId = int.tryParse(data['thread_id'].toString());
-
           if (newId == null) {
             // If the ID is null or not a valid number, we can't proceed.
             throw Exception('Invalid thread_id format from server.');
           }
           // --- END OF FIX ---
-
           final inviteCode = data['invite_code'] as String?;
           final newThread = Thread(
             id: newId, // Use the new, safely parsed integer ID
@@ -1224,7 +1220,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             await _setThreadCode(newId, inviteCode);
             _showPrivateThreadDialog(title, inviteCode);
           }
-          
+        
           if (mounted) {
             setState(() {
               discoverThreads.insert(0, newThread);
@@ -1364,7 +1360,113 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
   }
-
+  Future<bool> _deleteThread(int threadId) async {
+    if (_deletingThreadIds.contains(threadId)) {
+      return false; // Already deleting, avoid multiple calls
+    }
+    final bool online = await _isDeviceOnline();
+    if (!online) {
+      _showError('Please connect to internet to delete the roundtable.');
+      return false;
+    }
+    if (userId == null || userId == 0 || username == null || username!.isEmpty) {
+      _showError('User authentication required to delete.');
+      return false;
+    }
+    try {
+      final bodyData = json.encode({
+        'thread_id': threadId,
+        'user_id': userId,
+        'username': username,
+      });
+      final response = await http.post(
+        Uri.parse('https://server.awarcrown.com/threads/delete'),
+        headers: {'Content-Type': 'application/json'},
+        body: bodyData,
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && data['success'] == true) {
+          // Remove from local lists
+          if (mounted) {
+            setState(() {
+              discoverThreads.removeWhere((t) => t.id == threadId);
+              myThreads.removeWhere((t) => t.id == threadId);
+              searchResults.removeWhere((t) => t.id == threadId);
+              _deletingThreadIds.remove(threadId);
+            });
+          }
+          // Remove from cache
+          _threadCache.remove(threadId);
+          // Clear local prefs if any
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove('inspired_$threadId');
+          await prefs.remove('code_$threadId');
+          _showSuccess(data['message'] ?? 'Roundtable deleted successfully.');
+          return true;
+        } else {
+          final errorMsg = data['error'] ?? 'Invalid response from server';
+          _showError('Failed to delete roundtable: $errorMsg');
+          if (mounted) {
+            setState(() {
+              _deletingThreadIds.remove(threadId);
+            });
+          }
+          return false;
+        }
+      } else {
+        throw Exception('Failed to delete roundtable: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('Delete thread error: $e');
+      _showError('Failed to delete roundtable: ${_getErrorMessage(e)}');
+      if (mounted) {
+        setState(() {
+          _deletingThreadIds.remove(threadId);
+        });
+      }
+      return false;
+    }
+  }
+  void _showDeleteConfirmation(int threadId, String title) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Roundtable'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Are you sure you want to delete this roundtable? This action cannot be undone.'),
+            const SizedBox(height: 8),
+            Text(
+              '"$title"',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              if (mounted) {
+                setState(() {
+                  _deletingThreadIds.add(threadId);
+                });
+              }
+              await _deleteThread(threadId);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
   void _showCreateDialog() {
     showCreateRoundtableDialog(
       context: context,
@@ -1540,7 +1642,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
                   color: accentColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.add, color: Colors.white, size: 20),
               ),
@@ -1639,7 +1741,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     final List<Animation<double>> localSlideAnimations = _getCurrentSlideAnimations(isDiscover);
     final ScrollController localScrollController = _getCurrentScrollController(isDiscover);
     localThreads.any((t) => t.isFromCache);
-    
+  
     Future<void> onRefresh() async {
       if (localIsSearching) {
         await _onSearchChanged(_searchController.text);
@@ -1649,7 +1751,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     }
     return localLoading
         ? RefreshIndicator(
-          
+        
             onRefresh: onRefresh,
             color: const Color(0xFF4A90E2),
             strokeWidth: 2.5,
@@ -1660,9 +1762,15 @@ class _ThreadsScreenState extends State<ThreadsScreen>
               itemBuilder: (context, index) => Shimmer.fromColors(
                 baseColor: Colors.grey[300]!,
                 highlightColor: Colors.grey[100]!,
-                child: Card(
+                child: Container(
                   margin: EdgeInsets.symmetric(horizontal: padding, vertical: 6),
-                  child: SizedBox(height: 120, child: Container(color: Colors.white)),
+                  height: 120,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.white, Colors.blue.shade50],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
             ),
@@ -1783,269 +1891,348 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                   );
   }
   Widget _buildThreadCard(Thread thread, double cardPadding, String currentUser, Color cardColor, {required bool isMy}) {
-    // List<Widget> actionButtons = [
-  
-    // ];
-    // if (isMy) {
-    //   actionButtons.insert(0, Expanded(
-    //     child: _ActionButton(
-    //       icon: Icons.lightbulb_outline,
-    //       label: '${thread.inspiredCount}',
-    //       iconSize: 20,
-    //       fontSize: 13,
-    //       onTap: () => _toggleInspire(thread.id),
-    //     ),
-    //   ));
-    //   actionButtons.insert(1, const SizedBox(width: 8));
-    // }
-    final cardWidget = Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          splashColor: const Color(0xFF4A90E2).withOpacity(0.1),
-          highlightColor: const Color(0xFF4A90E2).withOpacity(0.05),
-          onTap: () => Navigator.push(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => ThreadDetailScreen(
-                thread: thread,
-                username: currentUser,
-                userId: userId ?? 0,
-              ),
-              transitionDuration: const Duration(milliseconds: 400),
-              reverseTransitionDuration: const Duration(milliseconds: 300),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0.0, 0.1),
-                      end: Offset.zero,
-                    ).animate(CurvedAnimation(
-                      parent: animation,
-                      curve: Curves.easeOutCubic,
-                    )),
-                    child: child,
-                  ),
-                );
-              },
+    final isDeleting = _deletingThreadIds.contains(thread.id);
+    final cardWidget = Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        splashColor: const Color(0xFF4A90E2).withOpacity(0.1),
+        highlightColor: const Color(0xFF4A90E2).withOpacity(0.05),
+        onTap: isDeleting ? null : () => Navigator.push(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (context, animation, secondaryAnimation) => ThreadDetailScreen(
+              thread: thread,
+              username: currentUser,
+              userId: userId ?? 0,
             ),
+            transitionDuration: const Duration(milliseconds: 400),
+            reverseTransitionDuration: const Duration(milliseconds: 300),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(
+                opacity: animation,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.0, 0.1),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  )),
+                  child: child,
+                ),
+              );
+            },
           ),
-          child: Column(
-            children: [
-              Container(
-                padding: EdgeInsets.all(cardPadding),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: cardColor,
-                  border: Border.all(color: const Color(0xFFE5E9F0), width: 1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF1E3A5F).withOpacity(0.08),
-                      blurRadius: 20,
-                      offset: const Offset(0, 4),
-                    ),
+        ),
+        child: Stack(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              padding: EdgeInsets.all(cardPadding),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    cardColor,
+                    cardColor.withOpacity(0.8),
+                    Colors.blue.shade50.withOpacity(0.6),
                   ],
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4A90E2).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF1E3A5F).withOpacity(0.1),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: Colors.white.withOpacity(0.2),
+                    blurRadius: 4,
+                    offset: const Offset(-2, -2),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.blue.shade100, Colors.blue.shade200],
                           ),
-                          child: const AnimatedRoundTableIcon(size: 24),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blue.withOpacity(0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
+                        child: const AnimatedRoundTableIcon(size: 28, color: Colors.blue),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: ShaderMask(
+                                    shaderCallback: (bounds) => LinearGradient(
+  colors: [Colors.black, Theme.of(context).colorScheme.secondary],
+).createShader(bounds),
                                     child: Text(
                                       thread.title,
                                       style: const TextStyle(
                                         fontWeight: FontWeight.w700,
                                         fontSize: 17,
-                                        color: Color(0xFF1E3A5F),
+                                        color: Colors.black,
                                         height: 1.3,
                                         letterSpacing: -0.3,
                                       ),
                                     ),
                                   ),
-                                  if (thread.visibility == 'private')
-                                    const Icon(Icons.lock, size: 16, color: Colors.grey),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                thread.body,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Color(0xFF6B7280),
-                                  fontSize: 14,
-                                  height: 1.5,
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF4A90E2).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: const Color(0xFF4A90E2).withOpacity(0.3),
-                              width: 1,
+                                if (thread.visibility == 'private')
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey[200],
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.lock, size: 14, color: Colors.grey),
+                                  ),
+                              ],
                             ),
-                          ),
-                          child: Text(
-                            thread.category,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF2D5AA0),
-                            ),
-                          ),
-                        ),
-                        ...thread.tags.take(2).map((t) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: const Color(0xFF10B981).withOpacity(0.3),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                '#$t',
-                                style: const TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF059669),
-                                ),
-                              ),
-                            )),
-                        if (thread.tags.length > 2)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE5E9F0),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              '+${thread.tags.length - 2}',
+                            const SizedBox(height: 8),
+                            Text(
+                              thread.body,
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
                                 color: Color(0xFF6B7280),
+                                fontSize: 14,
+                                height: 1.5,
                               ),
                             ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.blue.shade100, Colors.blue.shade200],
                           ),
-                      ],
-                    ),
-                    if (isMy && thread.visibility == 'private' && thread.inviteCode != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8.0),
-                        child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.grey[300]!),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  'Code: ${thread.inviteCode}',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.copy, size: 16),
-                                onPressed: () {
-                                  Clipboard.setData(ClipboardData(text: thread.inviteCode ?? ''));
-                                  _showSuccess('Code copied!');
-                                },
-                              ),
-                            ],
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.blue.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          thread.category,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF2D5AA0),
                           ),
                         ),
                       ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Icon(Icons.person_outline, size: 14, color: const Color(0xFF9CA3AF)),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${thread.creatorRole.isNotEmpty ? '${thread.creatorRole} • ' : ''}${thread.creator}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF6B7280),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
+                      ...thread.tags.take(2).map((t) => Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Colors.green.shade100, Colors.green.shade200],
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.green.withOpacity(0.2),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: Text(
+                              '#$t',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF059669),
+                              ),
+                            ),
+                          )),
+                      if (thread.tags.length > 2)
                         Container(
-                          width: 4,
-                          height: 4,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFD1D5DB),
-                            shape: BoxShape.circle,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE5E9F0),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '+${thread.tags.length - 2}',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF6B7280),
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Icon(Icons.calendar_today_outlined, size: 12, color: const Color(0xFF9CA3AF)),
-                        const SizedBox(width: 4),
-                        Text(
-                          thread.createdAt.toString().split(' ')[0],
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                    ],
+                  ),
+                  if (isMy && thread.visibility == 'private' && thread.inviteCode != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8.0),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Colors.grey[100]!, Colors.grey[200]!],
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.2),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.lock_outline, size: 16, color: Colors.grey),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Code: ${thread.inviteCode}',
+                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.copy, size: 16),
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: thread.inviteCode ?? ''));
+                                _showSuccess('Code copied!');
+                              },
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Icon(Icons.person_outline, size: 14, color: const Color(0xFF9CA3AF)),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${thread.creatorRole.isNotEmpty ? '${thread.creatorRole} • ' : ''}${thread.creator}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFD1D5DB),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Icon(Icons.calendar_today_outlined, size: 12, color: const Color(0xFF9CA3AF)),
+                      const SizedBox(width: 4),
+                      Text(
+                        thread.createdAt.toString().split(' ')[0],
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF6B7280)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (isDeleting)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                    ),
+                  ),
+                ),
+              ),
+            if (isMy && !isDeleting)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: GestureDetector(
+                  onTap: () => _showDeleteConfirmation(thread.id, thread.title),
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.2),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
-                    // const SizedBox(height: 12),
-                    // Padding(
-                    //   padding: const EdgeInsets.only(top: 2),
-                    //   child: Row(
-                    //     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    //     children: actionButtons,
-                    //   ),
-                    // ),
-                  ],
+                    child: const Icon(
+                      Icons.delete_outline,
+                      color: Colors.red,
+                      size: 18,
+                    ),
+                  ),
                 ),
               ),
-              if (thread.isFromCache)
-                Positioned(
-                  bottom: 4,
-                  right: 8,
-                  child: Icon(Icons.cached, size: 12, color: Colors.grey),
+            if (thread.isFromCache)
+              Positioned(
+                bottom: 4,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.cached, size: 12, color: Colors.grey),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
@@ -2065,10 +2252,8 @@ class _ActionButton extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
-    this.iconSize,
-    this.fontSize,
     // ignore: unused_element_parameter
-    this.iconColor,
+    this.iconColor, this.iconSize, this.fontSize,
   });
   @override
   Widget build(BuildContext context) {
