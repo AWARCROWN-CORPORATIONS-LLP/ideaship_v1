@@ -3,22 +3,25 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:ideaship/feed/publicprofile.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-
 import 'threads.dart';
+
 
 class ThreadDetailScreen extends StatefulWidget {
   final Thread thread;
   final String username;
   final int userId;
+
   const ThreadDetailScreen({
     super.key,
     required this.thread,
     required this.username,
     required this.userId,
   });
+
   @override
   State<ThreadDetailScreen> createState() => _ThreadDetailScreenState();
 }
@@ -33,18 +36,14 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
   late AnimationController _detailAnimationController;
   late Animation<double> _detailFadeAnimation;
   final ScrollController _commentsScrollController = ScrollController();
-  bool isLoadingMoreComments = false;
-  int commentsOffset = 0;
-  final int commentsLimit = 20;
-  Timer? _commentsScrollDebounceTimer;
   Timer? _commentsRetryTimer;
   int _commentsRetryCount = 0;
   static const int _commentsMaxRetries = 3;
   http.Client? _commentsHttpClient;
-  bool _hasReachedMaxComments = false;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isOnline = false;
-  Set<int> _loadedCommentIds = <int>{};
+  final Set<int> _loadedCommentIds = <int>{};
+
   // UI State
   final Color _pageColor = const Color(0xFFFDFBF5);
   final Color _cardColor = Colors.white;
@@ -65,11 +64,22 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       CurvedAnimation(parent: _detailAnimationController, curve: Curves.easeInOut),
     );
     _detailAnimationController.forward();
-    _setupCommentsScrollListener();
     _initConnectivity();
-    _loadComments(reset: true);
+    _loadComments();
     _syncInspireStatus();
   }
+  
+  // --- ADDED NAVIGATION FUNCTION ---
+  void _navigateToProfile(String username) {
+    if (username.isEmpty) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PublicProfilePage(targetUsername: username),
+      ),
+    );
+  }
+  // --- END ---
 
   void _addCommentIds(Comment comment) {
     _loadedCommentIds.add(comment.id);
@@ -94,7 +104,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       _isOnline = results.any((result) => result != ConnectivityResult.none);
       if (mounted) setState(() {});
       if (mounted && _isOnline && !wasOnline) {
-        _backgroundSyncComments();
+        _loadComments();
       }
     });
   }
@@ -106,72 +116,6 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       return results.any((result) => result != ConnectivityResult.none);
     } catch (e) {
       return false;
-    }
-  }
-
-  Future<void> _backgroundSyncComments() async {
-    if (!mounted || widget.username.isEmpty) return;
-    try {
-      final code = await _getThreadCode(widget.thread.id);
-      final uri = Uri.parse(
-          'https://server.awarcrown.com/threads/comments?id=${widget.thread.id}&username=${Uri.encodeComponent(widget.username)}&limit=$commentsLimit&offset=0${code != null ? '&code=${Uri.encodeComponent(code)}' : ''}');
-      final response = await (_commentsHttpClient ?? http.Client())
-          .get(uri)
-          .timeout(const Duration(seconds: 15));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final commentList = data['comments'] as List<dynamic>? ?? [];
-        final commentMap = <int, List<Map<String, dynamic>>>{};
-        for (var c in commentList) {
-          if (c is Map<String, dynamic>) {
-            final parentId = c['parent_comment_id'] as int?;
-            if (parentId != null) {
-              commentMap.putIfAbsent(parentId, () => []).add(c);
-            }
-          }
-        }
-        final List<Comment> freshComments = [];
-        for (final c in commentList) {
-          if (c is Map<String, dynamic> && c['parent_comment_id'] == null) {
-            try {
-              freshComments.add(Comment.fromJson(c, commentMap, isFromCache: false));
-            } catch (e) {
-              debugPrint('Error parsing fresh comment: $e');
-            }
-          }
-        }
-        final List<Comment> newComments = freshComments.where((c) => !_loadedCommentIds.contains(c.id)).toList();
-        if (newComments.isNotEmpty) {
-          if (mounted) {
-            setState(() {
-              comments.insertAll(0, newComments);
-              _updateLoadedIdsForList(newComments);
-              if (hasError && comments.length == newComments.length) {
-                hasError = false;
-                errorMessage = null;
-              }
-            });
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${newComments.length} new comment${newComments.length > 1 ? 's' : ''} synced!'),
-                backgroundColor: Colors.green,
-                duration: const Duration(seconds: 2),
-              ),
-            );
-          }
-        } else {
-          if (hasError && comments.isEmpty) {
-            setState(() {
-              hasError = false;
-              errorMessage = null;
-            });
-          }
-        }
-      } else {
-        debugPrint('Background sync failed: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('Background sync error: $e');
     }
   }
 
@@ -221,29 +165,10 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
     await prefs.setString('code_$threadId', code);
   }
 
-  void _setupCommentsScrollListener() {
-    _commentsScrollController.addListener(_onCommentsScroll);
-  }
-
-  void _onCommentsScroll() {
-    _commentsScrollDebounceTimer?.cancel();
-    _commentsScrollDebounceTimer = Timer(const Duration(milliseconds: 300), () {
-      if (!_commentsScrollController.hasClients) return;
-      final position = _commentsScrollController.position;
-      if (position.pixels >= position.maxScrollExtent - 200) {
-        if (!isLoadingMoreComments && !hasError && !_hasReachedMaxComments) {
-          _loadMoreComments();
-        }
-      }
-    });
-  }
-
   @override
   void dispose() {
-    _commentsScrollDebounceTimer?.cancel();
     _commentsRetryTimer?.cancel();
     _connectivitySubscription?.cancel();
-    _commentsScrollController.removeListener(_onCommentsScroll);
     _commentsScrollController.dispose();
     _detailAnimationController.dispose();
     _commentController.dispose();
@@ -252,7 +177,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
     super.dispose();
   }
 
-  Future<void> _loadComments({bool reset = false}) async {
+  Future<void> _loadComments() async {
     if (widget.username.isEmpty) {
       if (mounted) {
         setState(() {
@@ -264,54 +189,46 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       }
       return;
     }
-    final bool online = await _isDeviceOnline();
-    bool useCacheOnly = !online;
-    if (reset) {
-      commentsOffset = 0;
-      if (!useCacheOnly) {
-        comments.clear();
-      }
-      isLoadingMoreComments = false;
-    }
+
     if (mounted) {
       setState(() {
-        if (reset) {
-          isLoading = true;
-          hasError = false;
-        } else {
-          isLoadingMoreComments = true;
-        }
+        isLoading = true;
+        hasError = false;
       });
     }
+
     List<Comment> newComments = [];
+    final bool online = await _isDeviceOnline();
     bool fetchSuccess = false;
-    if (!useCacheOnly) {
+    bool usingCache = false;
+
+    if (online) {
       try {
         final code = await _getThreadCode(widget.thread.id);
         final uri = Uri.parse(
-            'https://server.awarcrown.com/threads/comments?id=${widget.thread.id}&username=${Uri.encodeComponent(widget.username)}&limit=$commentsLimit&offset=$commentsOffset${code != null ? '&code=${Uri.encodeComponent(code)}' : ''}');
+          'https://server.awarcrown.com/threads/comments'
+          '?id=${widget.thread.id}'
+          '&username=${Uri.encodeComponent(widget.username)}'
+          '&limit=1000'
+          '&offset=0'
+          '${code != null ? '&code=${Uri.encodeComponent(code)}' : ''}',
+        );
+
         final response = await (_commentsHttpClient ?? http.Client())
             .get(uri)
             .timeout(const Duration(seconds: 15));
+
         debugPrint('Comments response: ${response.body}');
-        if (response.statusCode == 200) {
+        if (response.statusCode == 200 || response.statusCode == 201) {
           final data = json.decode(response.body);
           final commentList = data['comments'] as List<dynamic>? ?? [];
-          final commentMap = <int, List<Map<String, dynamic>>>{};
-          for (var c in commentList) {
+
+          for (final dynamic c in commentList) {
             if (c is Map<String, dynamic>) {
-              final parentId = c['parent_comment_id'] as int?;
-              if (parentId != null) {
-                commentMap.putIfAbsent(parentId, () => []).add(c);
-              }
-            }
-          }
-          for (final c in commentList) {
-            if (c is Map<String, dynamic> && c['parent_comment_id'] == null) {
               try {
-                newComments.add(Comment.fromJson(c, commentMap, isFromCache: false));
+                newComments.add(Comment.fromJson(c, isFromCache: false));
               } catch (e) {
-                debugPrint('Error parsing top-level comment: $e');
+                debugPrint('Error parsing comment: $e');
               }
             }
           }
@@ -319,17 +236,21 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
         } else if (response.statusCode == 403) {
           _showError('Access denied. Invalid code for private thread.');
         } else if (response.statusCode == 404) {
-          _hasReachedMaxComments = true;
+          newComments = [];
         } else {
-          throw Exception('Failed to load comments: ${response.statusCode} - ${response.body}');
+          throw Exception(
+            'Failed to load comments: ${response.statusCode} - ${response.body}',
+          );
         }
       } catch (e) {
         debugPrint('Load comments error: $e');
-        useCacheOnly = true;
       }
     }
-    if (useCacheOnly || !fetchSuccess) {
-      if (reset && comments.isEmpty) {
+
+    if (!online || !fetchSuccess) {
+      usingCache = true;
+      newComments = List<Comment>.from(comments);
+      if (newComments.isEmpty) {
         if (mounted) {
           setState(() {
             isLoading = false;
@@ -339,65 +260,41 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
         }
         return;
       }
-      if (!reset && commentsOffset >= comments.length) {
-        newComments = [];
-      } else {
-        newComments = comments.skip(commentsOffset).take(commentsLimit).toList()
-            .map((c) => Comment(
-                  id: c.id,
-                  parentId: c.parentId,
-                  body: c.body,
-                  commenter: c.commenter,
-                  createdAt: c.createdAt,
-                  replies: c.replies,
-                  isFromCache: true,
-                ))
-            .toList();
-      }
     }
+
     if (mounted) {
       setState(() {
-        if (reset) {
-          comments = newComments;
-          _loadedCommentIds.clear();
-          _updateLoadedIdsForList(comments);
-          isLoading = false;
-        } else {
-          comments.addAll(newComments);
-          _updateLoadedIdsForList(newComments);
-          isLoadingMoreComments = false;
-        }
-        commentsOffset += newComments.length;
-        _hasReachedMaxComments = newComments.length < commentsLimit;
+        comments = newComments;
+        _loadedCommentIds.clear();
+        _updateLoadedIdsForList(comments);
+        isLoading = false;
+        hasError = false;
         _commentsRetryCount = 0;
       });
     }
-    if (useCacheOnly && newComments.isNotEmpty && mounted) {
+
+    if (usingCache && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Showing cached comments. Syncing when online.'),
+        const SnackBar(
+          content: Text('Showing cached comments. Syncing when online.'),
           backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 3),
+          duration: Duration(seconds: 3),
         ),
       );
     }
   }
 
-  void _scheduleCommentsRetry(Future<void> Function() retryFunction) {
+  void _scheduleCommentsRetry() {
     if (_commentsRetryCount >= _commentsMaxRetries) return;
     _commentsRetryTimer?.cancel();
     _commentsRetryCount++;
     final delay = Duration(seconds: 2) * (1 << (_commentsRetryCount - 1));
     _commentsRetryTimer = Timer(delay, () async {
       final bool online = await _isDeviceOnline();
-      if (mounted && !isLoading && !isLoadingMoreComments && online) {
-        retryFunction();
+      if (mounted && !isLoading && online) {
+        _loadComments();
       }
     });
-  }
-
-  Future<void> _loadMoreComments() async {
-    await _loadComments(reset: false);
   }
 
   String _getErrorMessage(dynamic e) {
@@ -456,7 +353,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
         _commentController.clear();
         _commentFocusNode.unfocus();
         setState(() => _replyToCommentId = null);
-        await _loadComments(reset: true);
+        await _loadComments();
         _showSuccess('Comment added successfully!');
       } else {
         throw Exception('Failed to add comment: ${response.statusCode}');
@@ -482,47 +379,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
     });
   }
 
-  Future<void> _sendCollab(int threadId, String message) async {
-    final bool online = await _isDeviceOnline();
-    if (!online) {
-      _showError('Please connect to internet to join collab.');
-      return;
-    }
-    if (widget.username.isEmpty) return;
-    final oldCount = widget.thread.collabCount;
-    widget.thread.collabCount++;
-    if (mounted) setState(() {});
-    try {
-      final code = await _getThreadCode(threadId);
-      final bodyData = json.encode({
-        'message': message,
-        'username': widget.username,
-        if (code != null) 'code': code,
-      });
-      final uri = Uri.parse('https://server.awarcrown.com/threads/collab?id=$threadId');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: bodyData,
-      ).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        try {
-          final data = json.decode(response.body);
-          if (data is Map<String, dynamic> && data.containsKey('collab_count')) {
-            widget.thread.collabCount = data['collab_count'];
-          }
-        } catch (_) {}
-        if (mounted) _showSuccess('Joined the roundtable!');
-      } else {
-        throw Exception('Failed to join roundtable: ${response.statusCode}');
-      }
-    } catch (e) {
-      widget.thread.collabCount = oldCount;
-      if (mounted) setState(() {});
-      if (mounted) _showError('Failed to join roundtable: ${_getErrorMessage(e)}');
-    }
-  }
-
+  
   Future<void> _toggleInspire(int threadId) async {
     final bool online = await _isDeviceOnline();
     if (!online) {
@@ -610,20 +467,12 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
             ),
           ),
         ListView.builder(
-          itemCount: comments.length + (isLoadingMoreComments ? 1 : 0),
+          itemCount: comments.length,
           controller: _commentsScrollController,
           padding: EdgeInsets.zero,
           physics: const NeverScrollableScrollPhysics(),
           shrinkWrap: true,
           itemBuilder: (context, index) {
-            if (index == comments.length) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(16.0),
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            }
             final comment = comments[index];
             return _CommentCard(comment: comment, onReply: _onReplyTapped);
           },
@@ -659,7 +508,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
               Text(errorMessage ?? 'Failed to load comments'),
               const SizedBox(height: 8),
               ElevatedButton(
-                onPressed: () => _loadComments(reset: true),
+                onPressed: _loadComments,
                 child: const Text('Retry'),
               ),
             ],
@@ -672,7 +521,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
         child: Center(
           child: Column(
             children: [
-              AnimatedRoundTableIcon(size: 60, color: _secondaryTextColor),
+              const Icon(Icons.comment_outlined, size: 60, color: Color(0xFF6B7280)),
               const SizedBox(height: 16),
               Text(
                 'Be the first to comment',
@@ -779,30 +628,37 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
     );
   }
 
+  // --- MODIFIED _buildHeaderInfo ---
   Widget _buildHeaderInfo(BuildContext context) {
     return Row(
       children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: Colors.white.withOpacity(0.3),
-          child: Text(
-            widget.thread.creator.isNotEmpty ? widget.thread.creator[0].toUpperCase() : '?',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+        GestureDetector( // <-- WRAPPED
+          onTap: () => _navigateToProfile(widget.thread.creator), // <-- ADDED
+          child: CircleAvatar(
+            radius: 20,
+            backgroundColor: Colors.white.withOpacity(0.3),
+            child: Text(
+              widget.thread.creator.isNotEmpty ? widget.thread.creator[0].toUpperCase() : '?',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18),
+            ),
           ),
         ),
         const SizedBox(width: 12),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.thread.creator,
-              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-            Text(
-              '${widget.thread.creatorRole.isNotEmpty ? '${widget.thread.creatorRole} • ' : ''}${widget.thread.createdAt.toString().split(' ')[0]}',
-              style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13),
-            ),
-          ],
+        GestureDetector( // <-- WRAPPED
+          onTap: () => _navigateToProfile(widget.thread.creator), // <-- ADDED
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.thread.creator,
+                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              Text(
+                '${widget.thread.creatorRole.isNotEmpty ? '${widget.thread.creatorRole} • ' : ''}${widget.thread.createdAt.toString().split(' ')[0]}',
+                style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 13),
+              ),
+            ],
+          ),
         ),
         const Spacer(),
         Container(
@@ -825,6 +681,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       ],
     );
   }
+  // --- END OF MODIFICATION ---
 
   Widget _buildTags() {
     if (widget.thread.tags.isEmpty) return const SizedBox.shrink();
@@ -852,14 +709,15 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       }
       return;
     }
-    await _loadComments(reset: true);
+    await _loadComments();
   }
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF1E3A5F);
-    const secondaryColor = Color(0xFF2D5AA0);
-    const accentColor = Color(0xFF4A90E2);
+    const Color gradientStart = Color(0xFF6A11CB); // Deep Purple
+    const Color gradientMid = Color(0xFF2575FC); // Vibrant Blue
+    const Color gradientEnd = Color(0xFF00C9FF); // Bright Cyan
+    
     final bool isInspired = widget.thread.isInspiredByMe;
     final Color inspireColor = isInspired ? const Color(0xFFF59E0B) : const Color(0xFF90F0C0);
     final bool usingCache = widget.thread.isFromCache;
@@ -886,7 +744,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
                   floating: false,
                   pinned: true,
                   elevation: 2,
-                  backgroundColor: primaryColor,
+                  backgroundColor: gradientStart, 
                   flexibleSpace: FlexibleSpaceBar(
                     titlePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     background: Hero(
@@ -896,8 +754,12 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [primaryColor, secondaryColor, accentColor],
-                            stops: [0.0, 0.6, 1.0],
+                            colors: [
+                              gradientStart,
+                              gradientMid,
+                              gradientEnd,
+                            ],
+                            stops: [0.0, 0.5, 1.0],
                           ),
                         ),
                         child: Padding(
@@ -938,12 +800,6 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
                                       label: '${widget.thread.inspiredCount}',
                                       color: inspireColor,
                                       onTap: () => _toggleInspire(widget.thread.id),
-                                    ),
-                                    _HeaderActionButton(
-                                      icon: Icons.people_outline,
-                                      label: '${widget.thread.collabCount}',
-                                      color: const Color(0xFF81C7F5),
-                                      onTap: () => _sendCollab(widget.thread.id, 'Interested in joining!'),
                                     ),
                                     _HeaderActionButton(
                                       icon: Icons.comment_outlined,
@@ -1008,30 +864,70 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
   }
 }
 
-class _CommentCard extends StatelessWidget {
+class _CommentCard extends StatefulWidget {
   final Comment comment;
   final bool isReply;
   final Function(Comment) onReply;
+
   const _CommentCard({
     required this.comment,
     this.isReply = false,
     required this.onReply,
   });
+
+  @override
+  State<_CommentCard> createState() => _CommentCardState();
+}
+
+class _CommentCardState extends State<_CommentCard> {
+  late bool _isExpanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _isExpanded = false; // Start collapsed for better UX with replies
+  }
+
+  String get _timeAgo {
+    final diff = DateTime.now().difference(widget.comment.createdAt);
+    if (diff.inDays >= 1) {
+      return '${diff.inDays}d';
+    } else if (diff.inHours >= 1) {
+      return '${diff.inHours}h';
+    } else if (diff.inMinutes >= 1) {
+      return '${diff.inMinutes}m';
+    } else {
+      return 'Just now';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(left: isReply ? 32.0 : 16.0, right: 16.0, top: 12.0, bottom: 4.0),
+      padding: EdgeInsets.only(left: widget.isReply ? 32.0 : 16.0, right: 16.0, top: 12.0, bottom: 4.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.blue[100],
-                child: Text(
-                  comment.commenter.isNotEmpty ? comment.commenter[0].toUpperCase() : '?',
-                  style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+              // --- MODIFIED _CommentCard ---
+              GestureDetector( // <-- WRAPPED
+                onTap: () { // <-- ADDED
+                  if (widget.comment.commenter.isEmpty) return;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => PublicProfilePage(targetUsername: widget.comment.commenter),
+                    ),
+                  );
+                },
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: Colors.blue[100],
+                  child: Text(
+                    widget.comment.commenter.isNotEmpty ? widget.comment.commenter[0].toUpperCase() : '?',
+                    style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -1039,37 +935,67 @@ class _CommentCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      comment.commenter,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Color(0xFF1a2533)),
+                    GestureDetector( // <-- WRAPPED
+                      onTap: () { // <-- ADDED
+                        if (widget.comment.commenter.isEmpty) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PublicProfilePage(targetUsername: widget.comment.commenter),
+                          ),
+                        );
+                      },
+                      child: Text(
+                        widget.comment.commenter,
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: Color(0xFF1a2533)),
+                      ),
                     ),
                     Text(
-                      comment.createdAt.toString().split('.')[0],
+                      _timeAgo,
                       style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
                     ),
                   ],
                 ),
               ),
+              // --- END OF MODIFICATION ---
             ],
           ),
           Padding(
             padding: const EdgeInsets.only(left: 42.0, top: 8, bottom: 4),
             child: Text(
-              comment.body,
+              widget.comment.body,
               style: const TextStyle(fontSize: 15, color: Color(0xFF333D4B), height: 1.5),
             ),
           ),
           Padding(
             padding: const EdgeInsets.only(left: 30.0),
             child: TextButton(
-              onPressed: () => onReply(comment),
+              onPressed: () => widget.onReply(widget.comment),
               child: const Text(
                 'Reply',
                 style: TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF4A90E2)),
               ),
             ),
           ),
-          if (comment.replies.isNotEmpty)
+          if (widget.comment.replies.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 30.0, top: 4.0),
+              child: TextButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+                },
+                icon: Icon(_isExpanded ? Icons.expand_less : Icons.expand_more, size: 16),
+                label: Text(
+                  _isExpanded
+                      ? 'Hide replies'
+                      : 'View ${widget.comment.replies.length} ${widget.comment.replies.length > 1 ? 'replies' : 'reply'}',
+                  style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF4A90E2), fontSize: 13),
+                ),
+              ),
+            ),
+          if (widget.comment.replies.isNotEmpty && _isExpanded)
             Padding(
               padding: const EdgeInsets.only(left: 12.0, top: 8.0),
               child: Container(
@@ -1077,13 +1003,13 @@ class _CommentCard extends StatelessWidget {
                   border: Border(left: BorderSide(color: Color(0xFFE5E9F0), width: 2.0)),
                 ),
                 child: Column(
-                  children: comment.replies
-                      .map((reply) => _CommentCard(comment: reply, isReply: true, onReply: onReply))
+                  children: widget.comment.replies
+                      .map((reply) => _CommentCard(comment: reply, isReply: true, onReply: widget.onReply))
                       .toList(),
                 ),
               ),
             ),
-          if (comment.isFromCache)
+          if (widget.comment.isFromCache)
             Padding(
               padding: const EdgeInsets.only(left: 42.0, top: 4),
               child: Text('Cached', style: TextStyle(fontSize: 10, color: Colors.grey)),

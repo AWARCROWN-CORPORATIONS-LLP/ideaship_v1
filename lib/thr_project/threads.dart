@@ -1,3 +1,4 @@
+// File: lib/threads_screen.dart (modified)
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -13,7 +14,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:lottie/lottie.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-
+import 'create_roundtable_dialog.dart'; 
 
 class Thread {
   final int id;
@@ -24,14 +25,12 @@ class Thread {
   final String creatorRole;
   int inspiredCount;
   final int commentCount;
-  int collabCount;
   final List<String> tags;
   final DateTime createdAt;
   bool isInspiredByMe;
   final String visibility;
   final String? inviteCode;
   final bool isFromCache;
-
   Thread({
     required this.id,
     required this.title,
@@ -41,7 +40,6 @@ class Thread {
     required this.creatorRole,
     required this.inspiredCount,
     required this.commentCount,
-    required this.collabCount,
     required this.tags,
     required this.createdAt,
     required this.isInspiredByMe,
@@ -49,7 +47,6 @@ class Thread {
     this.inviteCode,
     this.isFromCache = false,
   });
-
   Thread copyWith({
     int? id,
     String? title,
@@ -59,7 +56,6 @@ class Thread {
     String? creatorRole,
     int? inspiredCount,
     int? commentCount,
-    int? collabCount,
     List<String>? tags,
     DateTime? createdAt,
     bool? isInspiredByMe,
@@ -76,7 +72,6 @@ class Thread {
       creatorRole: creatorRole ?? this.creatorRole,
       inspiredCount: inspiredCount ?? this.inspiredCount,
       commentCount: commentCount ?? this.commentCount,
-      collabCount: collabCount ?? this.collabCount,
       tags: tags ?? this.tags,
       createdAt: createdAt ?? this.createdAt,
       isInspiredByMe: isInspiredByMe ?? this.isInspiredByMe,
@@ -85,7 +80,6 @@ class Thread {
       isFromCache: isFromCache ?? this.isFromCache,
     );
   }
-
   factory Thread.fromJson(Map<String, dynamic> json, {bool isFromCache = false}) {
     try {
       return Thread(
@@ -97,10 +91,8 @@ class Thread {
         creatorRole: json['creator_role'] ?? '',
         inspiredCount: json['inspired_count'] ?? 0,
         commentCount: json['comment_count'] ?? 0,
-        collabCount: json['collab_count'] ?? 0,
         tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
-        createdAt:
-            DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+        createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
         isInspiredByMe: json['user_has_inspired'] ?? false,
         visibility: json['visibility'] ?? 'public',
         inviteCode: json['invite_code'],
@@ -108,26 +100,10 @@ class Thread {
       );
     } catch (e) {
       debugPrint('Error parsing Thread from JSON: $e');
-      return Thread(
-        id: 0,
-        title: 'Error Loading Thread',
-        body: 'Failed to load thread details.',
-        category: 'Error',
-        creator: 'Unknown',
-        creatorRole: '',
-        inspiredCount: 0,
-        commentCount: 0,
-        collabCount: 0,
-        tags: [],
-        createdAt: DateTime.now(),
-        isInspiredByMe: false,
-        visibility: 'public',
-        isFromCache: isFromCache,
-      );
+      return Thread(id: 0, title: '', body: '', category: '', creator: '', creatorRole: '', inspiredCount: 0, commentCount: 0, tags: [], createdAt: DateTime.now(), isInspiredByMe: false, visibility: 'public', isFromCache: isFromCache);
     }
   }
 }
-
 class Comment {
   final int id;
   final int? parentId;
@@ -136,7 +112,6 @@ class Comment {
   final DateTime createdAt;
   final List<Comment> replies;
   final bool isFromCache;
-
   Comment({
     required this.id,
     this.parentId,
@@ -146,28 +121,19 @@ class Comment {
     this.replies = const [],
     this.isFromCache = false,
   });
-
-  factory Comment.fromJson(
-      Map<String, dynamic> json, Map<int, List<Map<String, dynamic>>> commentMap, {bool isFromCache = false}) {
+  factory Comment.fromJson(Map<String, dynamic> json, {bool isFromCache = false}) {
     try {
-      final id = json['comment_id'] ?? 0;
-      final repliesJson = commentMap[id] ?? [];
-      final replies = <Comment>[];
-      for (final r in repliesJson) {
-        try {
-          replies.add(Comment.fromJson(r, commentMap, isFromCache: isFromCache));
-        } catch (e) {
-          debugPrint('Error parsing reply comment: $e');
-        }
-      }
+      // Recursively parse replies if present (nested structure from backend)
+      final List<Comment> replyComments = (json['replies'] as List<dynamic>? ?? [])
+          .map((r) => Comment.fromJson(r as Map<String, dynamic>, isFromCache: isFromCache))
+          .toList();
       return Comment(
-        id: id,
-        parentId: json['parent_comment_id'],
-        body: json['comment_body'] ?? '',
-        commenter: json['commenter_username'] ?? '',
-        createdAt:
-            DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
-        replies: replies,
+        id: json['comment_id'] as int? ?? 0,
+        parentId: json['parent_comment_id'] as int?,
+        body: json['comment_body'] as String? ?? '',
+        commenter: json['commenter_username'] as String? ?? '',
+        createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now(),
+        replies: replyComments,
         isFromCache: isFromCache,
       );
     } catch (e) {
@@ -183,7 +149,6 @@ class Comment {
     }
   }
 }
-
 class RoundTablePainter extends CustomPainter {
   final double rotation;
   RoundTablePainter({this.rotation = 0.0});
@@ -223,7 +188,6 @@ class RoundTablePainter extends CustomPainter {
   bool shouldRepaint(covariant RoundTablePainter oldDelegate) =>
       oldDelegate.rotation != rotation;
 }
-
 class AnimatedRoundTableIcon extends StatefulWidget {
   final double size;
   final Color color;
@@ -235,7 +199,6 @@ class AnimatedRoundTableIcon extends StatefulWidget {
   @override
   State<AnimatedRoundTableIcon> createState() => _AnimatedRoundTableIconState();
 }
-
 class _AnimatedRoundTableIconState extends State<AnimatedRoundTableIcon>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
@@ -273,13 +236,11 @@ class _AnimatedRoundTableIconState extends State<AnimatedRoundTableIcon>
     );
   }
 }
-
 class OnboardingTourScreen extends StatefulWidget {
   const OnboardingTourScreen({super.key});
   @override
   State<OnboardingTourScreen> createState() => _OnboardingTourScreenState();
 }
-
 class _OnboardingTourScreenState extends State<OnboardingTourScreen>
     with TickerProviderStateMixin {
   late PageController _pageController;
@@ -369,7 +330,7 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
                   ],
                 ),
               ),
-              // Page 3: Collaborate
+              // Page 3: Collaborate (Removing this page)
               Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -384,7 +345,7 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
                     const SizedBox(height: 32),
                     Text('Pull Up a Chair',
                         style: Theme.of(context).textTheme.headlineSmall),
-                    Text('Join collabs with a simple tap.'),
+                    Text('Join discussions with a simple tap.'), // Generic enough to keep
                   ],
                 ),
               ),
@@ -397,15 +358,14 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
-                  3,
+                  3, // Kept at 3, but you might want to reduce this if you remove Page 3
                   (index) => AnimatedContainer(
                         duration: const Duration(milliseconds: 300),
                         margin: const EdgeInsets.symmetric(horizontal: 4),
                         height: 8,
                         width: currentPage == index ? 24 : 8,
                         decoration: BoxDecoration(
-                          color:
-                              currentPage == index ? Colors.blue : Colors.grey,
+                          color: currentPage == index ? Colors.blue : Colors.grey,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       )),
@@ -444,13 +404,11 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
     );
   }
 }
-
 class ThreadsScreen extends StatefulWidget {
   const ThreadsScreen({super.key});
   @override
   _ThreadsScreenState createState() => _ThreadsScreenState();
 }
-
 class _ThreadsScreenState extends State<ThreadsScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
@@ -480,7 +438,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
   String? username;
   int? userId;
   String sort = 'recent';
-  final int limit = 20;
+  final int limit = 10;
   final ScrollController _discoverScrollController = ScrollController();
   final ScrollController _myScrollController = ScrollController();
   late AnimationController _animationController;
@@ -501,7 +459,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
   static const Duration _cacheValidDuration = Duration(minutes: 5);
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isOnline = false;
-
   @override
   void initState() {
     super.initState();
@@ -526,7 +483,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     _startAutoUpdate();
     _initConnectivity();
   }
-
   void _onTabChanged() {
     if (_tabController.index != _tabController.previousIndex) {
       final newIsMyView = _tabController.index == 1;
@@ -538,14 +494,12 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
   }
-
   void _loadTabDataIfNeeded(bool isMy) {
     final isEmpty = isMy ? myThreads.isEmpty : discoverThreads.isEmpty;
     if (isEmpty) {
       _fetchThreads(reset: true, isMy: isMy);
     }
   }
-
   Future<void> _initConnectivity() async {
     final connectivity = Connectivity();
     final results = await connectivity.checkConnectivity();
@@ -560,9 +514,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     });
   }
-
   bool get isOnline => _isOnline;
-
   Future<bool> _isDeviceOnline() async {
     try {
       final connectivity = Connectivity();
@@ -572,7 +524,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       return false;
     }
   }
-
   void _startAutoUpdate() {
     _autoUpdateTimer = Timer.periodic(_autoUpdateInterval, (timer) async {
       if (mounted && isOnline) {
@@ -583,12 +534,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     });
   }
-
   void _setupScrollListeners() {
     _discoverScrollController.addListener(_onDiscoverScroll);
     _myScrollController.addListener(_onMyScroll);
   }
-
   void _onDiscoverScroll() {
     _discoverScrollDebounceTimer?.cancel();
     _discoverScrollDebounceTimer = Timer(const Duration(milliseconds: 300), () {
@@ -605,7 +554,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     });
   }
-
   void _onMyScroll() {
     _myScrollDebounceTimer?.cancel();
     _myScrollDebounceTimer = Timer(const Duration(milliseconds: 300), () {
@@ -618,7 +566,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     });
   }
-
   @override
   void dispose() {
     _searchController.dispose();
@@ -635,7 +582,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     _httpClient?.close();
     super.dispose();
   }
-
   Future<void> _checkOnboarding() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -650,7 +596,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       debugPrint('Error checking onboarding: $e');
     }
   }
-
   Future<void> _initializeData() async {
     try {
       await _loadUsernameAndUserId();
@@ -670,7 +615,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
   }
-
   Future<void> _loadUsernameAndUserId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -687,7 +631,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
   }
-
   Future<void> _fetchUserId() async {
     if (username == null || username!.isEmpty) return;
     try {
@@ -723,7 +666,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       _showError(_getErrorMessage(e));
     }
   }
-
   Future<void> _setupFCM() async {
     try {
       await Firebase.initializeApp();
@@ -768,7 +710,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       debugPrint('Error setting up FCM: $e');
     }
   }
-
   String _getErrorMessage(dynamic e) {
     if (e is SocketException) {
       return 'No internet connection. Please check your connection and try again.';
@@ -780,7 +721,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       return 'An unexpected error occurred. Please try again.';
     }
   }
-
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -792,7 +732,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
-
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -804,17 +743,14 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
-
   Future<String?> _getThreadCode(int threadId) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('code_$threadId');
   }
-
   Future<void> _setThreadCode(int threadId, String code) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('code_$threadId', code);
   }
-
   Future<void> _fetchThreads({bool reset = false, required bool isMy}) async {
     if (username == null || username!.isEmpty) return;
     final bool online = await _isDeviceOnline();
@@ -851,8 +787,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             discoverErrorMessage = null;
           }
         } else {
-          if (isMy) myLoadingMore = true;
-          else discoverLoadingMore = true;
+          if (isMy) {
+            myLoadingMore = true;
+          } else {
+            discoverLoadingMore = true;
+          }
         }
       });
     }
@@ -894,19 +833,18 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         if (response.statusCode == 200) {
           final List<dynamic> data = json.decode(response.body);
           for (final jsonItem in data) {
-            try {
-              final thread = Thread.fromJson(jsonItem, isFromCache: false);
-              newThreads.add(thread);
-              _threadCache[thread.id] = thread;
-              lastFetchTime = DateTime.now();
-            } catch (e) {
-              debugPrint('Error parsing thread: $e');
-            }
-          }
+            final thread = Thread.fromJson(jsonItem, isFromCache: false);
+            newThreads.add(thread);
+            _threadCache[thread.id] = thread;
+            lastFetchTime = DateTime.now();
+                    }
           fetchSuccess = true;
         } else if (response.statusCode == 404) {
-          if (isMy) myHasReachedMax = true;
-          else discoverHasReachedMax = true;
+          if (isMy) {
+            myHasReachedMax = true;
+          } else {
+            discoverHasReachedMax = true;
+          }
         } else {
           throw Exception('Server error: ${response.statusCode} - ${response.body}');
         }
@@ -988,11 +926,17 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         );
       });
       if (isMy) {
-        if (reset) mySlideAnimations = newAnimations;
-        else mySlideAnimations.addAll(newAnimations);
+        if (reset) {
+          mySlideAnimations = newAnimations;
+        } else {
+          mySlideAnimations.addAll(newAnimations);
+        }
       } else {
-        if (reset) discoverSlideAnimations = newAnimations;
-        else discoverSlideAnimations.addAll(newAnimations);
+        if (reset) {
+          discoverSlideAnimations = newAnimations;
+        } else {
+          discoverSlideAnimations.addAll(newAnimations);
+        }
       }
       _staggerController.forward(from: 0.0);
     }
@@ -1005,14 +949,15 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         ),
       );
     }
-    if (isMy) _myLastFetchTime = lastFetchTime;
-    else _discoverLastFetchTime = lastFetchTime;
+    if (isMy) {
+      _myLastFetchTime = lastFetchTime;
+    } else {
+      _discoverLastFetchTime = lastFetchTime;
+    }
   }
-
   Future<void> _fetchMoreThreads({required bool isMy}) async {
     await _fetchThreads(reset: false, isMy: isMy);
   }
-
   Future<void> _searchThreads(String query, {bool reset = false}) async {
     if (isMyView) return;
     final bool online = await _isDeviceOnline();
@@ -1044,14 +989,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         if (response.statusCode == 200) {
           final List<dynamic> data = json.decode(response.body);
           for (final jsonItem in data) {
-            try {
-              final thread = Thread.fromJson(jsonItem, isFromCache: false);
-              newThreads.add(thread);
-              _threadCache[thread.id] = thread;
-            } catch (e) {
-              debugPrint('Error parsing search thread: $e');
-            }
-          }
+            final thread = Thread.fromJson(jsonItem, isFromCache: false);
+            newThreads.add(thread);
+            _threadCache[thread.id] = thread;
+                    }
           fetchSuccess = true;
         } else {
           throw Exception('Search error: ${response.statusCode}');
@@ -1093,8 +1034,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
           ),
         );
       });
-      if (reset) discoverSlideAnimations = newAnimations;
-      else discoverSlideAnimations.addAll(newAnimations);
+      if (reset) {
+        discoverSlideAnimations = newAnimations;
+      } else {
+        discoverSlideAnimations.addAll(newAnimations);
+      }
       _staggerController.forward(from: 0.0);
     }
     if (useCacheOnly && newThreads.isNotEmpty && mounted) {
@@ -1107,12 +1051,9 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       );
     }
   }
-
   Future<void> _searchMoreThreads(String query) async {
     await _searchThreads(query, reset: false);
   }
-
-  // CORRECTED: Changed from `void` to `Future<void> async` and added `await`
   Future<void> _onSearchChanged(String query) async {
     if (query.isEmpty) {
       setState(() {
@@ -1120,10 +1061,9 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         searchResults.clear();
       });
     } else {
-      await _searchThreads(query, reset: true); // Added await
+      await _searchThreads(query, reset: true);
     }
   }
-
   void _clearSearch() {
     _searchController.clear();
     setState(() {
@@ -1131,7 +1071,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       searchResults.clear();
     });
   }
-
   Future<void> _joinWithCode() async {
     final TextEditingController codeController = TextEditingController();
     showDialog(
@@ -1163,7 +1102,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
-
   Future<void> _joinPrivateThread(String code) async {
     final bool online = await _isDeviceOnline();
     if (!online) {
@@ -1190,14 +1128,13 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             ),
           );
         }
-      } else {
+            } else {
         _showError('Invalid code or thread not found');
       }
     } catch (e) {
       _showError('Failed to join: $_getErrorMessage(e)');
     }
   }
-
   void _scheduleRetry(Future<void> Function() retryFunction) {
     if (_retryCount >= _maxRetries) return;
     _retryTimer?.cancel();
@@ -1218,19 +1155,18 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       );
     }
   }
-
-  Future<void> _createThread(
+  Future<bool> _createThread(
       String title, String body, String category, List<String> tags, String visibility) async {
     final bool online = await _isDeviceOnline();
     if (!online) {
       _showError('Please connect to internet to create a roundtable.');
-      return;
+      return false;
     }
     if (userId == null || userId == 0 || username == null || username!.isEmpty) {
       if (mounted) {
         _showError('Please wait to create a roundtable');
       }
-      return;
+      return false;
     }
     try {
       final bodyData = json.encode({
@@ -1246,13 +1182,27 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         headers: {'Content-Type': 'application/json'},
         body: bodyData,
       ).timeout(const Duration(seconds: 10));
+
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data is Map<String, dynamic> && data.containsKey('thread_id')) {
-          final newId = data['thread_id'] as int;
+        debugPrint('Create response: ${response.body}');
+        
+        // Check for 'success' key *and* 'thread_id' key
+        if (data is Map<String, dynamic> && data['success'] == true && data.containsKey('thread_id')) {
+          
+          // --- THIS IS THE FIX ---
+          // Safely parse the thread_id, which might be a String ("72") or int (72)
+          final int? newId = int.tryParse(data['thread_id'].toString());
+
+          if (newId == null) {
+            // If the ID is null or not a valid number, we can't proceed.
+            throw Exception('Invalid thread_id format from server.');
+          }
+          // --- END OF FIX ---
+
           final inviteCode = data['invite_code'] as String?;
           final newThread = Thread(
-            id: newId,
+            id: newId, // Use the new, safely parsed integer ID
             title: title,
             body: body,
             category: category,
@@ -1260,7 +1210,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             creatorRole: '',
             inspiredCount: 0,
             commentCount: 0,
-            collabCount: 0,
             tags: tags,
             createdAt: DateTime.now(),
             isInspiredByMe: true,
@@ -1274,9 +1223,8 @@ class _ThreadsScreenState extends State<ThreadsScreen>
           if (visibility == 'private' && inviteCode != null) {
             await _setThreadCode(newId, inviteCode);
             _showPrivateThreadDialog(title, inviteCode);
-          } else {
-            _showSuccess('Roundtable created!');
           }
+          
           if (mounted) {
             setState(() {
               discoverThreads.insert(0, newThread);
@@ -1288,21 +1236,27 @@ class _ThreadsScreenState extends State<ThreadsScreen>
           } else {
             _fetchThreads(reset: true, isMy: false);
           }
+          return true; // Return success
         } else {
-          _fetchThreads(reset: true, isMy: false);
-          _fetchThreads(reset: true, isMy: true);
+          // Handle cases where "success" is false or "thread_id" is missing
+          final errorMsg = data['error'] ?? 'Invalid response from server';
+          _showError('Failed to create roundtable: $errorMsg');
+          return false; // Return failure
         }
-        if (mounted) Navigator.pop(context);
       } else {
+        // Handle non-200 server responses
+        debugPrint('Create failed with status: ${response.statusCode}, body: ${response.body}');
         throw Exception('Failed to create roundtable: ${response.statusCode}');
       }
     } catch (e) {
+      // Handle timeouts, JSON parsing errors, or the exception we threw above
+      debugPrint('Create thread error: $e');
       if (mounted) {
         _showError('Failed to create roundtable: ${_getErrorMessage(e)}');
       }
+      return false; // Return failure
     }
   }
-
   void _showPrivateThreadDialog(String title, String code) {
     showDialog(
       context: context,
@@ -1341,7 +1295,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
-
   Future<void> _toggleInspire(int threadId) async {
     final bool online = await _isDeviceOnline();
     if (!online) {
@@ -1412,319 +1365,43 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     }
   }
 
-  Future<void> _sendCollab(int threadId, String message) async {
-    final bool online = await _isDeviceOnline();
-    if (!online) {
-      _showError('Please connect to internet to join collab.');
-      return;
-    }
-    if (username == null || username!.isEmpty) return;
-    List<Thread> targetList = isMyView ? myThreads : discoverThreads;
-    final threadIndex = targetList.indexWhere((t) => t.id == threadId);
-    if (threadIndex == -1) return;
-    final thread = targetList[threadIndex];
-    final oldCount = thread.collabCount;
-    thread.collabCount++;
-    _threadCache[threadId]?.collabCount = thread.collabCount;
-    if (mounted) setState(() {});
-    try {
-      final code = await _getThreadCode(threadId);
-      final bodyData = json.encode({
-        'message': message,
-        'username': username,
-        if (code != null) 'code': code,
-      });
-      final uri = Uri.parse('https://server.awarcrown.com/threads/collab?id=$threadId');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: bodyData,
-      ).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        try {
-          final data = json.decode(response.body);
-          if (data is Map<String, dynamic> &&
-              data.containsKey('collab_count')) {
-            thread.collabCount = data['collab_count'];
-            _threadCache[threadId]?.collabCount = data['collab_count'];
-          }
-        } catch (_) {
-          // Keep optimistic update
-        }
-        if (mounted) {
-          _showJoinAnimation(context, threadId);
-          _showSuccess('Joined the roundtable discussion!');
-        }
-      } else {
-        throw Exception('Failed to join discussion: ${response.statusCode}');
-      }
-    } catch (e) {
-      thread.collabCount = oldCount;
-      _threadCache[threadId]?.collabCount = oldCount;
-      if (mounted) setState(() {});
-      if (mounted) {
-        _showError('Failed to join discussion: ${_getErrorMessage(e)}');
-      }
-    }
-  }
-
-  void _showJoinAnimation(BuildContext context, int threadId) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) => StatefulBuilder(
-        builder: (BuildContext context, StateSetter setDialogState) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Timer(const Duration(milliseconds: 2000), () {
-              if (dialogContext.mounted) {
-                Navigator.of(dialogContext).pop();
-              }
-            });
-          });
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            child: Stack(
-              children: [
-                const Center(
-                  child: AnimatedRoundTableIcon(size: 200),
-                ),
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: TweenAnimationBuilder<double>(
-                    tween: Tween(begin: 0.0, end: 1.0),
-                    duration: const Duration(milliseconds: 500),
-                    builder: (context, value, child) => Opacity(
-                      opacity: value,
-                      child: Icon(Icons.party_mode,
-                          size: 50 * value, color: Colors.yellow),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   void _showCreateDialog() {
-    final formKey = GlobalKey<FormState>();
-    final titleController = TextEditingController();
-    final bodyController = TextEditingController();
-    String selectedCategory = 'Idea';
-    List<String> selectedTags = [];
-    bool isPrivate = false;
-    showModalBottomSheet(
+    showCreateRoundtableDialog(
       context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            bottom: MediaQuery.of(context).padding.bottom + 20,
-          ),
-          child: Form(
-            key: formKey,
-            child: ListView(
-              controller: scrollController,
-              children: [
-                const SizedBox(height: 20),
-                const Center(
-                  child: AnimatedRoundTableIcon(size: 60, color: Colors.blue),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Start a New Roundtable',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E3A5F),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const Text(
-                  'Gather ideas around the table',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Color(0xFF6B7280),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 30),
-                TextFormField(
-                  controller: titleController,
-                  decoration: InputDecoration(
-                    labelText: 'Topic Title *',
-                    hintText: 'What\'s the discussion about?',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.title),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a title';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: bodyController,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    labelText: 'Opening Thoughts *',
-                    hintText: 'Share your initial ideas...',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.description),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please share your thoughts';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedCategory,
-                  decoration: InputDecoration(
-                    labelText: 'Theme *',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.category),
-                  ),
-                  items: ['Idea', 'Problem', 'Build', 'Event', 'Collab']
-                      .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                      .toList(),
-                  onChanged: (val) => setState(() => selectedCategory = val!),
-                  validator: (value) => value == null ? 'Select a theme' : null,
-                ),
-                const SizedBox(height: 16),
-                SwitchListTile(
-                  title: const Text('Private Discussion'),
-                  subtitle: const Text('Require invite code to join'),
-                  value: isPrivate,
-                  onChanged: (val) => setState(() => isPrivate = val),
-                  secondary: const Icon(Icons.lock_outline),
-                  controlAffinity: ListTileControlAffinity.trailing,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  onFieldSubmitted: (val) {
-                    if (val.isNotEmpty && !selectedTags.contains(val)) {
-                      setState(() => selectedTags.add(val));
-                    }
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Add Tags (comma or enter to add)',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    prefixIcon: const Icon(Icons.tag),
-                    suffixIcon: selectedTags.isEmpty
-                        ? null
-                        : IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () => setState(() => selectedTags.clear()),
-                          ),
-                  ),
-                ),
-                if (selectedTags.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: selectedTags.map((t) => Chip(
-                      label: Text('#$t'),
-                      onDeleted: () => setState(() => selectedTags.remove(t)),
-                    )).toList(),
-                  ),
-                ],
-                const SizedBox(height: 30),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: formKey.currentState!.validate()
-                        ? () => _createThread(
-                              titleController.text,
-                              bodyController.text,
-                              selectedCategory,
-                              selectedTags,
-                              isPrivate ? 'private' : 'public',
-                            )
-                        : null,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Start Discussion',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
-          ),
-        ),
-      ),
+      onCreate: _createThread,
     );
   }
-
   List<Thread> _getCurrentThreads(bool isDiscover) {
     if (!isDiscover || !_isSearching) return isDiscover ? discoverThreads : myThreads;
     return searchResults;
   }
-
   bool _getCurrentLoading(bool isDiscover) {
     if (!isDiscover || !_isSearching) return isDiscover ? discoverLoading : myLoading;
     return discoverLoading;
   }
-
   bool _getCurrentHasError(bool isDiscover) {
     if (!isDiscover || !_isSearching) return isDiscover ? discoverHasError : myHasError;
     return discoverHasError;
   }
-
   String? _getCurrentErrorMessage(bool isDiscover) {
     if (!isDiscover || !_isSearching) return isDiscover ? discoverErrorMessage : myErrorMessage;
     return discoverErrorMessage;
   }
-
   bool _getCurrentLoadingMore(bool isDiscover) {
     if (!isDiscover || !_isSearching) return isDiscover ? discoverLoadingMore : myLoadingMore;
     return discoverLoadingMore;
   }
-
   bool _getCurrentHasReachedMax(bool isDiscover) {
     if (!isDiscover || !_isSearching) return isDiscover ? discoverHasReachedMax : myHasReachedMax;
     return discoverHasReachedMax;
   }
-
   List<Animation<double>> _getCurrentSlideAnimations(bool isDiscover) {
     if (!isDiscover || !_isSearching) return isDiscover ? discoverSlideAnimations : mySlideAnimations;
     return discoverSlideAnimations;
   }
-
   ScrollController _getCurrentScrollController(bool isDiscover) {
     return isDiscover ? _discoverScrollController : _myScrollController;
   }
-
   @override
   Widget build(BuildContext context) {
     final padding = 12.0;
@@ -1823,7 +1500,16 @@ class _ThreadsScreenState extends State<ThreadsScreen>
           ),
         ),
         actions: [
-          if (!_isSearching && !isMyView)
+          if (!_isSearching && !isMyView) ...[
+            // Refresh button with icon
+            IconButton(
+              onPressed: () async {
+                await _fetchThreads(reset: true, isMy: false);
+                await _fetchThreads(reset: true, isMy: true);
+              },
+              icon: const Icon(Icons.refresh, color: Colors.white),
+              tooltip: 'Refresh',
+            ),
             IconButton(
               onPressed: () {
                 setState(() {
@@ -1832,7 +1518,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
               },
               icon: const Icon(Icons.search, color: Colors.white),
             ),
-          if (!_isSearching && !isMyView) ...[
             PopupMenuButton<String>(
               icon: const Icon(Icons.sort, color: Colors.white),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1938,7 +1623,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       extendBody: true,
     );
   }
-
   Widget _buildTabContent({
     required bool isDiscover,
     required double padding,
@@ -1951,23 +1635,21 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     final bool localHasError = _getCurrentHasError(isDiscover);
     final String? localError = _getCurrentErrorMessage(isDiscover);
     final bool localLoadingMore = _getCurrentLoadingMore(isDiscover);
-    final bool localHasReachedMax = _getCurrentHasReachedMax(isDiscover);
+    _getCurrentHasReachedMax(isDiscover);
     final List<Animation<double>> localSlideAnimations = _getCurrentSlideAnimations(isDiscover);
     final ScrollController localScrollController = _getCurrentScrollController(isDiscover);
-    final bool localUsingCache = localThreads.any((t) => t.isFromCache);
+    localThreads.any((t) => t.isFromCache);
     
-    // CORRECTED: Changed type to `Future<void> Function()` and made function `async`
-    final Future<void> Function() onRefresh = () async {
+    Future<void> onRefresh() async {
       if (localIsSearching) {
-        await _onSearchChanged(_searchController.text); // Added await
+        await _onSearchChanged(_searchController.text);
         return;
       }
-      await _fetchThreads(reset: true, isMy: !isDiscover); // Added await
-    };
-
+      await _fetchThreads(reset: true, isMy: !isDiscover);
+    }
     return localLoading
         ? RefreshIndicator(
-            // CORRECTED: Used the `onRefresh` variable for consistency
+          
             onRefresh: onRefresh,
             color: const Color(0xFF4A90E2),
             strokeWidth: 2.5,
@@ -2045,11 +1727,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                               ElevatedButton.icon(
                                 onPressed: localIsSearching
                                     ? _clearSearch
-                                    : (!isDiscover ? _showCreateDialog : _showCreateDialog),
+                                    : _showCreateDialog,
                                 icon: const Icon(Icons.add),
                                 label: Text(localIsSearching
                                     ? 'Clear Search'
-                                    : (!isDiscover ? 'Create Roundtable' : 'Start Roundtable')),
+                                    : 'Create Roundtable'),
                               ),
                             ],
                           ),
@@ -2100,62 +1782,22 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                     ),
                   );
   }
-
   Widget _buildThreadCard(Thread thread, double cardPadding, String currentUser, Color cardColor, {required bool isMy}) {
-    List<Widget> actionButtons = [
-      Expanded(
-        child: _ActionButton(
-          icon: Icons.comment_outlined,
-          label: '${thread.commentCount}',
-          iconSize: 20,
-          fontSize: 13,
-          onTap: () => Navigator.push(
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => ThreadDetailScreen(
-                thread: thread,
-                username: currentUser,
-                userId: userId ?? 0,
-              ),
-              transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                return SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(1.0, 0.0),
-                    end: Offset.zero,
-                  ).animate(CurvedAnimation(
-                    parent: animation,
-                    curve: Curves.easeInOut,
-                  )),
-                  child: child,
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-      const SizedBox(width: 8),
-      Expanded(
-        child: _ActionButton(
-          icon: Icons.people_outline,
-          label: '${thread.collabCount}',
-          iconSize: 20,
-          fontSize: 13,
-          onTap: () => _sendCollab(thread.id, 'Interested in discussing!'),
-        ),
-      ),
-    ];
-    if (isMy) {
-      actionButtons.insert(0, Expanded(
-        child: _ActionButton(
-          icon: Icons.lightbulb_outline,
-          label: '${thread.inspiredCount}',
-          iconSize: 20,
-          fontSize: 13,
-          onTap: () => _toggleInspire(thread.id),
-        ),
-      ));
-      actionButtons.insert(1, const SizedBox(width: 8));
-    }
+    // List<Widget> actionButtons = [
+  
+    // ];
+    // if (isMy) {
+    //   actionButtons.insert(0, Expanded(
+    //     child: _ActionButton(
+    //       icon: Icons.lightbulb_outline,
+    //       label: '${thread.inspiredCount}',
+    //       iconSize: 20,
+    //       fontSize: 13,
+    //       onTap: () => _toggleInspire(thread.id),
+    //     ),
+    //   ));
+    //   actionButtons.insert(1, const SizedBox(width: 8));
+    // }
     final cardWidget = Card(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       elevation: 0,
@@ -2346,7 +1988,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                               IconButton(
                                 icon: const Icon(Icons.copy, size: 16),
                                 onPressed: () {
-                                  Clipboard.setData(ClipboardData(text: thread.inviteCode!));
+                                  Clipboard.setData(ClipboardData(text: thread.inviteCode ?? ''));
                                   _showSuccess('Code copied!');
                                 },
                               ),
@@ -2385,14 +2027,14 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: actionButtons,
-                      ),
-                    ),
+                    // const SizedBox(height: 12),
+                    // Padding(
+                    //   padding: const EdgeInsets.only(top: 2),
+                    //   child: Row(
+                    //     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    //     children: actionButtons,
+                    //   ),
+                    // ),
                   ],
                 ),
               ),
@@ -2412,7 +2054,6 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         : Hero(tag: 'thread_${thread.id}', child: cardWidget);
   }
 }
-
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -2426,6 +2067,7 @@ class _ActionButton extends StatelessWidget {
     required this.onTap,
     this.iconSize,
     this.fontSize,
+    // ignore: unused_element_parameter
     this.iconColor,
   });
   @override
