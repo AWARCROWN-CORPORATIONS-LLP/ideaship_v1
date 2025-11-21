@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:ideaship/feed/createpost.dart';
-import 'package:ideaship/feed/posts.dart'; // For CommentsPage
+import 'package:ideaship/feed/posts.dart'; 
 import 'package:ideaship/feed/startups.dart';
 import 'package:ideaship/jobs/job_drawer.dart';
 import 'package:ideaship/settings/usersettings.dart';
@@ -12,11 +12,12 @@ import 'package:ideaship/thr_project/thread_details.dart';
 import 'package:ideaship/user/userprofile.dart';
 import 'package:ideaship/thr_project/threads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:ideaship/notify/notifications.dart'; // Import NotificationsPage
+import 'package:ideaship/notify/notifications.dart'; 
 import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:ideaship/free_lan/freelancer_welcome_screen.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -36,7 +37,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   String? _role;
   String? _major;
   bool _isLoading = true;
-  //bool _isMessageActive = false;
+
   bool _isDarkMode = false;
   int _unreadCount = 0; 
 

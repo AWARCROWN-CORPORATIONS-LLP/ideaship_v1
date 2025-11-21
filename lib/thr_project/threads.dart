@@ -2205,6 +2205,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
+                          //_ignore:withOpacity
                           color: Colors.red.withOpacity(0.2),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
