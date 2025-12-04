@@ -9,6 +9,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import 'publicprofile.dart';
+
 class ExpandedText extends StatefulWidget {
   final String text;
   final TextStyle style;
@@ -22,6 +23,7 @@ class ExpandedText extends StatefulWidget {
   @override
   State<ExpandedText> createState() => _ExpandedTextState();
 }
+
 class _ExpandedTextState extends State<ExpandedText> {
   bool _isExpanded = false;
   @override
@@ -49,7 +51,9 @@ class _ExpandedTextState extends State<ExpandedText> {
                 overflow: TextOverflow.ellipsis,
               ),
               secondChild: Text(widget.text, style: widget.style),
-              crossFadeState: _isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+              crossFadeState: _isExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
               duration: const Duration(milliseconds: 300),
             ),
             const SizedBox(height: 4),
@@ -70,6 +74,7 @@ class _ExpandedTextState extends State<ExpandedText> {
     );
   }
 }
+
 class Skeleton extends StatefulWidget {
   final double height;
   final double width;
@@ -83,7 +88,9 @@ class Skeleton extends StatefulWidget {
   @override
   State<Skeleton> createState() => _SkeletonState();
 }
-class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
+
+class _SkeletonState extends State<Skeleton>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> gradientPosition;
   @override
@@ -93,18 +100,21 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
       duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
-    gradientPosition = Tween<double>(begin: -3, end: 10).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.linear),
-    )..addListener(() {
-        if (mounted) setState(() {});
-      });
+    gradientPosition =
+        Tween<double>(begin: -3, end: 10).animate(
+          CurvedAnimation(parent: _controller, curve: Curves.linear),
+        )..addListener(() {
+          if (mounted) setState(() {});
+        });
     _controller.repeat();
   }
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -126,6 +136,7 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
     );
   }
 }
+
 class PostSkeleton extends StatelessWidget {
   const PostSkeleton({super.key});
   @override
@@ -199,6 +210,7 @@ class PostSkeleton extends StatelessWidget {
     );
   }
 }
+
 class CommentSkeleton extends StatelessWidget {
   const CommentSkeleton({super.key});
   @override
@@ -240,6 +252,7 @@ class CommentSkeleton extends StatelessWidget {
     );
   }
 }
+
 class CommentItem extends StatelessWidget {
   final dynamic comment;
   final int depth;
@@ -272,10 +285,16 @@ class CommentItem extends StatelessWidget {
             child: CircleAvatar(
               radius: 18,
               backgroundImage: comment['profile_picture'] != null
-                  ? NetworkImage('https://server.awarcrown.com/accessprofile/uploads/${comment['profile_picture']}')
+                  ? NetworkImage(
+                      'https://server.awarcrown.com/accessprofile/uploads/${comment['profile_picture']}',
+                    )
                   : null,
               child: comment['profile_picture'] == null
-                  ? Icon(Icons.person, size: 18, color: colorScheme.onSurfaceVariant)
+                  ? Icon(
+                      Icons.person,
+                      size: 18,
+                      color: colorScheme.onSurfaceVariant,
+                    )
                   : null,
             ),
           ),
@@ -287,7 +306,9 @@ class CommentItem extends StatelessWidget {
                 Row(
                   children: [
                     GestureDetector(
-                      onTap: onProfileTap != null ? () => onProfileTap!(username) : null,
+                      onTap: onProfileTap != null
+                          ? () => onProfileTap!(username)
+                          : null,
                       child: Text(
                         username,
                         style: const TextStyle(
@@ -299,14 +320,21 @@ class CommentItem extends StatelessWidget {
                     const SizedBox(width: 8),
                     Text(
                       _formatTimeStatic(comment['created_at']),
-                      style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   comment['comment'] ?? '',
-                  style: TextStyle(fontSize: 14, height: 1.4, color: colorScheme.onSurface),
+                  style: TextStyle(
+                    fontSize: 14,
+                    height: 1.4,
+                    color: colorScheme.onSurface,
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.only(top: 8),
@@ -314,7 +342,9 @@ class CommentItem extends StatelessWidget {
                     children: [
                       GestureDetector(
                         onTap: () {
-                          final id = int.tryParse(comment['comment_id'].toString()) ?? 0;
+                          final id =
+                              int.tryParse(comment['comment_id'].toString()) ??
+                              0;
                           if (id > 0) {
                             onLike(id, postId);
                           }
@@ -332,7 +362,9 @@ class CommentItem extends StatelessWidget {
                               '${comment['like_count'] ?? 0}',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isLiked ? Colors.red : colorScheme.onSurfaceVariant,
+                                color: isLiked
+                                    ? Colors.red
+                                    : colorScheme.onSurfaceVariant,
                               ),
                             ),
                           ],
@@ -341,7 +373,9 @@ class CommentItem extends StatelessWidget {
                       const SizedBox(width: 16),
                       GestureDetector(
                         onTap: () {
-                          final id = int.tryParse(comment['comment_id'].toString()) ?? 0;
+                          final id =
+                              int.tryParse(comment['comment_id'].toString()) ??
+                              0;
                           if (id > 0) {
                             onReply(id, comment['username'] ?? '');
                           }
@@ -365,30 +399,41 @@ class CommentItem extends StatelessWidget {
       ),
     );
   }
-  static String _formatTimeStatic(String? timeString) {
-    if (timeString == null) return 'Unknown';
+
+  String _formatTimeStatic(String? timeString) {
+    if (timeString == null || timeString.isEmpty) return 'Unknown';
+
     try {
-      final date = DateTime.parse(timeString);
-      final now = DateTime.now();
-      final diff = now.difference(date);
-      if (diff.inDays > 365) {
+      String fixed = timeString.replaceAll(' ', 'T');
+
+      DateTime date = DateTime.parse(fixed).toLocal();
+      DateTime now = DateTime.now();
+
+      Duration diff = now.difference(date);
+
+      if (diff.inSeconds < 0) return 'Just now';
+
+      if (diff.inDays >= 365) {
         return '${(diff.inDays / 365).floor()}y ago';
-      } else if (diff.inDays > 30) {
+      } else if (diff.inDays >= 30) {
         return '${(diff.inDays / 30).floor()}mo ago';
-      } else if (diff.inDays > 0) {
+      } else if (diff.inDays >= 1) {
         return '${diff.inDays}d ago';
-      } else if (diff.inHours > 0) {
+      } else if (diff.inHours >= 1) {
         return '${diff.inHours}h ago';
-      } else if (diff.inMinutes > 0) {
+      } else if (diff.inMinutes >= 1) {
         return '${diff.inMinutes}m ago';
+      } else if (diff.inSeconds >= 1) {
+        return '${diff.inSeconds}s ago';
       } else {
         return 'Just now';
       }
-    } catch (_) {
+    } catch (e) {
       return timeString;
     }
   }
 }
+
 class CommentsPage extends StatefulWidget {
   final dynamic post;
   final List<dynamic> comments;
@@ -404,6 +449,7 @@ class CommentsPage extends StatefulWidget {
   @override
   State<CommentsPage> createState() => _CommentsPageState();
 }
+
 class _CommentsPageState extends State<CommentsPage> {
   late dynamic post;
   late String _username;
@@ -422,36 +468,45 @@ class _CommentsPageState extends State<CommentsPage> {
     post = widget.post;
     _username = widget.username;
     _userId = widget.userId;
-    comments = List.from(widget.comments); // Copy to avoid mutation
+    comments = List.from(widget.comments);
     _initializeUserId();
     _processLikeQueue();
     if (comments.isEmpty) {
       _fetchComments();
     }
   }
+
   List<dynamic> _parseComments(List<dynamic> rawComments) {
     return rawComments.map((c) {
       final comment = Map<String, dynamic>.from(c);
-      // Parse key numeric fields to int; fallback to 0 if invalid
-      comment['comment_id'] = int.tryParse(comment['comment_id'].toString()) ?? 0;
-      comment['like_count'] = int.tryParse(comment['like_count'].toString()) ?? 0;
+      comment['comment_id'] =
+          int.tryParse(comment['comment_id'].toString()) ?? 0;
+      comment['like_count'] =
+          int.tryParse(comment['like_count'].toString()) ?? 0;
       comment['user_id'] = int.tryParse(comment['user_id'].toString()) ?? 0;
-      // Add more fields if needed (e.g., 'parent_comment_id')
-      comment['parent_comment_id'] = int.tryParse(comment['parent_comment_id'].toString());
+      comment['parent_comment_id'] = int.tryParse(
+        comment['parent_comment_id'].toString(),
+      );
       return comment;
     }).toList();
   }
+
   Future<void> _initializeUserId() async {
     if (_userId == null || _userId == 0) {
       await _fetchUserId();
     }
   }
+
   Future<void> _fetchUserId() async {
     if (_username.isEmpty) return;
     try {
-      final response = await http.get(
-        Uri.parse('https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(_username)}'),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(_username)}',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && data['error'] == null) {
@@ -480,6 +535,7 @@ class _CommentsPageState extends State<CommentsPage> {
       _showError(_getErrorMessage(e));
     }
   }
+
   @override
   void dispose() {
     commentController.dispose();
@@ -487,6 +543,7 @@ class _CommentsPageState extends State<CommentsPage> {
     _refreshNotifier.dispose();
     super.dispose();
   }
+
   Future<void> _queueLikeAction(Map<String, dynamic> actionMap) async {
     final prefs = await SharedPreferences.getInstance();
     List<dynamic> queue = [];
@@ -497,6 +554,7 @@ class _CommentsPageState extends State<CommentsPage> {
     queue.add(actionMap);
     await prefs.setString('like_queue', json.encode(queue));
   }
+
   Future<void> _processLikeQueue() async {
     if (_userId == null || _userId == 0) {
       await _fetchUserId();
@@ -521,17 +579,20 @@ class _CommentsPageState extends State<CommentsPage> {
         if (item['type'] == 'post') {
           endpoint = 'https://server.awarcrown.com/feed/like_action';
           body = 'post_id=${item['id']}&user_id=$_userId';
-        } else if (item['type'] == 'comment') {
+        } /*else if (item['type'] == 'comment') {
           endpoint = 'https://server.awarcrown.com/feed/comment_reaction';
-          body = 'comment_id=${item['id']}&user_id=$_userId&action=${item['action']}';
-        } else {
+          body =
+              'comment_id=${item['id']}&user_id=$_userId&action=${item['action']}';
+        } */else {
           continue;
         }
-        final response = await http.post(
-          Uri.parse(endpoint),
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-          body: body,
-        ).timeout(const Duration(seconds: 10));
+        final response = await http
+            .post(
+              Uri.parse(endpoint),
+              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+              body: body,
+            )
+            .timeout(const Duration(seconds: 10));
         if (response.statusCode != 200) {
           throw http.ClientException('Server error: ${response.statusCode}');
         }
@@ -548,6 +609,7 @@ class _CommentsPageState extends State<CommentsPage> {
       }
     }
   }
+
   String _getErrorMessage(dynamic e) {
     if (e is SocketException) {
       return 'No internet connection. Please check your connection and try again.';
@@ -559,6 +621,7 @@ class _CommentsPageState extends State<CommentsPage> {
       return 'An unexpected error occurred. Please try again.';
     }
   }
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -570,6 +633,7 @@ class _CommentsPageState extends State<CommentsPage> {
       ),
     );
   }
+
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -581,18 +645,22 @@ class _CommentsPageState extends State<CommentsPage> {
       ),
     );
   }
+
   Future<void> _fetchComments() async {
     await _processLikeQueue();
     if (commentLoading || _username.isEmpty) return;
     if (mounted) setState(() => commentLoading = true);
     try {
-      final url = 'https://server.awarcrown.com/feed/fetch_comments?post_id=${post['post_id']}&username=${Uri.encodeComponent(_username)}';
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final url =
+          'https://server.awarcrown.com/feed/fetch_comments?post_id=${post['post_id']}&username=${Uri.encodeComponent(_username)}';
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
           setState(() => comments = _parseComments(data['comments'] ?? []));
-          _refreshNotifier.value = !_refreshNotifier.value; // Trigger rebuild for nested lists
+          _refreshNotifier.value = !_refreshNotifier.value;
         }
       } else {
         throw http.ClientException('Server error: ${response.statusCode}');
@@ -605,90 +673,140 @@ class _CommentsPageState extends State<CommentsPage> {
       if (mounted) setState(() => commentLoading = false);
     }
   }
-  Future<void> _toggleCommentReaction(int commentId) async {
-    if (!mounted) return;
-    if (_userId == null || _userId == 0) {
-      await _fetchUserId();
-      if (!mounted || _userId == null || _userId == 0) {
-        _showError('User not authenticated. Please log in again.');
-        return;
-      }
-    }
-    if (commentIsReacting[commentId] ?? false) return;
-    final commentIndex = comments.indexWhere((c) => int.tryParse(c['comment_id'].toString()) == commentId);
-    if (commentIndex == -1) return;
-    final comment = comments[commentIndex];
-    final oldLiked = comment['current_reaction'] != null;
-    final oldCount = comment['like_count'] ?? 0;
-    final newLiked = !oldLiked;
-    final newCount = oldCount + (newLiked ? 1 : -1);
-    final action = newLiked ? 'like' : 'unlike';
-    // Optimistic update
-    if (mounted) {
-      setState(() {
-        comments[commentIndex]['current_reaction'] = newLiked ? 'like' : null;
-        comments[commentIndex]['like_count'] = newCount;
-      });
-    }
-    setState(() => commentIsReacting[commentId] = true);
-    try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/comment_reaction'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'comment_id=$commentId&user_id=$_userId&action=$action',
-      ).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is Map<String, dynamic> && mounted) {
-          setState(() {
-            if (data['like_count'] != null) {
-              comments[commentIndex]['like_count'] = data['like_count'];
-            }
-            if (data['is_liked'] != null) {
-              comments[commentIndex]['current_reaction'] = data['is_liked'] ? 'like' : null;
-            }
-          });
-        }
-      } else {
-        throw http.ClientException('Server error: ${response.statusCode}');
-      }
-    } catch (e) {
-      final isOfflineError = e is SocketException || e is TimeoutException;
-      if (isOfflineError) {
-        await _queueLikeAction({'type': 'comment', 'id': commentId, 'action': action});
-        _showSuccess('Like action queued offline');
-      } else {
-        if (mounted) {
-          setState(() {
-            comments[commentIndex]['current_reaction'] = oldLiked ? 'like' : null;
-            comments[commentIndex]['like_count'] = oldCount;
-          });
-        }
-        _showError('Failed to ${newLiked ? 'like' : 'unlike'} comment: ${_getErrorMessage(e)}');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => commentIsReacting[commentId] = false);
-      }
+// Prevent multiple rapid reaction clicks
+Map<int, DateTime> _lastReactionTime = {}; 
+
+Future<void> _toggleCommentReaction(int commentId) async {
+  if (!mounted) return;
+
+  // User ID must exist
+  if (_userId == null || _userId == 0) {
+    await _fetchUserId();
+    if (!mounted || _userId == null || _userId == 0) {
+      _showError('User not authenticated. Please log in again.');
+      return;
     }
   }
+
+  final now = DateTime.now();
+  final lastTime = _lastReactionTime[commentId];
+
+  if (lastTime != null && now.difference(lastTime).inMilliseconds < 500) {
+    // Ignore tapping too fast (less than 500ms)
+    return;
+  }
+
+  _lastReactionTime[commentId] = now;
+
+  if (commentIsReacting[commentId] == true) return;
+
+  final commentIndex = comments.indexWhere(
+    (c) => int.tryParse(c['comment_id'].toString()) == commentId,
+  );
+
+  if (commentIndex == -1) return;
+
+  final comment = comments[commentIndex];
+
+  final bool oldLiked = comment['current_reaction'] == 'like';
+  final int oldCount = (comment['like_count'] ?? 0);
+
+  final bool newLiked = !oldLiked;
+  final int newCount = oldCount + (newLiked ? 1 : -1);
+
+  final String action = newLiked ? "like" : "unlike";
+
+  if (mounted) {
+    setState(() {
+      comments[commentIndex]['current_reaction'] = newLiked ? 'like' : null;
+      comments[commentIndex]['like_count'] = newCount;
+    });
+  }
+
+  commentIsReacting[commentId] = true;
+
+  try {
+    final response = await http
+        .post(
+          Uri.parse("https://server.awarcrown.com/feed/like_comment"),
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+          body: {
+            'comment_id': commentId.toString(),
+            'user_id': _userId.toString(),
+            'action': action,
+          },
+        )
+        .timeout(Duration(seconds: 10));
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+
+      if (mounted && data is Map<String, dynamic>) {
+        setState(() {
+          comments[commentIndex]['like_count'] =
+              data['like_count'] ?? newCount;
+
+          comments[commentIndex]['current_reaction'] =
+              data['is_liked'] == true ? 'like' : null;
+        });
+      }
+    } else {
+      throw http.ClientException("Server error: ${response.statusCode}");
+    }
+  } catch (e) {
+    final offline = e is SocketException || e is TimeoutException;
+
+    if (offline) {
+      await _queueLikeAction({
+        'type': 'comment',
+        'id': commentId,
+        'action': action,
+      });
+      _showSuccess("Like action queued offline");
+    } else {
+     
+      if (mounted) {
+        setState(() {
+          comments[commentIndex]['current_reaction'] =
+              oldLiked ? 'like' : null;
+          comments[commentIndex]['like_count'] = oldCount;
+        });
+      }
+
+      _showError(
+          "Failed to ${newLiked ? 'like' : 'unlike'} comment: ${_getErrorMessage(e)}");
+    }
+  } finally {
+    if (mounted) {
+      commentIsReacting[commentId] = false;
+      setState(() {});
+    }
+  }
+}
+
+
   Future<void> _postComment(String text, {int? parentCommentId}) async {
     if (text.isEmpty || _username.isEmpty) return;
     try {
-      String body = 'post_id=${post['post_id']}&username=${Uri.encodeComponent(_username)}&comment=${Uri.encodeComponent(text)}';
+      String body =
+          'post_id=${post['post_id']}&username=${Uri.encodeComponent(_username)}&comment=${Uri.encodeComponent(text)}';
       if (parentCommentId != null) {
         body += '&parent_comment_id=$parentCommentId';
       }
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/submit_comment'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: body,
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/feed/submit_comment'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data is Map<String, dynamic> && data['status'] == 'success' && mounted) {
+        if (data is Map<String, dynamic> &&
+            data['status'] == 'success' &&
+            mounted) {
           setState(() {
-            final newComment = _parseComments([data])[0]; // Parse just this one
+            final newComment = _parseComments([data])[0]; 
             comments.insert(0, newComment);
             _refreshNotifier.value = !_refreshNotifier.value;
           });
@@ -697,7 +815,9 @@ class _CommentsPageState extends State<CommentsPage> {
             replyToCommentId = null;
             replyToUsername = '';
           });
-          final message = parentCommentId != null ? 'Reply posted' : 'Comment posted';
+          final message = parentCommentId != null
+              ? 'Reply posted'
+              : 'Comment posted';
           _showSuccess(message);
         } else if (data is Map<String, dynamic> && data['status'] == 'error') {
           _showError(data['message'] ?? 'Failed to post comment');
@@ -711,6 +831,7 @@ class _CommentsPageState extends State<CommentsPage> {
       _showError('Failed to post comment: ${_getErrorMessage(e)}');
     }
   }
+
   void _navigateToProfile(String username) {
     Navigator.push(
       context,
@@ -719,17 +840,24 @@ class _CommentsPageState extends State<CommentsPage> {
       ),
     );
   }
+
   void _addCommentsToFlat(List<dynamic> flat, dynamic comment, int depth) {
     (comment as Map<String, dynamic>)['_depth'] = depth;
     flat.add(comment);
-    final children = comments
-        .where((c) => int.tryParse(c['parent_comment_id'].toString()) == int.tryParse(comment['comment_id'].toString()))
-        .toList()
-      ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
+    final children =
+        comments
+            .where(
+              (c) =>
+                  int.tryParse(c['parent_comment_id'].toString()) ==
+                  int.tryParse(comment['comment_id'].toString()),
+            )
+            .toList()
+          ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
     for (var child in children) {
       _addCommentsToFlat(flat, child, depth + 1);
     }
   }
+
   Widget _buildCommentsList() {
     final allComments = comments;
     if (allComments.isEmpty) {
@@ -751,10 +879,13 @@ class _CommentsPageState extends State<CommentsPage> {
       );
     }
     final flatComments = <dynamic>[];
-    final mainComments = allComments
-        .where((c) => int.tryParse(c['parent_comment_id'].toString()) == null)
-        .toList()
-      ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
+    final mainComments =
+        allComments
+            .where(
+              (c) => int.tryParse(c['parent_comment_id'].toString()) == null,
+            )
+            .toList()
+          ..sort((a, b) => b['created_at'].compareTo(a['created_at']));
     for (var main in mainComments) {
       _addCommentsToFlat(flatComments, main, 0);
     }
@@ -797,6 +928,7 @@ class _CommentsPageState extends State<CommentsPage> {
       ),
     );
   }
+
   String _formatTime(String? timeString) {
     if (timeString == null) return 'Unknown';
     try {
@@ -806,7 +938,7 @@ class _CommentsPageState extends State<CommentsPage> {
       if (diff.inDays > 365) {
         return '${(diff.inDays / 365).floor()}y ago';
       } else if (diff.inDays > 30) {
-          return '${(diff.inDays / 30).floor()}mo ago';
+        return '${(diff.inDays / 30).floor()}mo ago';
       } else if (diff.inDays > 0) {
         return '${diff.inDays}d ago';
       } else if (diff.inHours > 0) {
@@ -820,6 +952,7 @@ class _CommentsPageState extends State<CommentsPage> {
       return timeString;
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -861,7 +994,10 @@ class _CommentsPageState extends State<CommentsPage> {
                     }),
                     child: Container(
                       margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(16),
@@ -906,16 +1042,25 @@ class _CommentsPageState extends State<CommentsPage> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(24),
-                        borderSide: BorderSide(color: colorScheme.primary, width: 2),
+                        borderSide: BorderSide(
+                          color: colorScheme.primary,
+                          width: 2,
+                        ),
                       ),
                       filled: true,
                       fillColor: colorScheme.surfaceContainerHighest,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
                     ),
                     onSubmitted: (value) {
                       final trimmed = value.trim();
                       if (trimmed.isNotEmpty) {
-                        _postComment(trimmed, parentCommentId: replyToCommentId);
+                        _postComment(
+                          trimmed,
+                          parentCommentId: replyToCommentId,
+                        );
                       }
                     },
                     maxLines: null,
@@ -929,16 +1074,25 @@ class _CommentsPageState extends State<CommentsPage> {
                     final text = value.text.trim();
                     final isEnabled = text.isNotEmpty;
                     return Material(
-                      color: isEnabled ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                      color: isEnabled
+                          ? colorScheme.primary
+                          : colorScheme.onSurfaceVariant,
                       borderRadius: BorderRadius.circular(24),
                       child: InkWell(
                         onTap: isEnabled
-                            ? () => _postComment(text, parentCommentId: replyToCommentId)
+                            ? () => _postComment(
+                                text,
+                                parentCommentId: replyToCommentId,
+                              )
                             : null,
                         borderRadius: BorderRadius.circular(24),
                         child: const Padding(
                           padding: EdgeInsets.all(12),
-                          child: Icon(Icons.send, color: Colors.white, size: 20),
+                          child: Icon(
+                            Icons.send,
+                            color: Colors.white,
+                            size: 20,
+                          ),
                         ),
                       ),
                     );
@@ -952,11 +1106,13 @@ class _CommentsPageState extends State<CommentsPage> {
     );
   }
 }
+
 class PostsPage extends StatefulWidget {
   const PostsPage({super.key});
   @override
   State<PostsPage> createState() => _PostsPageState();
 }
+
 class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   List<dynamic> posts = [];
   bool isLoading = false;
@@ -978,13 +1134,15 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   final Map<int, bool> isSavingMap = {};
   final ValueNotifier<bool> _refreshNotifier = ValueNotifier(false);
   Set<int> _savedPosts = {};
-  final Map<int, bool> isReportingMap = {}; // Track reporting state to prevent spam
+  final Map<int, bool> isReportingMap =
+      {}; // Track reporting state to prevent spam
   @override
   void initState() {
     super.initState();
     _initializeData();
     _scrollController.addListener(_onScroll);
   }
+
   Future<void> _initializeData() async {
     await _loadUsername();
     await _loadSavedPosts();
@@ -993,6 +1151,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     await _updateFollowStatuses();
     await _fetchPosts();
   }
+
   @override
   void dispose() {
     _scrollController.dispose();
@@ -1006,23 +1165,29 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     _refreshNotifier.dispose();
     super.dispose();
   }
+
   double _getAspectRatio(dynamic post) {
     final w = (post['image_width'] ?? 1).toDouble();
     final h = (post['image_height'] ?? 1).toDouble();
     return w > 0 ? h / w : 1.0;
   }
+
   Future<void> _loadSavedPosts() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final savedStr = prefs.getString('saved_posts');
       if (savedStr != null) {
         final List<dynamic> savedList = json.decode(savedStr);
-        _savedPosts = savedList.map((e) => int.tryParse(e.toString()) ?? 0).where((id) => id > 0).toSet();
+        _savedPosts = savedList
+            .map((e) => int.tryParse(e.toString()) ?? 0)
+            .where((id) => id > 0)
+            .toSet();
       }
     } catch (e) {
       debugPrint('Error loading saved posts: $e');
     }
   }
+
   Future<void> _saveSavedPosts() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1032,6 +1197,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       debugPrint('Error saving saved posts: $e');
     }
   }
+
   Future<void> _queueLikeAction(Map<String, dynamic> actionMap) async {
     final prefs = await SharedPreferences.getInstance();
     List<dynamic> queue = [];
@@ -1042,6 +1208,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     queue.add(actionMap);
     await prefs.setString('like_queue', json.encode(queue));
   }
+
   Future<void> _processLikeQueue() async {
     if (_userId == null || _userId == 0) {
       await _fetchUserId();
@@ -1066,17 +1233,20 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         if (item['type'] == 'post') {
           endpoint = 'https://server.awarcrown.com/feed/like_action';
           body = 'post_id=${item['id']}&user_id=$_userId';
-        } else if (item['type'] == 'comment') {
+        } /*else if (item['type'] == 'comment') {
           endpoint = 'https://server.awarcrown.com/feed/comment_reaction';
-          body = 'comment_id=${item['id']}&user_id=$_userId&action=${item['action']}';
-        } else {
+          body =
+              'comment_id=${item['id']}&user_id=$_userId&action=${item['action']}';
+        }*/ else {
           continue;
         }
-        final response = await http.post(
-          Uri.parse(endpoint),
-          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-          body: body,
-        ).timeout(const Duration(seconds: 10));
+        final response = await http
+            .post(
+              Uri.parse(endpoint),
+              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+              body: body,
+            )
+            .timeout(const Duration(seconds: 10));
         if (response.statusCode != 200) {
           throw http.ClientException('Server error: ${response.statusCode}');
         }
@@ -1093,17 +1263,23 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
+
   int? _parseInt(dynamic value) {
     if (value == null) return null;
     if (value is int) return value;
     return int.tryParse(value.toString());
   }
+
   Future<bool> _getIsFollowing(int followedId) async {
     if (_userId == null) return false;
     try {
-      final response = await http.get(
-        Uri.parse('https://server.awarcrown.com/feed/get_follower?follower_id=$_userId&followed_id=$followedId'),
-      ).timeout(const Duration(seconds: 5));
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://server.awarcrown.com/feed/get_follower?follower_id=$_userId&followed_id=$followedId',
+            ),
+          )
+          .timeout(const Duration(seconds: 5));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic>) {
@@ -1115,6 +1291,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     }
     return false;
   }
+
   Future<void> _updateFollowStatuses() async {
     if (_userId == null || posts.isEmpty) return;
     final uniqueFollowedIds = posts
@@ -1145,6 +1322,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       setState(() {});
     }
   }
+
   String _getErrorMessage(dynamic e) {
     if (e is SocketException) {
       return 'No internet connection. Please check your connection and try again.';
@@ -1156,6 +1334,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       return 'An unexpected error occurred. Please try again.';
     }
   }
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1167,6 +1346,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1178,15 +1358,20 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   Future<void> _savePostsToCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('cached_posts', json.encode(posts));
-      await prefs.setInt('cache_timestamp', DateTime.now().millisecondsSinceEpoch);
+      await prefs.setInt(
+        'cache_timestamp',
+        DateTime.now().millisecondsSinceEpoch,
+      );
     } catch (e) {
       debugPrint('Error saving posts to cache: $e');
     }
   }
+
   Future<void> _loadPostsFromCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1194,7 +1379,8 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       final int? timestamp = prefs.getInt('cache_timestamp');
       if (cachedPostsJson != null && timestamp != null) {
         final cacheAge = DateTime.now().millisecondsSinceEpoch - timestamp;
-        if (cacheAge < 3600000) { // 1 hour
+        if (cacheAge < 3600000) {
+          // 1 hour
           final parsedPosts = json.decode(cachedPostsJson);
           if (parsedPosts is List && mounted) {
             setState(() {
@@ -1213,6 +1399,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       debugPrint('Error loading posts from cache: $e');
     }
   }
+
   Future<void> _loadUsername() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -1229,12 +1416,17 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       debugPrint('Error loading username: $e');
     }
   }
+
   Future<void> _fetchUserId() async {
     if (_username.isEmpty) return;
     try {
-      final response = await http.get(
-        Uri.parse('https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(_username)}'),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(_username)}',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && data['error'] == null) {
@@ -1263,17 +1455,20 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       _showError(_getErrorMessage(e));
     }
   }
+
   void _onScroll() {
     _scrollDebounceTimer?.cancel();
     _scrollDebounceTimer = Timer(const Duration(milliseconds: 200), () {
       if (!_scrollController.hasClients) return;
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 300) {
         if (hasMore && !isLoading && !networkError) {
           _fetchMorePosts();
         }
       }
     });
   }
+
   Future<Map<String, dynamic>?> _fetchPostsData({int? cursorId}) async {
     if (_username.isEmpty) return null;
     try {
@@ -1283,7 +1478,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
           .map((e) => '${e.key}=${Uri.encodeComponent(e.value)}')
           .join('&');
       final url = 'https://server.awarcrown.com/feed/fetch_posts?$queryString';
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 20));
       if (response.statusCode == 200) {
         final parsed = json.decode(response.body);
         if (parsed is Map<String, dynamic>) {
@@ -1298,6 +1495,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       rethrow;
     }
   }
+
   Future<void> _fetchPosts({int? cursorId}) async {
     await _processLikeQueue();
     if (isLoading || _username.isEmpty) return;
@@ -1312,7 +1510,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
             posts = List.from(newPosts);
           } else {
             final postsToAdd = newPosts.where((newPost) {
-              final existingIds = posts.map((existing) => _parseInt(existing['post_id']) ?? 0).toSet();
+              final existingIds = posts
+                  .map((existing) => _parseInt(existing['post_id']) ?? 0)
+                  .toSet();
               final newPostId = _parseInt(newPost['post_id']) ?? 0;
               return !existingIds.contains(newPostId);
             }).toList();
@@ -1340,11 +1540,13 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       if (mounted) setState(() => isLoading = false);
     }
   }
+
   Future<void> _fetchMorePosts() async {
     if (nextCursorId != null) {
       await _fetchPosts(cursorId: nextCursorId);
     }
   }
+
   Future<void> _refreshPosts() async {
     await _processLikeQueue();
     if (_username.isEmpty) return;
@@ -1378,7 +1580,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         });
         await _savePostsToCache();
         await _updateFollowStatuses();
-        _showSuccess('${newOnes.length} new post${newOnes.length > 1 ? 's' : ''} loaded');
+        _showSuccess(
+          '${newOnes.length} new post${newOnes.length > 1 ? 's' : ''} loaded',
+        );
         _refreshNotifier.value = !_refreshNotifier.value;
       }
     } catch (e) {
@@ -1388,6 +1592,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
+
   Future<void> _toggleLike(int postId, int index) async {
     if (!mounted) return;
     if (_userId == null || _userId == 0) {
@@ -1422,7 +1627,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         iconController.stop();
       }
       iconController.forward().then((_) => iconController.reverse());
-      final hasImage = posts[index]['media_url'] != null && posts[index]['media_url'].isNotEmpty;
+      final hasImage =
+          posts[index]['media_url'] != null &&
+          posts[index]['media_url'].isNotEmpty;
       if (hasImage && mounted) {
         setState(() => showHeartOverlay[postId] = true);
         final overlayController = AnimationController(
@@ -1440,11 +1647,13 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
     try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/like_action'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=$postId&user_id=$_userId',
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/feed/like_action'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'post_id=$postId&user_id=$_userId',
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -1472,7 +1681,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
             posts[index]['like_count'] = oldCount;
           });
         }
-        _showError('Failed to ${newLiked ? 'like' : 'unlike'} post: ${_getErrorMessage(e)}');
+        _showError(
+          'Failed to ${newLiked ? 'like' : 'unlike'} post: ${_getErrorMessage(e)}',
+        );
       }
     } finally {
       if (mounted) {
@@ -1480,13 +1691,17 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
+
   Future<void> _fetchComments(int postId) async {
     if (_username.isEmpty) return;
     if (isFetchingComments[postId] ?? false) return;
     setState(() => isFetchingComments[postId] = true);
     try {
-      final url = 'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username)}';
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final url =
+          'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username)}';
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -1505,6 +1720,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
+
   Future<void> _toggleFollow(int followedUserId, int index) async {
     if (!mounted) return;
     if (_userId == null || _userId == 0) {
@@ -1528,18 +1744,23 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     isFollowingMap[followedUserId] = newFollowing;
     if (mounted) setState(() {});
     try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/handle_followers'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'follower_id=$_userId&followed_id=$followedUserId&action=${newFollowing ? 'follow' : 'unfollow'}',
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/feed/handle_followers'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body:
+                'follower_id=$_userId&followed_id=$followedUserId&action=${newFollowing ? 'follow' : 'unfollow'}',
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic>) {
           if (data['status'] == 'success') {
             _showSuccess(newFollowing ? 'Followed user' : 'Unfollowed user');
           } else {
-            throw Exception(data['message'] ?? 'Failed to process follow action');
+            throw Exception(
+              data['message'] ?? 'Failed to process follow action',
+            );
           }
         }
       } else {
@@ -1555,13 +1776,16 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
       isFollowingMap[followedUserId] = oldFollowing;
       if (mounted) setState(() {});
-      _showError('Failed to ${newFollowing ? 'follow' : 'unfollow'} user: ${_getErrorMessage(e)}');
+      _showError(
+        'Failed to ${newFollowing ? 'follow' : 'unfollow'} user: ${_getErrorMessage(e)}',
+      );
     } finally {
       if (mounted) {
         setState(() => isProcessingFollow[followedUserId] = false);
       }
     }
   }
+
   Future<void> _reportPost(int postId, String reason) async {
     if (_username.isEmpty || (isReportingMap[postId] ?? false)) return;
     setState(() => isReportingMap[postId] = true);
@@ -1590,10 +1814,14 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
             'Post reported for "$reason". Thank you for helping keep the community safe.',
           );
         } else {
-          _showError(data['message'] ?? 'Failed to report post. Please try again.');
+          _showError(
+            data['message'] ?? 'Failed to report post. Please try again.',
+          );
         }
       } else if (response.statusCode == 429) {
-        _showError('You have already reported this post recently. Please wait before reporting again.');
+        _showError(
+          'You have already reported this post recently. Please wait before reporting again.',
+        );
       } else if (response.statusCode == 404) {
         _showError('Post not found or already removed.');
       } else if (response.statusCode == 400) {
@@ -1606,7 +1834,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     } on TimeoutException {
       _showError('Request timed out. Please try again.');
     } on SocketException {
-      _showError('No internet connection. Please check your connection and try again.');
+      _showError(
+        'No internet connection. Please check your connection and try again.',
+      );
     } on FormatException {
       _showError('Invalid response format from server.');
     } catch (e) {
@@ -1615,14 +1845,17 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       if (mounted) setState(() => isReportingMap[postId] = false);
     }
   }
+
   Future<void> _sharePost(int postId) async {
     if (_username.isEmpty) return;
     try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/share_post'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/feed/share_post'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && data['status'] == 'success') {
@@ -1642,6 +1875,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       _showError('Failed to share post: ${_getErrorMessage(e)}');
     }
   }
+
   void _showShareSheet(String shareUrl) {
     showModalBottomSheet(
       context: context,
@@ -1705,50 +1939,94 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       },
     );
   }
+
   Future<void> _shareToInstagram(String shareUrl) async {
     await Share.share(shareUrl, subject: 'Check this post on Awarcrown');
     if (mounted) Navigator.pop(context);
   }
-  Future<void> _deletePost(int postId) async {
-    if (_username.isEmpty) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Post'),
-        content: const Text('Are you sure you want to delete this post?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/delete_post'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
-      ).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200 && mounted) {
-        setState(() => posts.removeWhere((p) => _parseInt(p['post_id']) == postId));
-        await _savePostsToCache();
+Future<void> _deletePost(int postId) async {
+  if (_username.isEmpty) return;
+
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      title: const Text('Delete Post'),
+      content: const Text('Are you sure you want to delete this post?'),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          child: const Text('Delete'),
+        ),
+      ],
+    ),
+  );
+
+  if (confirmed != true) return;
+
+  try {
+    final response = await http.post(
+      Uri.parse('https://server.awarcrown.com/feed/delete_post'),
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: {
+        'post_id': postId.toString(),
+        'username': _username,
+      },
+    ).timeout(const Duration(seconds: 10));
+
+    if (response.statusCode == 200 && mounted) {
+      final res = jsonDecode(response.body);
+
+      if (res['status'] == 'success') {
+        // -------------------------------------------------------
+        // 1️⃣ Remove from visible posts list (UI)
+        // -------------------------------------------------------
+        setState(() {
+          posts.removeWhere((p) => _parseInt(p['post_id']) == postId);
+        });
+
+        // -------------------------------------------------------
+        // 2️⃣ Remove from local SharedPreferences cached posts
+        // -------------------------------------------------------
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final String? cachedJson = prefs.getString('cached_posts');
+
+          if (cachedJson != null) {
+            List<dynamic> cachedList = jsonDecode(cachedJson);
+
+            cachedList.removeWhere(
+              (p) => _parseInt(p['post_id']) == postId,
+            );
+
+            await prefs.setString('cached_posts', jsonEncode(cachedList));
+          }
+        } catch (_) {
+          // ignore cache errors, app will still work
+        }
+
         _savedPosts.remove(postId);
         await _saveSavedPosts();
+
+  
+        _refreshNotifier.value = !_refreshNotifier.value;
+
         _showSuccess('Post deleted successfully');
       } else {
-        throw http.ClientException('Server error: ${response.statusCode}');
+        _showError(res['message'] ?? 'Failed to delete post');
       }
-    } catch (e) {
-      _showError('Failed to delete post: ${_getErrorMessage(e)}');
+    } else {
+      _showError('Server returned: ${response.statusCode}');
     }
+  } catch (e) {
+    _showError('Failed to delete post: ${_getErrorMessage(e)}');
   }
+}
+
   Future<void> _toggleSave(int postId, int index) async {
     if (!mounted) return;
     if (_userId == null || _userId == 0) {
@@ -1777,11 +2055,13 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       });
     }
     try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/save_post'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/feed/save_post'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'post_id=$postId&username=${Uri.encodeComponent(_username)}',
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
@@ -1808,13 +2088,16 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
           posts[index]['is_saved'] = oldSaved;
         });
       }
-      _showError('Failed to ${newSaved ? 'save' : 'unsave'} post: ${_getErrorMessage(e)}');
+      _showError(
+        'Failed to ${newSaved ? 'save' : 'unsave'} post: ${_getErrorMessage(e)}',
+      );
     } finally {
       if (mounted) {
         setState(() => isSavingMap[postId] = false);
       }
     }
   }
+
   void _navigateToProfile(String username) {
     Navigator.push(
       context,
@@ -1823,11 +2106,13 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   bool _isOwnPost(int postId, int index) {
     if (_userId == null || _userId == 0) return false;
     final postUserId = _parseInt(posts[index]['user_id']);
     return postUserId == _userId;
   }
+
   void _showImageViewer(String imageUrl) {
     showGeneralDialog(
       context: context,
@@ -1873,7 +2158,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                 right: 20,
                 child: SafeArea(
                   child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 30,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ),
@@ -1884,6 +2173,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       },
     );
   }
+
   Widget _buildEmptyState() {
     final colorScheme = Theme.of(context).colorScheme;
     return Center(
@@ -1892,7 +2182,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.feed_outlined, size: 80, color: colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.feed_outlined,
+              size: 80,
+              color: colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 16),
             Text(
               'No posts yet',
@@ -1905,7 +2199,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
             const SizedBox(height: 8),
             Text(
               'Follow users to see their posts here',
-              style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant),
+              style: TextStyle(
+                fontSize: 14,
+                color: colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1913,6 +2210,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   Widget _buildErrorState() {
     final colorScheme = Theme.of(context).colorScheme;
     return Center(
@@ -1921,7 +2219,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 80, color: colorScheme.onSurfaceVariant),
+            Icon(
+              Icons.error_outline,
+              size: 80,
+              color: colorScheme.onSurfaceVariant,
+            ),
             const SizedBox(height: 16),
             const Text(
               'Failed to load posts',
@@ -1939,8 +2241,13 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
               icon: const Icon(Icons.refresh),
               label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
               ),
             ),
           ],
@@ -1948,6 +2255,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   Widget _buildPostItem(int index) {
     final post = posts[index];
     final postId = _parseInt(post['post_id']) ?? 0;
@@ -1961,10 +2269,13 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     final isSaved = post['is_saved'] ?? _savedPosts.contains(postId);
     final isSaving = isSavingMap[postId] ?? false;
     final isReporting = isReportingMap[postId] ?? false;
-    final iconAnimation = likeAnimationControllers[postId] ?? const AlwaysStoppedAnimation(1.0);
-    final overlayAnimation = heartOverlayControllers[postId] ?? const AlwaysStoppedAnimation(0.0);
+    final iconAnimation =
+        likeAnimationControllers[postId] ?? const AlwaysStoppedAnimation(1.0);
+    final overlayAnimation =
+        heartOverlayControllers[postId] ?? const AlwaysStoppedAnimation(0.0);
     final userId = _parseInt(post['user_id']) ?? 0;
-    final isFollowing = isFollowingMap[userId] ?? (post['is_following'] ?? false);
+    final isFollowing =
+        isFollowingMap[userId] ?? (post['is_following'] ?? false);
     final isProcessing = isProcessingFollow[userId] ?? false;
     final aspectRatio = _getAspectRatio(post);
     final screenWidth = MediaQuery.of(context).size.width;
@@ -1986,10 +2297,15 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                     child: CircleAvatar(
                       radius: 20,
                       backgroundImage: post['profile_picture'] != null
-                          ? NetworkImage('https://server.awarcrown.com/accessprofile/uploads/${post['profile_picture']}')
+                          ? NetworkImage(
+                              'https://server.awarcrown.com/accessprofile/uploads/${post['profile_picture']}',
+                            )
                           : null,
                       child: post['profile_picture'] == null
-                          ? Icon(Icons.person, color: colorScheme.onSurfaceVariant)
+                          ? Icon(
+                              Icons.person,
+                              color: colorScheme.onSurfaceVariant,
+                            )
                           : null,
                     ),
                   ),
@@ -1999,15 +2315,23 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         GestureDetector(
-                          onTap: () => _navigateToProfile(post['username'] ?? ''),
+                          onTap: () =>
+                              _navigateToProfile(post['username'] ?? ''),
                           child: Text(
                             post['username'] ?? 'Unknown',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
                           ),
                         ),
+                        const SizedBox(height: 8),
                         Text(
                           _formatTime(post['created_at']),
-                          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
                       ],
                     ),
@@ -2016,11 +2340,18 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                     Padding(
                       padding: const EdgeInsets.only(right: 8.0),
                       child: ElevatedButton(
-                        onPressed: isProcessing ? null : () => _toggleFollow(userId, index),
+                        onPressed: isProcessing
+                            ? null
+                            : () => _toggleFollow(userId, index),
                         style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           minimumSize: const Size(80, 32),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
                         ),
                         child: isProcessing
                             ? const SizedBox(
@@ -2028,10 +2359,15 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                                 height: 16,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    Colors.white,
+                                  ),
                                 ),
                               )
-                            : const Text('Follow', style: TextStyle(fontSize: 12)),
+                            : const Text(
+                                'Follow',
+                                style: TextStyle(fontSize: 12),
+                              ),
                       ),
                     ),
                   if (!_isOwnPost(postId, index))
@@ -2047,15 +2383,28 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                           value: 'report',
                           child: Row(
                             children: [
-                              Icon(Icons.flag_outlined, size: 20, color: Colors.orange),
+                              Icon(
+                                Icons.flag_outlined,
+                                size: 20,
+                                color: Colors.orange,
+                              ),
                               const SizedBox(width: 8),
-                              const Text('Report', style: TextStyle(color: Colors.orange)),
+                              const Text(
+                                'Report',
+                                style: TextStyle(color: Colors.orange),
+                              ),
                             ],
                           ),
                         ),
                       ],
-                      icon: Icon(Icons.more_vert, size: 20, color: colorScheme.onSurfaceVariant),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      icon: Icon(
+                        Icons.more_vert,
+                        size: 20,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                   if (_isOwnPost(postId, index))
                     PopupMenuButton<String>(
@@ -2069,37 +2418,57 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                           value: 'delete',
                           child: Row(
                             children: [
-                              Icon(Icons.delete_outline, size: 20, color: Colors.red),
+                              Icon(
+                                Icons.delete_outline,
+                                size: 20,
+                                color: Colors.red,
+                              ),
                               const SizedBox(width: 8),
-                              const Text('Delete', style: TextStyle(color: Colors.red)),
+                              const Text(
+                                'Delete',
+                                style: TextStyle(color: Colors.red),
+                              ),
                             ],
                           ),
                         ),
                       ],
-                      icon: Icon(Icons.more_vert, size: 20, color: colorScheme.onSurfaceVariant),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      icon: Icon(
+                        Icons.more_vert,
+                        size: 20,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                 ],
               ),
             ),
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onDoubleTap: () => _toggleLike(postId, index),
-              onLongPress: imageUrl != null ? () => _showImageViewer(imageUrl) : null,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (post['content'] != null && post['content'].isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: ExpandedText(
-                        text: post['content'] as String,
-                        style: TextStyle(fontSize: 14, height: 1.4, color: colorScheme.onSurface),
-                        maxLines: 3,
-                      ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (post['content'] != null && post['content'].isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
                     ),
-                  if (imageUrl != null)
-                    Stack(
+                    child: ExpandedText(
+                      text: post['content'] as String,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.4,
+                        color: colorScheme.onSurface,
+                      ),
+                      maxLines: 3,
+                    ),
+                  ),
+                if (imageUrl != null)
+                  GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onDoubleTap: () => _toggleLike(postId, index),
+                    onLongPress: () => _showImageViewer(imageUrl),
+                    child: Stack(
                       children: [
                         Container(
                           width: double.infinity,
@@ -2116,23 +2485,34 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                                   key: ValueKey(imageUrl),
                                   imageUrl: imageUrl,
                                   fit: BoxFit.cover,
-                                  fadeInDuration: const Duration(milliseconds: 200),
-                                  fadeOutDuration: const Duration(milliseconds: 200),
+                                  fadeInDuration: const Duration(
+                                    milliseconds: 200,
+                                  ),
+                                  fadeOutDuration: const Duration(
+                                    milliseconds: 200,
+                                  ),
                                   placeholder: (context, url) => Container(
                                     color: colorScheme.surfaceContainerHighest,
-                                    child: const Skeleton(height: double.infinity, width: double.infinity),
-                                  ),
-                                  errorWidget: (context, url, error) => Container(
-                                    decoration: BoxDecoration(
-                                      color: colorScheme.surfaceContainerHighest,
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Icon(
-                                      Icons.image_not_supported,
-                                      color: colorScheme.onSurfaceVariant,
-                                      size: 48,
+                                    child: const Skeleton(
+                                      height: double.infinity,
+                                      width: double.infinity,
                                     ),
                                   ),
+                                  errorWidget: (context, url, error) =>
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: colorScheme
+                                              .surfaceContainerHighest,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.image_not_supported,
+                                          color: colorScheme.onSurfaceVariant,
+                                          size: 48,
+                                        ),
+                                      ),
                                 ),
                               ),
                             ),
@@ -2143,14 +2523,23 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                             child: AnimatedBuilder(
                               animation: overlayAnimation,
                               builder: (context, child) {
-                                final scale = Curves.easeOut.transform(overlayAnimation.value) * 1.5;
-                                final opacity = 1.0 - (overlayAnimation.value * 0.8);
+                                final scale =
+                                    Curves.easeOut.transform(
+                                      overlayAnimation.value,
+                                    ) *
+                                    1.5;
+                                final opacity =
+                                    1.0 - (overlayAnimation.value * 0.8);
                                 return Transform.scale(
                                   scale: scale,
                                   alignment: Alignment.center,
                                   child: Opacity(
                                     opacity: opacity,
-                                    child: const Icon(Icons.favorite, size: 100, color: Colors.red),
+                                    child: const Icon(
+                                      Icons.favorite,
+                                      size: 100,
+                                      color: Colors.red,
+                                    ),
                                   ),
                                 );
                               },
@@ -2158,8 +2547,8 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                           ),
                       ],
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
             Container(
@@ -2174,7 +2563,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                         onTap: () => _toggleLike(postId, index),
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -2184,19 +2576,27 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                                       height: 24,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.red),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.red,
+                                            ),
                                       ),
                                     )
                                   : AnimatedBuilder(
                                       animation: iconAnimation,
                                       builder: (context, child) {
-                                        final scale = 1.0 + (0.4 * iconAnimation.value);
+                                        final scale =
+                                            1.0 + (0.4 * iconAnimation.value);
                                         return Transform.scale(
                                           scale: scale,
                                           child: Icon(
-                                            isLiked ? Icons.favorite : Icons.favorite_border,
+                                            isLiked
+                                                ? Icons.favorite
+                                                : Icons.favorite_border,
                                             size: 24,
-                                            color: isLiked ? Colors.red : colorScheme.onSurface,
+                                            color: isLiked
+                                                ? Colors.red
+                                                : colorScheme.onSurface,
                                           ),
                                         );
                                       },
@@ -2207,7 +2607,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                                 style: TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: isLiked ? Colors.red : colorScheme.onSurface,
+                                  color: isLiked
+                                      ? Colors.red
+                                      : colorScheme.onSurface,
                                 ),
                               ),
                             ],
@@ -2236,7 +2638,10 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                               },
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -2246,10 +2651,17 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                                       height: 24,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                              Colors.blue,
+                                            ),
                                       ),
                                     )
-                                  : Icon(Icons.mode_comment_outlined, size: 24, color: colorScheme.onSurface),
+                                  : Icon(
+                                      Icons.mode_comment_outlined,
+                                      size: 24,
+                                      color: colorScheme.onSurface,
+                                    ),
                               const SizedBox(width: 6),
                               Text(
                                 '${post['comment_count'] ?? 0}',
@@ -2274,7 +2686,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                       ),
                       const Spacer(),
                       InkWell(
-                        onTap: isSaving ? null : () => _toggleSave(postId, index),
+                        onTap: isSaving
+                            ? null
+                            : () => _toggleSave(postId, index),
                         borderRadius: BorderRadius.circular(20),
                         child: Padding(
                           padding: const EdgeInsets.all(12),
@@ -2284,13 +2698,19 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                                   height: 24,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.blue),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.blue,
+                                    ),
                                   ),
                                 )
                               : Icon(
-                                  isSaved ? Icons.bookmark : Icons.bookmark_border,
+                                  isSaved
+                                      ? Icons.bookmark
+                                      : Icons.bookmark_border,
                                   size: 24,
-                                  color: isSaved ? colorScheme.primary : colorScheme.onSurfaceVariant,
+                                  color: isSaved
+                                      ? colorScheme.primary
+                                      : colorScheme.onSurfaceVariant,
                                 ),
                         ),
                       ),
@@ -2304,6 +2724,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   void _showReportDialog(int postId) {
     final List<String> reasons = [
       'Spam or misleading',
@@ -2326,9 +2747,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: selectedReason,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                ),
+                decoration: const InputDecoration(border: OutlineInputBorder()),
                 items: reasons.map((reason) {
                   return DropdownMenuItem<String>(
                     value: reason,
@@ -2363,6 +2782,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   Widget _buildList() {
     if (posts.isEmpty) {
       if (isLoading) {
@@ -2397,6 +2817,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       ),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -2412,10 +2833,15 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                 elevation: 2,
                 child: Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: colorScheme.errorContainer,
-                    border: Border(bottom: BorderSide(color: colorScheme.error, width: 1)),
+                    border: Border(
+                      bottom: BorderSide(color: colorScheme.error, width: 1),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -2442,26 +2868,25 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     );
   }
   String _formatTime(String? timeString) {
-    if (timeString == null) return 'Unknown';
-    try {
-      final date = DateTime.parse(timeString);
-      final now = DateTime.now();
-      final diff = now.difference(date);
-      if (diff.inDays > 365) {
-        return '${(diff.inDays / 365).floor()}y ago';
-      } else if (diff.inDays > 30) {
-          return '${(diff.inDays / 30).floor()}mo ago';
-      } else if (diff.inDays > 0) {
-        return '${diff.inDays}d ago';
-      } else if (diff.inHours > 0) {
-        return '${diff.inHours}h ago';
-      } else if (diff.inMinutes > 0) {
-        return '${diff.inMinutes}m ago';
-      } else {
-        return 'Just now';
-      }
-    } catch (_) {
-      return timeString;
-    }
+  if (timeString == null || timeString.isEmpty) return 'Unknown';
+
+  try {
+    DateTime date = DateTime.parse(timeString).toLocal();
+    Duration diff = DateTime.now().difference(date);
+
+    if (diff.inSeconds < 0) return '0s';
+    if (diff.inSeconds < 60) return '${diff.inSeconds}secs ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}mins ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}days ago';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}weeks ago';
+    if (diff.inDays < 365) return '${(diff.inDays / 30).floor()}months ago';
+
+    return '${(diff.inDays / 365).floor()}y';
+  } catch (e) {
+    return timeString;
   }
+}
+
+
 }

@@ -17,7 +17,7 @@ import 'package:http/http.dart' as http;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:ideaship/free_lan/freelancer_welcome_screen.dart';
+
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
@@ -166,25 +166,25 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     String? token = await fcm.getToken();
     if (_username != null) {
       await http.post(
-        Uri.parse('https://server.awarcrown.com/threads/update_token'),  // Or general endpoint
+        Uri.parse('https://server.awarcrown.com/threads/update_token'), 
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'username': _username, 'token': token}),
       );
     }
 
-    // Foreground: Show local notif AND store
+    
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       debugPrint('Foreground message: ${message.notification?.title}');
-      _showLocalNotification(message); // Show local notification
-      _storeNotification(message); // Use local helper
-      // No manual update; _storeNotification will load and set count
+      _showLocalNotification(message);
+      _storeNotification(message); 
+      
     });
 
-    // Background/Terminated tap: Store and handle nav
+    
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       _storeNotification(message);
-      _handleNotificationNavigation(message.data); // Handle navigation
-      _markAllRead();  // Optional: Mark on app open
+      _handleNotificationNavigation(message.data); 
+      _markAllRead();  
     });
 
     RemoteMessage? initialMessage = await fcm.getInitialMessage();
@@ -194,7 +194,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     }
   }
 
-  // Store notification from RemoteMessage
+  
   Future<void> _storeNotification(RemoteMessage message) async {
     final prefs = await SharedPreferences.getInstance();
     final notifData = {
@@ -208,10 +208,10 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     final notificationsJson = prefs.getStringList('notifications') ?? [];
     notificationsJson.insert(0, json.encode(notifData));
     await prefs.setStringList('notifications', notificationsJson);
-    await _loadUnreadCount();  // Reload to set accurate count
+    await _loadUnreadCount();  
   }
 
-  // New: Load unread count from prefs
+ 
   Future<void> _loadUnreadCount() async {
     final prefs = await SharedPreferences.getInstance();
     final notificationsJson = prefs.getStringList('notifications') ?? [];
@@ -222,12 +222,11 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     if (mounted) setState(() => _unreadCount = unread);
   }
 
-  // Updated: Set unread count to absolute value (for callback)
+ 
   void _setUnreadCount(int count) {
     if (mounted) setState(() => _unreadCount = count);
   }
 
-  // New: Mark all as read
   Future<void> _markAllRead() async {
     final prefs = await SharedPreferences.getInstance();
     final notificationsJson = prefs.getStringList('notifications') ?? [];
@@ -242,7 +241,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
     }
     if (updated) {
       await prefs.setStringList('notifications', notificationsJson);
-      await _loadUnreadCount();  // Reload to set accurate count
+      await _loadUnreadCount();  
     }
   }
 

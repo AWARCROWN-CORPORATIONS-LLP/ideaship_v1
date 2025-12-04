@@ -1,47 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:ideaship/thr_project/thread_details.dart';
 import 'dart:async';
-import 'dart:io';  
+import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:app_links/app_links.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';  // New import
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'auth/auth_log_reg.dart';
 import 'role_selection/role.dart';
 import 'dashboard.dart';
 import 'feed/posts.dart';
 import 'thr_project/threads.dart';
+
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint('Handling background message: ${message.messageId}');
   debugPrint('Message data: ${message.data}');
 
-  
   await _showLocalNotification(message);
 }
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-
-final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
 
 Future<void> _initializeLocalNotifications() async {
   const AndroidInitializationSettings initializationSettingsAndroid =
-      AndroidInitializationSettings('@mipmap/ic_launcher');  
+      AndroidInitializationSettings('@mipmap/ic_launcher');
 
   const DarwinInitializationSettings initializationSettingsIOS =
       DarwinInitializationSettings(
-    requestAlertPermission: true,
-    requestBadgePermission: true,
-    requestSoundPermission: true,
-    onDidReceiveLocalNotification: null,  
-  );
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+        onDidReceiveLocalNotification: null,
+      );
 
-  const InitializationSettings initializationSettings =
-      InitializationSettings(
+  const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
     iOS: initializationSettingsIOS,
   );
@@ -49,39 +48,38 @@ Future<void> _initializeLocalNotifications() async {
   await flutterLocalNotificationsPlugin.initialize(
     initializationSettings,
     onDidReceiveNotificationResponse: (NotificationResponse response) {
-   
-      final data = response.payload != null ? json.decode(response.payload!) : <String, dynamic>{};
-      _handleNotificationTap(data); 
+      final data = response.payload != null
+          ? json.decode(response.payload!)
+          : <String, dynamic>{};
+      _handleNotificationTap(data);
     },
   );
 
- 
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'high_importance_channel', 
-    'High Importance Notifications', 
+    'high_importance_channel',
+    'High Importance Notifications',
     description: 'Your app notifications',
     importance: Importance.max,
     playSound: true,
-    sound: RawResourceAndroidNotificationSound('default'), 
+    sound: RawResourceAndroidNotificationSound('default'),
   );
 
   if (Platform.isAndroid) {
     await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(channel);
   }
 }
-
 
 void _handleNotificationTap(Map<String, dynamic> data) {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     if (navigatorKey.currentContext != null) {
       final threadId = int.tryParse(data['thread_id'] ?? '');
       if (threadId != null) {
-       
         debugPrint('Navigating to thread: $threadId');
       }
-    
     }
   });
 }
@@ -89,36 +87,37 @@ void _handleNotificationTap(Map<String, dynamic> data) {
 Future<void> _showLocalNotification(RemoteMessage message) async {
   const AndroidNotificationDetails androidPlatformChannelSpecifics =
       AndroidNotificationDetails(
-    'high_importance_channel',
-    'High Importance Notifications',
-    channelDescription: 'Your app notifications',
-    importance: Importance.max,
-    priority: Priority.high,
-    showWhen: false,
-    icon: '@drawable/ic_notification',  
-  );
+        'high_importance_channel',
+        'High Importance Notifications',
+        channelDescription: 'Your app notifications',
+        importance: Importance.max,
+        priority: Priority.high,
+        showWhen: false,
+        icon: '@drawable/ic_notification',
+      );
 
   const DarwinNotificationDetails iOSPlatformChannelSpecifics =
       DarwinNotificationDetails(
-    presentAlert: true,
-    presentBadge: true,
-    presentSound: true,
-  );
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
 
   const NotificationDetails platformChannelSpecifics = NotificationDetails(
     android: androidPlatformChannelSpecifics,
     iOS: iOSPlatformChannelSpecifics,
   );
 
-  final title = message.notification?.title ?? message.data['title'] ?? 'Notification';
+  final title =
+      message.notification?.title ?? message.data['title'] ?? 'Notification';
   final body = message.notification?.body ?? message.data['body'] ?? '';
 
   await flutterLocalNotificationsPlugin.show(
-    0, 
+    0,
     title,
     body,
     platformChannelSpecifics,
-    payload: json.encode(message.data),  
+    payload: json.encode(message.data),
   );
 }
 
@@ -126,7 +125,7 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-  await _initializeLocalNotifications();  
+  await _initializeLocalNotifications();
   runApp(const MyApp());
 }
 
@@ -146,7 +145,6 @@ class _MyAppState extends State<MyApp> {
     super.initState();
     _loadUsername();
     _initDeepLinks();
-   
   }
 
   Future<void> _loadUsername() async {
@@ -193,7 +191,6 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
-  // Navigation helpers
   void _navigateToPost(int postId) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchAndNavigateToPost(postId);
@@ -210,19 +207,25 @@ class _MyAppState extends State<MyApp> {
     if (_username == null || _username!.isEmpty) return;
 
     try {
-      final response = await http.get(
-        Uri.parse(
-            'https://server.awarcrown.com/feed/fetch_single_post?post_id=$postId&username=${Uri.encodeComponent(_username!)}'),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://server.awarcrown.com/feed/fetch_single_post?post_id=$postId&username=${Uri.encodeComponent(_username!)}',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final post = data['post'] ?? {};
         if (post.isNotEmpty) {
-          final commentsResponse = await http.get(
-            Uri.parse(
-                'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username!)}'),
-          ).timeout(const Duration(seconds: 10));
+          final commentsResponse = await http
+              .get(
+                Uri.parse(
+                  'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username!)}',
+                ),
+              )
+              .timeout(const Duration(seconds: 10));
 
           List<dynamic> comments = [];
           if (commentsResponse.statusCode == 200) {
@@ -234,9 +237,9 @@ class _MyAppState extends State<MyApp> {
           final userId = prefs.getInt('user_id');
 
           if (navigatorKey.currentState != null) {
-            ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
-              const SnackBar(content: Text('Opening post...')),
-            );
+            ScaffoldMessenger.of(
+              navigatorKey.currentContext!,
+            ).showSnackBar(const SnackBar(content: Text('Opening post...')));
             navigatorKey.currentState!.push(
               MaterialPageRoute(
                 builder: (context) => CommentsPage(
@@ -264,9 +267,9 @@ class _MyAppState extends State<MyApp> {
     if (_username == null || _username!.isEmpty) return;
 
     try {
-      final response = await http.get(
-        Uri.parse('https://server.awarcrown.com/threads/$threadId'),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(Uri.parse('https://server.awarcrown.com/threads/$threadId'))
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -276,9 +279,9 @@ class _MyAppState extends State<MyApp> {
         final userId = prefs.getInt('user_id');
 
         if (navigatorKey.currentState != null) {
-          ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
-            const SnackBar(content: Text('Opening thread...')),
-          );
+          ScaffoldMessenger.of(
+            navigatorKey.currentContext!,
+          ).showSnackBar(const SnackBar(content: Text('Opening thread...')));
           navigatorKey.currentState!.push(
             MaterialPageRoute(
               builder: (context) => ThreadDetailScreen(
@@ -300,9 +303,13 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _handleShareToken(String token) async {
     try {
-      final response = await http.get(
-        Uri.parse('https://server.awarcrown.com/feed/post_feature?token=$token'),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://server.awarcrown.com/feed/post_feature?token=$token',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -324,10 +331,7 @@ class _MyAppState extends State<MyApp> {
   void _showDeepLinkError(String message) {
     if (navigatorKey.currentContext != null) {
       ScaffoldMessenger.of(navigatorKey.currentContext!).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text(message), backgroundColor: Colors.red),
       );
     } else {
       debugPrint('Deep link error (no context): $message');
@@ -372,13 +376,15 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(seconds: 2),
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutBack));
 
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeIn),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeIn));
 
     _controller.forward();
 
@@ -464,9 +470,10 @@ class _SplashScreenState extends State<SplashScreen>
                     Text(
                       "Awarcrown",
                       style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold),
+                        color: Colors.black,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),

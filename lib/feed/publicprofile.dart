@@ -843,28 +843,26 @@ class _PublicProfilePageState extends State<PublicProfilePage> with TickerProvid
   }
 
   String _formatTime(String? timeString) {
-    if (timeString == null) return 'Unknown';
-    try {
-      final date = DateTime.parse(timeString);
-      final now = DateTime.now();
-      final diff = now.difference(date);
-      if (diff.inDays > 365) {
-        return '${(diff.inDays / 365).floor()}y ago';
-      } else if (diff.inDays > 30) {
-        return '${(diff.inDays / 30).floor()}mo ago';
-      } else if (diff.inDays > 0) {
-        return '${diff.inDays}d ago';
-      } else if (diff.inHours > 0) {
-        return '${diff.inHours}h ago';
-      } else if (diff.inMinutes > 0) {
-        return '${diff.inMinutes}m ago';
-      } else {
-        return 'Just now';
-      }
-    } catch (_) {
-      return timeString;
-    }
+  if (timeString == null || timeString.isEmpty) return 'Unknown';
+
+  try {
+    DateTime date = DateTime.parse(timeString).toLocal();
+    Duration diff = DateTime.now().difference(date);
+
+    if (diff.inSeconds < 0) return '0s';
+    if (diff.inSeconds < 60) return '${diff.inSeconds}secs ago';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}mins ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays < 7) return '${diff.inDays}days ago';
+    if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}weeks ago';
+    if (diff.inDays < 365) return '${(diff.inDays / 30).floor()}months ago';
+
+    return '${(diff.inDays / 365).floor()}y';
+  } catch (e) {
+    return timeString;
   }
+}
+
 
   @override
   void dispose() {
@@ -1093,33 +1091,26 @@ class _PublicProfilePageState extends State<PublicProfilePage> with TickerProvid
                                         : null,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      GestureDetector(
-                                        onTap: () => Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => PublicProfilePage(targetUsername: post['username'] ?? ''),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          post['username'] ?? 'Unknown',
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                      ),
-                                      Text(
-                                        _formatTime(post['created_at']),
-                                        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                             const SizedBox(width: 12),
+Expanded(
+  child: Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        post['username'] ?? 'Unknown',
+        style: const TextStyle(
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+        ),
+      ),
+      Text(
+        _formatTime(post['created_at']),
+        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+      ),
+    ],
+  ),
+),
+
                                 if (!_isOwnPost(postId, index) && !isFollowingUser)
                                   Padding(
                                     padding: const EdgeInsets.only(right: 8.0),

@@ -676,7 +676,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       );
       debugPrint('User granted permission: ${settings.authorizationStatus}');
       String? token = await fcm.getToken();
-      if (token != null && username != null) {
+      if (username != null) {
         await http.post(
           Uri.parse('https://server.awarcrown.com/threads/update_token'),
           headers: {'Content-Type': 'application/json'},
