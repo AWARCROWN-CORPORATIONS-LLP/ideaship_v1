@@ -1092,24 +1092,24 @@ class _PublicProfilePageState extends State<PublicProfilePage> with TickerProvid
                                   ),
                                 ),
                              const SizedBox(width: 12),
-Expanded(
-  child: Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(
-        post['username'] ?? 'Unknown',
-        style: const TextStyle(
-          fontWeight: FontWeight.bold,
-          fontSize: 14,
-        ),
-      ),
-      Text(
-        _formatTime(post['created_at']),
-        style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
-      ),
-    ],
-  ),
-),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          post['username'] ?? 'Unknown',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        Text(
+                                          _formatTime(post['created_at']),
+                                          style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
 
                                 if (!_isOwnPost(postId, index) && !isFollowingUser)
                                   Padding(

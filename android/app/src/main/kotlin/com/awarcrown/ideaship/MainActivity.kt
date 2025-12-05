@@ -1,4 +1,4 @@
-package com.example.ideaship_ui
+package com.awarcrown.ideaship
 
 import io.flutter.embedding.android.FlutterActivity
 

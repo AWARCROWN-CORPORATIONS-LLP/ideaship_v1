@@ -3,17 +3,23 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ideaship/auth/auth_log_reg.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../user/userprofile.dart'; // Add this import
+import '../user/userprofile.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key, required Future<void> Function() onThemeChanged});
+  final Future<void> Function() onThemeChanged;
+
+  const SettingsPage({
+    super.key,
+    required this.onThemeChanged,
+  });
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  
   bool _darkMode = false;
   bool _followSystemTheme = true;
   String _username = '';
@@ -27,27 +33,26 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _darkMode = prefs.getBool('darkMode') ?? false;
-        _followSystemTheme = prefs.getBool('followSystemTheme') ?? true;
-        _username = prefs.getString('username') ?? '';
-        _email = prefs.getString('email') ?? '';
-      });
-    }
+
+    if (!mounted) return;
+
+    setState(() {
+      _darkMode = prefs.getBool('darkMode') ?? false;
+      _followSystemTheme = prefs.getBool('followSystemTheme') ?? true;
+      _username = prefs.getString('username') ?? '';
+      _email = prefs.getString('email') ?? '';
+    });
   }
 
   Future<void> _saveBool(String key, bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(key, value);
+    await widget.onThemeChanged(); // refresh theme
   }
 
   void _showSnackBar(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _navigateToProfile() {
@@ -57,31 +62,34 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  // ---------------- THEME SECTION -----------------
+
   Widget _buildThemeSection() {
     return Column(
       children: [
         SwitchListTile(
           title: const Text('Follow System Theme'),
           value: _followSystemTheme,
-          onChanged: (val) {
+          onChanged: (val) async {
             setState(() {
               _followSystemTheme = val;
               if (val) _darkMode = false;
             });
-            _saveBool('followSystemTheme', val);
-            _saveBool('darkMode', _darkMode);
+
+            await _saveBool('followSystemTheme', val);
+            await _saveBool('darkMode', _darkMode);
           },
         ),
         Opacity(
-          opacity: _followSystemTheme ? 0.5 : 1.0,
+          opacity: _followSystemTheme ? 0.4 : 1.0,
           child: SwitchListTile(
             title: const Text('Dark Mode'),
             value: _darkMode,
             onChanged: _followSystemTheme
                 ? null
-                : (val) {
+                : (val) async {
                     setState(() => _darkMode = val);
-                    _saveBool('darkMode', val);
+                    await _saveBool('darkMode', val);
                   },
           ),
         ),
@@ -89,12 +97,15 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  // ---------------- LOGOUT -----------------
+
   void _showLogoutConfirmation() {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout? This will delete all app data.'),
+        content: const Text(
+            'Are you sure you want to logout? This will delete all local app data.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -114,42 +125,89 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear(); // This deletes all saved data in SharedPreferences (user prefs, theme settings, etc.)
-    // If your app uses other storage (e.g., SQLite, Hive, files), add clearing logic here.
-    // For example:
-    // await DatabaseHelper().deleteDatabase(); // Hypothetical DB clear
-    // await FileStorage.clearAll(); // Hypothetical file clear
+    await prefs.clear();
 
-    if (mounted) {
-      _showSnackBar('Logged out successfully. All data has been cleared.');
+    if (!mounted) return;
+
+    _showSnackBar('Logged out successfully.');
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const AuthLogReg()),
+    );
+  }
+
+  // ---------------- DELETE ACCOUNT -----------------
+
+  void _showDeleteAccountConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Account'),
+        content: const Text(
+          'Are you sure you want to delete your account?\n\n'
+          'This action is permanent and cannot be undone.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _deleteAccount();
+            },
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAccount() async {
+    try {
+      _showSnackBar("Processing account deletion...");
+
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString("username") ?? "";
+
+      
+      final response = await http.post(
+        Uri.parse("https://server.awarcrown.com/api/delete_account"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"username": username}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        _showSnackBar("Account deleted successfully.");
+      } else {
+        _showSnackBar("Account deleted locally (server offline).");
+      }
+
+      await prefs.clear();
+
+      if (!mounted) return;
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => const AuthLogReg()),
       );
-    }
-  }
-
-  void _contactUs() {
-    _showSnackBar('Contact: support@ideaship.com');
-  }
-
-  Future<void> _openTerms() async {
-    final uri = Uri.parse('https://server.awarcrown.com/terms');
-    try {
-      await launchUrl(uri);
     } catch (e) {
-      _showSnackBar('Could not open Terms of Service: $e');
+      _showSnackBar("Error deleting account: $e");
     }
   }
 
-  Future<void> _openPrivacy() async {
-    final uri = Uri.parse('https://server.awarcrown.com/privacy');
-    try {
-      await launchUrl(uri);
-    } catch (e) {
-      _showSnackBar('Could not open Privacy Policy: $e');
+  // ---------------- LINKS -----------------
+
+  Future<void> _openLink(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      _showSnackBar("Failed to open link.");
     }
   }
+
+  // ---------------- ABOUT DIALOG -----------------
 
   void _showAbout() {
     showDialog(
@@ -164,7 +222,7 @@ class _SettingsPageState extends State<SettingsPage> {
               SizedBox(height: 8),
               Text('Developed by Awarcrown Elite Team'),
               SizedBox(height: 8),
-              Text('Connect ideas with opportunities through innovative platforms.'),
+              Text('Connecting ideas with opportunities.'),
               SizedBox(height: 8),
               Text('Website: https://awarcrown.com'),
               Text('Email: info@awarcrown.com'),
@@ -181,6 +239,8 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
+  // ---------------- UI -----------------
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -191,9 +251,10 @@ class _SettingsPageState extends State<SettingsPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
+
       body: ListView(
         children: [
-         
+          // Account
           _buildSectionHeader('Account & Profile'),
           ListTile(
             leading: const Icon(Icons.person),
@@ -203,36 +264,41 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
           const Divider(),
 
-          
+          // Theme
           _buildSectionHeader('App Preferences'),
           _buildThemeSection(),
           const Divider(),
 
-          
+          // Security
           _buildSectionHeader('Privacy & Security'),
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
             onTap: _showLogoutConfirmation,
           ),
+          ListTile(
+            leading: const Icon(Icons.delete_forever, color: Colors.red),
+            title: const Text('Delete Account', style: TextStyle(color: Colors.red)),
+            onTap: _showDeleteAccountConfirmation,
+          ),
           const Divider(),
 
-          
+          // Support
           _buildSectionHeader('Support & Info'),
           ListTile(
             leading: const Icon(Icons.contact_support),
             title: const Text('Contact Us'),
-            onTap: _contactUs,
+            onTap: () => _showSnackBar('Contact: support@ideaship.com'),
           ),
           ListTile(
             leading: const Icon(Icons.description),
             title: const Text('Terms of Service'),
-            onTap: _openTerms,
+            onTap: () => _openLink('https://server.awarcrown.com/terms'),
           ),
           ListTile(
             leading: const Icon(Icons.privacy_tip),
             title: const Text('Privacy Policy'),
-            onTap: _openPrivacy,
+            onTap: () => _openLink('https://server.awarcrown.com/privacy'),
           ),
           ListTile(
             leading: const Icon(Icons.info_outline),
@@ -249,7 +315,10 @@ class _SettingsPageState extends State<SettingsPage> {
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
       child: Text(
         title,
-        style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+        style: Theme.of(context)
+            .textTheme
+            .titleLarge
+            ?.copyWith(fontWeight: FontWeight.bold),
       ),
     );
   }

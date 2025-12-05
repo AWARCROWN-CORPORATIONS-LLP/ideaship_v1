@@ -467,7 +467,7 @@ class _NotificationsPageState extends State<NotificationsPage>
                                   ),
                                 ),
                               ),
-                              ...items.map((notif) => _buildNotificationCard(notif)).toList(),
+                              ...items.map((notif) => _buildNotificationCard(notif)),
                             ],
                           );
                         },

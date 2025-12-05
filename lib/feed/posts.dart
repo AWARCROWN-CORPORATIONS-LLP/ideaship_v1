@@ -674,7 +674,7 @@ class _CommentsPageState extends State<CommentsPage> {
     }
   }
 // Prevent multiple rapid reaction clicks
-Map<int, DateTime> _lastReactionTime = {}; 
+final Map<int, DateTime> _lastReactionTime = {}; 
 
 Future<void> _toggleCommentReaction(int commentId) async {
   if (!mounted) return;

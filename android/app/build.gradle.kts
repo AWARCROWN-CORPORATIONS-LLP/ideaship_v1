@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.ideaship_ui"
+    namespace = "com.awarcrown.ideaship"
     compileSdkVersion(flutter.compileSdkVersion)
     buildToolsVersion = "34.0.0"
     ndkVersion = "27.0.12077973"
@@ -25,7 +25,7 @@ android {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
 defaultConfig {
-    applicationId = "com.example.ideaship_ui"
+    applicationId = "com.awarcrown.ideaship"
     minSdk = 23
     targetSdk = 34
     versionCode = 1
