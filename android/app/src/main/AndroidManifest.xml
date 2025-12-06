@@ -1,30 +1,38 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.awarcrown.ideaship">
 
-   <!-- Internet and networking -->
-<uses-permission android:name="android.permission.INTERNET"/>
-<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <!-- Internet & Network -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 
-<!-- Camera 
-<uses-permission android:name="android.permission.CAMERA" />
+    <!-- Notifications (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
--->
+    <!-- Foreground services (Recommended for FCM, alarms, tasks) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_NOTIFICATIONS" />
 
-<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <!-- Storage permissions (Deprecated but kept for backward compatibility below Android 13) -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
 
+    <!-- Modern Media Permissions (Android 13+) -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
 
-<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-<uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
-<uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    <!-- Exact alarm (if app uses scheduled reminders / background jobs) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
-<meta-data
-    android:name="com.google.firebase.messaging.default_notification_channel_id"
-    android:value="high_importance_channel" />
+    <!-- Boot receiver -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
-<uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-<uses-permission android:name="android.permission.VIBRATE" />
-<uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Firebase Notification Channel -->
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_channel_id"
+        android:value="high_importance_channel" />
 
     <application
         android:name="${applicationName}"
@@ -33,66 +41,80 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true">
 
-        <!-- MainActivity for Flutter -->
-       <activity
-    android:name=".MainActivity"
-    android:exported="true"
-    android:launchMode="singleTop"
-    android:theme="@style/LaunchTheme"
-    android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
-    android:hardwareAccelerated="true"
-    android:windowSoftInputMode="adjustResize">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="
+                orientation|
+                keyboardHidden|
+                keyboard|
+                screenSize|
+                smallestScreenSize|
+                locale|
+                layoutDirection|
+                fontScale|
+                screenLayout|
+                density|
+                uiMode">
 
-
-            
+            <!-- Flutter normal theme -->
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
                 android:resource="@style/NormalTheme" />
 
+            <!-- Launcher -->
             <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep link handling -->
+            <!-- Deep Links -->
             <intent-filter android:autoVerify="true">
-        <action android:name="android.intent.action.VIEW" />
-        <category android:name="android.intent.category.DEFAULT" />
-        <category android:name="android.intent.category.BROWSABLE" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
 
-        <!-- Multiple subdomains supported -->
-        <data android:scheme="https" android:host="server.awarcrown.com" android:pathPrefix="/verify" />
-        <data android:scheme="https" android:host="share.awarcrown.com" />
-        <data android:scheme="https" android:host="royalgate.awarcrown.com" />
-        <data android:scheme="https" android:host="vanguard.awarcrown.com" />
-    </intent-filter>
-    <intent-filter>
-    <action android:name="android.intent.action.VIEW" />
-    <category android:name="android.intent.category.DEFAULT" />
-    <category android:name="android.intent.category.BROWSABLE" />
-    <data android:scheme="awarcrown" android:host="open" />
-</intent-filter>
+                <!-- Main verify route -->
+                <data android:scheme="https" android:host="server.awarcrown.com" android:pathPrefix="/verify" />
 
+                <!-- Other subdomains -->
+                <data android:scheme="https" android:host="share.awarcrown.com" />
+                <data android:scheme="https" android:host="royalgate.awarcrown.com" />
+                <data android:scheme="https" android:host="vanguard.awarcrown.com" />
+            </intent-filter>
+
+            <!-- Custom scheme -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="awarcrown" android:host="open" />
+            </intent-filter>
 
         </activity>
 
-        <!-- Flutter embedding version -->
+        <!-- Flutter embedding -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
-
     </application>
 
-    <!-- Queries for Android 11+ (for image picker / camera) -->
+    <!-- Queries for Android 11+ (image picker / camera / file chooser) -->
     <queries>
         <intent>
-            <action android:name="android.intent.action.PROCESS_TEXT"/>
-            <data android:mimeType="text/plain"/>
+            <action android:name="android.intent.action.PROCESS_TEXT" />
+            <data android:mimeType="text/plain" />
         </intent>
+
         <intent>
             <action android:name="android.intent.action.GET_CONTENT" />
             <data android:mimeType="image/*" />
         </intent>
+
         <intent>
             <action android:name="android.intent.action.IMAGE_CAPTURE" />
         </intent>

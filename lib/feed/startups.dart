@@ -10,7 +10,6 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:shimmer/shimmer.dart';
 
-
 enum SortOption { none, mostLiked, mostFollowed, newest }
 
 class StartupsPage extends StatefulWidget {
@@ -20,7 +19,8 @@ class StartupsPage extends StatefulWidget {
   _StartupsPageState createState() => _StartupsPageState();
 }
 
-class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMixin {
+class _StartupsPageState extends State<StartupsPage>
+    with TickerProviderStateMixin {
   List<dynamic> startups = [];
   List<dynamic> filteredStartups = [];
   bool isLoading = false;
@@ -65,9 +65,13 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
     }
 
     try {
-      final response = await http.get(
-        Uri.parse('https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(username)}'),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(username)}',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['error'] == null && data['user_id'] != null) {
@@ -112,13 +116,17 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
       setState(() {
         isOffline = true;
         startups = json.decode(cachedData).map((startup) {
-          if (startup['logo_url'] != null && startup['logo_url'].isNotEmpty) {
-            startup['full_logo_url'] = 'https://server.awarcrown.com/accessprofile/uploads/${startup['logo_url']}';
+          if (startup['profile_picture'] != null &&
+              startup['profile_picture'].isNotEmpty) {
+            startup['full_logo_url'] =
+                'https://server.awarcrown.com/accessprofile/uploads/${startup['profile_picture']}';
           } else {
             startup['full_logo_url'] = null;
           }
           startup['startup_id'] = startup['startup_id'].toString();
-          startup['is_favorited'] = favoritedStartups.contains(startup['startup_id']);
+          startup['is_favorited'] = favoritedStartups.contains(
+            startup['startup_id'],
+          );
           return startup;
         }).toList();
         filteredStartups = List.from(startups);
@@ -154,24 +162,35 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
     });
 
     try {
-      final response = await http.get(
-        Uri.parse('https://server.awarcrown.com/feed/stups/fetch_startups?user_id=${Uri.encodeComponent(userId!)}'),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://server.awarcrown.com/feed/stups/fetch_startups?user_id=${Uri.encodeComponent(userId!)}',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success']) {
           final List<dynamic> fetchedStartups = data['startups'] ?? [];
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('cached_startups', json.encode(fetchedStartups));
+          await prefs.setString(
+            'cached_startups',
+            json.encode(fetchedStartups),
+          );
           setState(() {
             startups = fetchedStartups.map((startup) {
-              if (startup['logo_url'] != null && startup['logo_url'].isNotEmpty) {
-                startup['full_logo_url'] = 'https://server.awarcrown.com/accessprofile/uploads/${startup['logo_url']}';
+              if (startup['profile_picture'] != null &&
+                  startup['profile_picture'].isNotEmpty) {
+                startup['full_logo_url'] =
+                    'https://server.awarcrown.com/accessprofile/uploads/${startup['profile_picture']}';
               } else {
                 startup['full_logo_url'] = null;
               }
               startup['startup_id'] = startup['startup_id'].toString();
-              startup['is_favorited'] = favoritedStartups.contains(startup['startup_id']);
+              startup['is_favorited'] = favoritedStartups.contains(
+                startup['startup_id'],
+              );
               return startup;
             }).toList();
             filteredStartups = List.from(startups);
@@ -209,23 +228,44 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
         final name = startup['startup_name']?.toLowerCase() ?? '';
         final industry = startup['industry']?.toLowerCase() ?? '';
         final description = startup['description']?.toLowerCase() ?? '';
-        bool matchesSearch = name.contains(query) || industry.contains(query) || description.contains(query);
-        bool matchesIndustry = selectedIndustry == null || startup['industry'] == selectedIndustry;
-        bool matchesFilter = industryFilters.entries.every((entry) => entry.value || startup['industry'] != entry.key);
-        bool matchesFavorites = !showFavoritesOnly || favoritedStartups.contains(startup['startup_id']);
-        return matchesSearch && matchesIndustry && matchesFilter && matchesFavorites;
+        bool matchesSearch =
+            name.contains(query) ||
+            industry.contains(query) ||
+            description.contains(query);
+        bool matchesIndustry =
+            selectedIndustry == null || startup['industry'] == selectedIndustry;
+        bool matchesFilter = industryFilters.entries.every(
+          (entry) => entry.value || startup['industry'] != entry.key,
+        );
+        bool matchesFavorites =
+            !showFavoritesOnly ||
+            favoritedStartups.contains(startup['startup_id']);
+        return matchesSearch &&
+            matchesIndustry &&
+            matchesFilter &&
+            matchesFavorites;
       }).toList();
 
       switch (_sortOption) {
         case SortOption.mostLiked:
-          filteredStartups.sort((a, b) => (b['like_count'] ?? 0).compareTo(a['like_count'] ?? 0));
+          filteredStartups.sort(
+            (a, b) => (b['likes_count'] ?? 0).compareTo(a['likes_count'] ?? 0),
+          );
           break;
         case SortOption.mostFollowed:
-          filteredStartups.sort((a, b) => (b['follow_count'] ?? 0).compareTo(a['follow_count'] ?? 0));
+          filteredStartups.sort(
+            (a, b) => (b['followers_count'] ?? 0).compareTo(
+              a['followers_count'] ?? 0,
+            ),
+          );
+
           break;
         case SortOption.newest:
-          filteredStartups.sort((a, b) => DateTime.parse(b['created_at'] ?? '1970-01-01')
-              .compareTo(DateTime.parse(a['created_at'] ?? '1970-01-01')));
+          filteredStartups.sort(
+            (a, b) => DateTime.parse(
+              b['created_at'] ?? '1970-01-01',
+            ).compareTo(DateTime.parse(a['created_at'] ?? '1970-01-01')),
+          );
           break;
         case SortOption.none:
           break;
@@ -271,22 +311,31 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
     _filterStartups();
 
     if (isOffline) {
-      _showSuccess('Favorite ${oldIsFavorited ? 'removed' : 'added'} offline. Will sync when online.');
+      _showSuccess(
+        'Favorite ${oldIsFavorited ? 'removed' : 'added'} offline. Will sync when online.',
+      );
       return;
     }
 
     try {
       final action = oldIsFavorited ? 'unfavorite' : 'favorite';
-      final body = 'user_id=${Uri.encodeComponent(userId!)}&startup_id=${Uri.encodeComponent(startupId)}&action=$action';
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/stups/favorite_startup'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: body,
-      ).timeout(const Duration(seconds: 10));
+      final body =
+          'user_id=${Uri.encodeComponent(userId!)}&startup_id=${Uri.encodeComponent(startupId)}&action=$action';
+      final response = await http
+          .post(
+            Uri.parse(
+              'https://server.awarcrown.com/feed/stups/favorite_startup',
+            ),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (!data['success']) {
-          throw Exception(data['message'] ?? 'Failed to update favorite status');
+          throw Exception(
+            data['message'] ?? 'Failed to update favorite status',
+          );
         }
         _showSuccess(oldIsFavorited ? 'Unfavorited' : 'Favorited');
       } else {
@@ -323,7 +372,8 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
       startups = startups.map((startup) {
         if (startup['startup_id'] == startupId) {
           startup['is_following'] = !oldFollowing;
-          startup['follow_count'] = (startup['follow_count'] ?? 0) + (oldFollowing ? -1 : 1);
+          startup['followers_count'] =
+              (startup['followers_count'] ?? 0) + (oldFollowing ? -1 : 1);
         }
         return startup;
       }).toList();
@@ -332,18 +382,21 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
 
     if (isOffline) {
       _showSuccess('Follow action queued offline. Will sync when online.');
-      // Optionally store action in SharedPreferences for later syncing
+
       return;
     }
 
     try {
       final action = oldFollowing ? 'unfollow' : 'follow';
-      final body = 'user_id=${Uri.encodeComponent(userId!)}&startup_id=${Uri.encodeComponent(startupId)}&action=$action';
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/stups/follow_startup'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: body,
-      ).timeout(const Duration(seconds: 10));
+      final body =
+          'user_id=${Uri.encodeComponent(userId!)}&startup_id=${Uri.encodeComponent(startupId)}&action=$action';
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/feed/stups/follow_startup'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (!data['success']) {
@@ -358,7 +411,8 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
         startups = startups.map((startup) {
           if (startup['startup_id'] == startupId) {
             startup['is_following'] = oldFollowing;
-            startup['follow_count'] = (startup['follow_count'] ?? 0) + (oldFollowing ? 1 : -1);
+            startup['followers_count'] =
+                (startup['followers_count'] ?? 0) + (oldFollowing ? 1 : -1);
           }
           return startup;
         }).toList();
@@ -379,7 +433,8 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
       startups = startups.map((startup) {
         if (startup['startup_id'] == startupId) {
           startup['is_liked'] = !oldLiked;
-          startup['like_count'] = (startup['like_count'] ?? 0) + (oldLiked ? -1 : 1);
+          startup['likes_count'] =
+              (startup['likes_count'] ?? 0) + (oldLiked ? -1 : 1);
         }
         return startup;
       }).toList();
@@ -393,12 +448,15 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
 
     try {
       final action = oldLiked ? 'unlike' : 'like';
-      final body = 'user_id=${Uri.encodeComponent(userId!)}&startup_id=${Uri.encodeComponent(startupId)}&action=$action';
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/stups/like_startup'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: body,
-      ).timeout(const Duration(seconds: 10));
+      final body =
+          'user_id=${Uri.encodeComponent(userId!)}&startup_id=${Uri.encodeComponent(startupId)}&action=$action';
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/feed/stups/like_startup'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (!data['success']) {
@@ -413,7 +471,8 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
         startups = startups.map((startup) {
           if (startup['startup_id'] == startupId) {
             startup['is_liked'] = oldLiked;
-            startup['like_count'] = (startup['like_count'] ?? 0) + (oldLiked ? 1 : -1);
+            startup['likes_count'] =
+                (startup['likes_count'] ?? 0) + (oldLiked ? 1 : -1);
           }
           return startup;
         }).toList();
@@ -427,37 +486,38 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
     if (userId == null || userId!.isEmpty || isOffline) return null;
 
     try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/stups/share_startup'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'startup_id=${Uri.encodeComponent(startupId)}&user_id=${Uri.encodeComponent(userId!)}',
-      ).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is Map<String, dynamic> && data['status'] == 'success') {
-          return data['share_url'] ?? '';
-        } else {
-          _showError(data['message'] ?? 'Failed to generate share link');
-        }
-      } else {
-        throw http.ClientException('Server error: ${response.statusCode}');
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/feed/stups/share_startup'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body:
+                'startup_id=${Uri.encodeComponent(startupId)}&user_id=${Uri.encodeComponent(userId!)}',
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode != 200) {
+        throw http.ClientException("Server error ${response.statusCode}");
       }
+
+      final data = json.decode(response.body);
+
+      if (data['status'] == 'success' && data['share_url'] != null) {
+        return data['share_url'];
+      }
+
+      _showError(data['message'] ?? "Failed to generate share link");
     } catch (e) {
-      _showError('Failed to generate share link: ${_getErrorMessage(e)}');
+      _showError("Failed to generate share link: ${_getErrorMessage(e)}");
     }
+
     return null;
   }
 
   String _getErrorMessage(dynamic e) {
-    if (e is SocketException) {
-      return 'No internet connection.';
-    } else if (e is TimeoutException) {
-      return 'Request timed out.';
-    } else if (e is http.ClientException) {
-      return 'Network error.';
-    } else {
-      return e.toString();
-    }
+    if (e is SocketException) return 'No internet connection.';
+    if (e is TimeoutException) return 'Request timed out.';
+    if (e is http.ClientException) return 'Network error.';
+    return e.toString();
   }
 
   void _showError(String message) {
@@ -483,6 +543,7 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
   void _showShareSheet(dynamic startup) async {
     final startupId = startup['startup_id'];
     final shareUrl = await _getShareLink(startupId);
+
     if (shareUrl == null || shareUrl.isEmpty) return;
 
     showModalBottomSheet(
@@ -492,60 +553,63 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
       ),
       builder: (BuildContext context) {
         final colorScheme = Theme.of(context).colorScheme;
-        return Container(
+
+        return Padding(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [colorScheme.surface, colorScheme.surfaceContainer],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Share this startup',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
+
               const SizedBox(height: 16),
+
               SelectableText(
                 shareUrl,
                 style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _AnimatedButton(
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: shareUrl));
-                        _showSuccess('Link copied!');
-                        Navigator.pop(context);
-                      },
-                      icon: Icons.copy,
-                      label: 'Copy Link',
-                    ),
-                  ),
-                ],
+
+              const SizedBox(height: 20),
+
+              // Copy Button (Full width)
+              SizedBox(
+                width: double.infinity,
+                child: _AnimatedButton(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: shareUrl));
+                    _showSuccess('Link copied!');
+                    Navigator.pop(context);
+                  },
+                  icon: Icons.copy,
+                  label: 'Copy Link',
+                  color: colorScheme.primary,
+                  textColor: Colors.white,
+                ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _AnimatedButton(
-                      onPressed: () {
-                        Share.share(shareUrl, subject: 'Check out this startup on Awarcrown');
-                        Navigator.pop(context);
-                      },
-                      icon: Icons.share,
-                      label: 'Share externally',
-                      color: Colors.purple,
-                    ),
-                  ),
-                ],
+
+              const SizedBox(height: 12),
+
+              // Share Externally Button (Full width)
+              SizedBox(
+                width: double.infinity,
+                child: _AnimatedButton(
+                  onPressed: () {
+                    Share.share(
+                      shareUrl,
+                      subject: 'Check out this startup on Awarcrown',
+                    );
+                    Navigator.pop(context);
+                  },
+                  icon: Icons.share,
+                  label: 'Share externally',
+                  color: Colors.purple,
+                  textColor: Colors.white,
+                ),
               ),
             ],
           ),
@@ -580,7 +644,9 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
                 selected: selectedIndustry == null,
                 onSelected: (_) => _updateIndustryFilter(null, null),
                 selectedColor: Theme.of(context).colorScheme.primaryContainer,
-                checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                checkmarkColor: Theme.of(
+                  context,
+                ).colorScheme.onPrimaryContainer,
               ),
             );
           } else if (index == 1) {
@@ -596,7 +662,9 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
                   _filterStartups();
                 },
                 selectedColor: Theme.of(context).colorScheme.primaryContainer,
-                checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
+                checkmarkColor: Theme.of(
+                  context,
+                ).colorScheme.onPrimaryContainer,
               ),
             );
           }
@@ -606,7 +674,8 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
             child: FilterChip(
               label: Text(industry),
               selected: selectedIndustry == industry,
-              onSelected: (selected) => _updateIndustryFilter(industry, selected),
+              onSelected: (selected) =>
+                  _updateIndustryFilter(industry, selected),
               selectedColor: Theme.of(context).colorScheme.primaryContainer,
               checkmarkColor: Theme.of(context).colorScheme.onPrimaryContainer,
             ),
@@ -621,9 +690,11 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
     final fullLogoUrl = startup['full_logo_url'];
     final isLiked = startup['is_liked'] ?? false;
     final isFollowing = startup['is_following'] ?? false;
-    final isFavorited = startup['is_favorited'] ?? favoritedStartups.contains(startup['startup_id']);
-    final likeCount = startup['like_count']?.toString() ?? '0';
-    final followCount = startup['follow_count']?.toString() ?? '0';
+    final isFavorited =
+        startup['is_favorited'] ??
+        favoritedStartups.contains(startup['startup_id']);
+    final likeCount = startup['likes_count']?.toString() ?? '0';
+    final followCount = startup['followers_count']?.toString() ?? '0';
 
     return FadeTransition(
       opacity: _fadeAnimation,
@@ -674,7 +745,8 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
                                   color: Colors.white,
                                 ),
                               ),
-                              errorWidget: (context, url, error) => const Icon(Icons.business, size: 64),
+                              errorWidget: (context, url, error) =>
+                                  const Icon(Icons.business, size: 64),
                             ),
                           )
                         : const CircleAvatar(
@@ -692,16 +764,22 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
                             Expanded(
                               child: Text(
                                 startup['startup_name'] ?? 'Unnamed Startup',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(
                                       fontWeight: FontWeight.bold,
                                       color: colorScheme.onSurface,
                                     ),
                               ),
                             ),
                             _AnimatedButton(
-                              icon: isFavorited ? Icons.bookmark : Icons.bookmark_border,
+                              icon: isFavorited
+                                  ? Icons.bookmark
+                                  : Icons.bookmark_border,
                               color: isFavorited ? Colors.blue : null,
-                              onPressed: () => _toggleFavorite(startup['startup_id'], isFavorited),
+                              onPressed: () => _toggleFavorite(
+                                startup['startup_id'],
+                                isFavorited,
+                              ),
                               size: 24,
                             ),
                             PopupMenuButton<String>(
@@ -726,7 +804,10 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
                         const SizedBox(height: 4),
                         if (startup['industry'] != null)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: colorScheme.primaryContainer,
                               borderRadius: BorderRadius.circular(12),
@@ -750,13 +831,21 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
                         Row(
                           children: [
                             _AnimatedButton(
-                              icon: isLiked ? Icons.favorite : Icons.favorite_border,
-                              color: isLiked ? Colors.red : null,
-                              onPressed: () => _toggleLike(startup['startup_id'], isLiked),
+                              icon: isLiked
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: isLiked
+                                  ? const Color.fromARGB(255, 234, 234, 234)
+                                  : null,
+                              onPressed: () =>
+                                  _toggleLike(startup['startup_id'], isLiked),
                               label: '$likeCount likes',
                             ),
                             const SizedBox(width: 16),
-                            Text('$followCount followers', style: Theme.of(context).textTheme.bodySmall),
+                            Text(
+                              '$followCount followers',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
                           ],
                         ),
                         const SizedBox(height: 8),
@@ -764,9 +853,14 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
                           children: [
                             Expanded(
                               child: _AnimatedButton(
-                                onPressed: () => _toggleFollow(startup['startup_id'], isFollowing),
+                                onPressed: () => _toggleFollow(
+                                  startup['startup_id'],
+                                  isFollowing,
+                                ),
                                 label: isFollowing ? 'Unfollow' : 'Follow',
-                                color: isFollowing ? const Color.fromARGB(255, 45, 23, 169) : colorScheme.primary,
+                                color: isFollowing
+                                    ? const Color.fromARGB(255, 45, 23, 169)
+                                    : colorScheme.primary,
                                 textColor: Colors.white,
                                 icon: Icons.person,
                               ),
@@ -802,7 +896,10 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
               children: List.generate(
                 3,
                 (index) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 8,
+                  ),
                   child: Container(
                     height: 100,
                     decoration: BoxDecoration(
@@ -853,10 +950,16 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
           Center(
             child: Column(
               children: [
-                Icon(Icons.search_off, size: 64, color: colorScheme.onSurfaceVariant),
+                Icon(
+                  Icons.search_off,
+                  size: 64,
+                  color: colorScheme.onSurfaceVariant,
+                ),
                 const SizedBox(height: 16),
                 Text(
-                  _searchController.text.isEmpty ? 'No startups found' : 'No matching startups',
+                  _searchController.text.isEmpty
+                      ? 'No startups found'
+                      : 'No matching startups',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
@@ -869,7 +972,8 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
       return ListView.builder(
         padding: const EdgeInsets.all(8.0),
         itemCount: filteredStartups.length,
-        itemBuilder: (context, index) => _buildStartupCard(filteredStartups[index]),
+        itemBuilder: (context, index) =>
+            _buildStartupCard(filteredStartups[index]),
       );
     }
   }
@@ -904,10 +1008,22 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
               });
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: SortOption.none, child: Text('Default')),
-              const PopupMenuItem(value: SortOption.mostLiked, child: Text('Most Liked')),
-              const PopupMenuItem(value: SortOption.mostFollowed, child: Text('Most Followed')),
-              const PopupMenuItem(value: SortOption.newest, child: Text('Newest')),
+              const PopupMenuItem(
+                value: SortOption.none,
+                child: Text('Default'),
+              ),
+              const PopupMenuItem(
+                value: SortOption.mostLiked,
+                child: Text('Most Liked'),
+              ),
+              const PopupMenuItem(
+                value: SortOption.mostFollowed,
+                child: Text('Most Followed'),
+              ),
+              const PopupMenuItem(
+                value: SortOption.newest,
+                child: Text('Newest'),
+              ),
             ],
           ),
         ],
@@ -934,7 +1050,10 @@ class _StartupsPageState extends State<StartupsPage> with TickerProviderStateMix
                       controller: _searchController,
                       decoration: InputDecoration(
                         hintText: 'Search startups...',
-                        prefixIcon: Icon(Icons.search, color: colorScheme.onSurfaceVariant),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
                         suffixIcon: _searchController.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear),
@@ -1007,7 +1126,8 @@ class _AnimatedButton extends StatefulWidget {
   _AnimatedButtonState createState() => _AnimatedButtonState();
 }
 
-class _AnimatedButtonState extends State<_AnimatedButton> with SingleTickerProviderStateMixin {
+class _AnimatedButtonState extends State<_AnimatedButton>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _scaleAnimation;
 
@@ -1018,9 +1138,10 @@ class _AnimatedButtonState extends State<_AnimatedButton> with SingleTickerProvi
       duration: const Duration(milliseconds: 200),
       vsync: this,
     );
-    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.95).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 0.95,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -1043,21 +1164,30 @@ class _AnimatedButtonState extends State<_AnimatedButton> with SingleTickerProvi
         scale: _scaleAnimation,
         child: widget.label != null
             ? ElevatedButton.icon(
-                onPressed: null,
-                icon: Icon(widget.icon, size: widget.size, color: widget.textColor),
+                onPressed: widget.onPressed,
+                icon: Icon(
+                  widget.icon,
+                  size: widget.size,
+                  color: widget.textColor,
+                ),
                 label: Text(
                   widget.label!,
                   style: TextStyle(color: widget.textColor),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: widget.color ?? colorScheme.primary,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                 ),
               )
             : IconButton(
                 icon: Icon(widget.icon, size: widget.size, color: widget.color),
-                onPressed: null,
+                onPressed: widget.onPressed,
               ),
       ),
     );
@@ -1082,8 +1212,10 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
   void initState() {
     super.initState();
     _loadUserId();
-    if (widget.startup['logo_url'] != null && widget.startup['logo_url'].isNotEmpty) {
-      widget.startup['full_logo_url'] = 'https://server.awarcrown.com/accessprofile/uploads/${widget.startup['logo_url']}';
+    if (widget.startup['logo_url'] != null &&
+        widget.startup['logo_url'].isNotEmpty) {
+      widget.startup['full_logo_url'] =
+          'https://server.awarcrown.com/accessprofile/uploads/${widget.startup['logo_url']}';
     }
     widget.startup['startup_id'] = widget.startup['startup_id'].toString();
     isFollowing = widget.startup['is_following'] ?? false;
@@ -1095,9 +1227,13 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
     final username = prefs.getString('username');
     if (username != null && username.isNotEmpty) {
       try {
-        final response = await http.get(
-          Uri.parse('https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(username)}'),
-        ).timeout(const Duration(seconds: 10));
+        final response = await http
+            .get(
+              Uri.parse(
+                'https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(username)}',
+              ),
+            )
+            .timeout(const Duration(seconds: 10));
         if (response.statusCode == 200) {
           final data = json.decode(response.body);
           if (data['error'] == null && data['user_id'] != null) {
@@ -1107,7 +1243,7 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
           }
         }
       } catch (e) {
-        // Handle error silently
+        // Ignore errors here; userId will remain null
       }
     }
   }
@@ -1118,17 +1254,21 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
     final bool oldFollowing = isFollowing;
     setState(() {
       isFollowing = !oldFollowing;
-      widget.startup['follow_count'] = (widget.startup['follow_count'] ?? 0) + (oldFollowing ? -1 : 1);
+      widget.startup['follow_count'] =
+          (widget.startup['follow_count'] ?? 0) + (oldFollowing ? -1 : 1);
     });
 
     try {
       final action = oldFollowing ? 'unfollow' : 'follow';
-      final body = 'user_id=${Uri.encodeComponent(userId!)}&startup_id=${Uri.encodeComponent(startupId)}&action=$action';
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/stups/follow_startup'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: body,
-      ).timeout(const Duration(seconds: 10));
+      final body =
+          'user_id=${Uri.encodeComponent(userId!)}&startup_id=${Uri.encodeComponent(startupId)}&action=$action';
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/feed/stups/follow_startup'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
@@ -1144,12 +1284,13 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
     } catch (e) {
       setState(() {
         isFollowing = oldFollowing;
-        widget.startup['follow_count'] = (widget.startup['follow_count'] ?? 0) + (oldFollowing ? 1 : -1);
+        widget.startup['follow_count'] =
+            (widget.startup['follow_count'] ?? 0) + (oldFollowing ? 1 : -1);
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update follow: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to update follow: $e')));
       }
     }
   }
@@ -1159,7 +1300,8 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
     final startupId = widget.startup['startup_id'];
     final bool oldFavorited = isFavorited;
     final prefs = await SharedPreferences.getInstance();
-    List<String> favoritedStartups = prefs.getStringList('favorited_startups') ?? [];
+    List<String> favoritedStartups =
+        prefs.getStringList('favorited_startups') ?? [];
 
     setState(() {
       isFavorited = !oldFavorited;
@@ -1174,12 +1316,17 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
 
     try {
       final action = oldFavorited ? 'unfavorite' : 'favorite';
-      final body = 'user_id=${Uri.encodeComponent(userId!)}&startup_id=${Uri.encodeComponent(startupId)}&action=$action';
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/stups/favorite_startup'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: body,
-      ).timeout(const Duration(seconds: 10));
+      final body =
+          'user_id=${Uri.encodeComponent(userId!)}&startup_id=${Uri.encodeComponent(startupId)}&action=$action';
+      final response = await http
+          .post(
+            Uri.parse(
+              'https://server.awarcrown.com/feed/stups/favorite_startup',
+            ),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode != 200) {
         throw http.ClientException('Server error: ${response.statusCode}');
       }
@@ -1211,54 +1358,77 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
     }
   }
 
-  Future<void> _launchUrl(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not launch URL')),
-        );
-      }
+  String _normalizeUrl(String url) {
+    if (url.isEmpty) return url;
+    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+      return 'https://$url';
     }
+    return url;
   }
+Future<void> _launchUrl(String url) async {
+  final normalized = _normalizeUrl(url);
+  final uri = Uri.parse(normalized);
+
+  try {
+    // Try open externally (Instagram / LinkedIn app)
+    bool openedExternal = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (openedExternal) return;
+
+    // Fallback: open in-app browser
+    bool openedWebView = await launchUrl(
+      uri,
+      mode: LaunchMode.inAppWebView,
+    );
+
+    if (!openedWebView && mounted) {
+      _showError("Unable to open link");
+    }
+  } catch (e) {
+    if (!mounted) return;
+    _showError("Failed to open URL");
+  }
+}
 
   Future<String?> _getShareLink(String startupId) async {
     if (userId == null || userId!.isEmpty) return null;
 
     try {
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/feed/stups/share_startup'),
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'startup_id=${Uri.encodeComponent(startupId)}&user_id=${Uri.encodeComponent(userId!)}',
-      ).timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is Map<String, dynamic> && data['status'] == 'success') {
-          return data['share_url'] ?? '';
-        } else {
-          _showError(data['message'] ?? 'Failed to generate share link');
-        }
-      } else {
-        throw http.ClientException('Server error: ${response.statusCode}');
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/feed/stups/share_startup'),
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body:
+                'startup_id=${Uri.encodeComponent(startupId)}&user_id=${Uri.encodeComponent(userId!)}',
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode != 200) {
+        throw http.ClientException("Server error ${response.statusCode}");
       }
+
+      final data = json.decode(response.body);
+
+      if (data['status'] == 'success' && data['share_url'] != null) {
+        return data['share_url'];
+      }
+
+      _showError(data['message'] ?? "Failed to generate share link");
     } catch (e) {
-      _showError('Failed to generate share link: ${_getErrorMessage(e)}');
+      _showError("Failed to generate share link: ${_getErrorMessage(e)}");
     }
+
     return null;
   }
 
   String _getErrorMessage(dynamic e) {
-    if (e is SocketException) {
-      return 'No internet connection.';
-    } else if (e is TimeoutException) {
-      return 'Request timed out.';
-    } else if (e is http.ClientException) {
-      return 'Network error.';
-    } else {
-      return e.toString();
-    }
+    if (e is SocketException) return 'No internet connection.';
+    if (e is TimeoutException) return 'Request timed out.';
+    if (e is http.ClientException) return 'Network error.';
+    return e.toString();
   }
 
   void _showError(String message) {
@@ -1284,6 +1454,7 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
   void _showShareSheet(dynamic startup) async {
     final startupId = startup['startup_id'];
     final shareUrl = await _getShareLink(startupId);
+
     if (shareUrl == null || shareUrl.isEmpty) return;
 
     showModalBottomSheet(
@@ -1293,60 +1464,61 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
       ),
       builder: (BuildContext context) {
         final colorScheme = Theme.of(context).colorScheme;
-        return Container(
+
+        return Padding(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [colorScheme.surface, colorScheme.surfaceContainer],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 'Share this startup',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
               ),
+
               const SizedBox(height: 16),
+
               SelectableText(
                 shareUrl,
                 style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
               ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _AnimatedButton(
-                      onPressed: () {
-                        Clipboard.setData(ClipboardData(text: shareUrl));
-                        _showSuccess('Link copied!');
-                        Navigator.pop(context);
-                      },
-                      icon: Icons.copy,
-                      label: 'Copy Link',
-                    ),
-                  ),
-                ],
+
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                child: _AnimatedButton(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: shareUrl));
+                    _showSuccess('Link copied!');
+                    Navigator.pop(context);
+                  },
+                  icon: Icons.copy,
+                  label: 'Copy Link',
+                  color: colorScheme.primary,
+                  textColor: Colors.white,
+                ),
               ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: _AnimatedButton(
-                      onPressed: () {
-                        Share.share(shareUrl, subject: 'Check out this startup on Awarcrown');
-                        Navigator.pop(context);
-                      },
-                      icon: Icons.share,
-                      label: 'Share externally',
-                      color: Colors.purple,
-                    ),
-                  ),
-                ],
+
+              const SizedBox(height: 12),
+
+              SizedBox(
+                width: double.infinity,
+                child: _AnimatedButton(
+                  onPressed: () {
+                    Share.share(
+                      shareUrl,
+                      subject: 'Check out this startup on Awarcrown',
+                    );
+                    Navigator.pop(context);
+                  },
+                  icon: Icons.share,
+                  label: 'Share externally',
+                  color: Colors.purple,
+                  textColor: Colors.white,
+                ),
               ),
             ],
           ),
@@ -1360,24 +1532,24 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
     final colorScheme = Theme.of(context).colorScheme;
     final startup = widget.startup;
     final fullLogoUrl = startup['full_logo_url'];
-    final likeCount = startup['like_count']?.toString() ?? '0';
+    final likeCount = startup['likes_count']?.toString() ?? '0';
     final followCount = startup['follow_count']?.toString() ?? '0';
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('Startup Details'),
-        backgroundColor: Colors.transparent,
         elevation: 0,
+        backgroundColor: const Color.fromARGB(255, 255, 255, 255),
         flexibleSpace: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
               colors: [
                 colorScheme.surface.withOpacity(0.95),
-                colorScheme.surface.withOpacity(0.0),
+                colorScheme.surface.withOpacity(0),
               ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
           ),
         ),
@@ -1399,141 +1571,171 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
           ),
         ],
       ),
+
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            
+            // ============================
+            // HEADER SECTION
+            // ============================
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
                   colors: [
                     colorScheme.primaryContainer,
-                    colorScheme.secondaryContainer.withOpacity(0.5),
+                    colorScheme.secondaryContainer.withOpacity(0.6),
                   ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
               ),
-              padding: const EdgeInsets.only(top: 100, bottom: 32, left: 16, right: 16),
+              padding: const EdgeInsets.only(
+                top: 100,
+                bottom: 36,
+                left: 20,
+                right: 20,
+              ),
               child: Column(
                 children: [
-                  // Logo with shadow
+                  // LOGO
                   Hero(
                     tag: 'startup_logo_${startup['startup_id']}',
-                    child: Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 20,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: fullLogoUrl != null
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(80),
-                              child: CachedNetworkImage(
-                                imageUrl: fullLogoUrl,
-                                width: 160,
-                                height: 160,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Shimmer.fromColors(
-                                  baseColor: Colors.grey[300]!,
-                                  highlightColor: Colors.grey[100]!,
-                                  child: Container(
-                                    width: 160,
-                                    height: 160,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  width: 160,
-                                  height: 160,
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.surfaceContainer,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(Icons.business, size: 80, color: colorScheme.onSurfaceVariant),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 25,
+                              spreadRadius: 3,
+                              offset: const Offset(0, 6),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(80),
+                          child: CachedNetworkImage(
+                            imageUrl: fullLogoUrl ?? "",
+                            width: 150,
+                            height: 150,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Shimmer.fromColors(
+                              baseColor: Colors.grey[300]!,
+                              highlightColor: Colors.grey[100]!,
+                              child: Container(
+                                width: 150,
+                                height: 150,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white,
                                 ),
                               ),
-                            )
-                          : Container(
-                              width: 160,
-                              height: 160,
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              width: 150,
+                              height: 150,
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainer,
+                                color: colorScheme.surfaceVariant,
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(Icons.business, size: 80, color: colorScheme.onSurfaceVariant),
+                              child: Icon(
+                                Icons.business,
+                                size: 70,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
                             ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+
+                  const SizedBox(height: 22),
+
+                  // TITLE
                   Text(
                     startup['startup_name'] ?? 'Unnamed Startup',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onPrimaryContainer,
-                        ),
                     textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primary.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      startup['industry'] ?? '',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            color: colorScheme.primary,
-                            fontWeight: FontWeight.w600,
-                          ),
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onPrimaryContainer,
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  // Stats Row
+
+                  const SizedBox(height: 10),
+
+                  // INDUSTRY TAG
+                  if (startup['industry'] != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: colorScheme.primary.withOpacity(0.18),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        startup['industry'],
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: colorScheme.primary,
+                            ),
+                      ),
+                    ),
+
+                  const SizedBox(height: 26),
+
+                  // LIKE + FOLLOW STATS
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _buildStatCard(
-                        context,
-                        Icons.favorite,
-                        likeCount,
-                        'Likes',
-                        Colors.red,
+                      SizedBox(
+                        width: 130,
+                        height: 125,
+                        child: _buildStatCard(
+                          context,
+                          Icons.favorite,
+                          likeCount,
+                          "Likes",
+                          Colors.red,
+                        ),
                       ),
-                      const SizedBox(width: 16),
-                      _buildStatCard(
-                        context,
-                        Icons.people,
-                        followCount,
-                        'Followers',
-                        colorScheme.primary,
+                      const SizedBox(width: 22),
+                      SizedBox(
+                        width: 130,
+                        height: 125,
+                        child: _buildStatCard(
+                          context,
+                          Icons.people,
+                          followCount,
+                          "Followers",
+                          colorScheme.primary,
+                        ),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            // Content Section
+
+            // ============================
+            // CONTENT SECTION
+            // ============================
             Padding(
-              padding: const EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Quick Info Cards Grid
                   _buildInfoCardGrid(context, startup),
-                  const SizedBox(height: 24),
-                  // Description Section
+
+                  const SizedBox(height: 26),
+
                   _buildSectionCard(
                     context,
                     Icons.description,
@@ -1541,8 +1743,9 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
                     startup['description'] ?? 'No description provided',
                     colorScheme.primary,
                   ),
-                  const SizedBox(height: 16),
-                  // Business Vision Section
+
+                  const SizedBox(height: 18),
+
                   _buildSectionCard(
                     context,
                     Icons.visibility,
@@ -1550,29 +1753,33 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
                     startup['business_vision'] ?? 'No vision provided',
                     colorScheme.secondary,
                   ),
-                  const SizedBox(height: 16),
-                  // Funding Goals Section
+
+                  const SizedBox(height: 18),
+
                   _buildSectionCard(
                     context,
                     Icons.attach_money,
                     'Funding Goals',
-                    startup['funding_goals'] ?? 'No funding goals provided',
+                    startup['funding_goals'] ?? 'Not specified',
                     Colors.green,
                   ),
-                  const SizedBox(height: 16),
-                  // Mentorship Needs Section
+
+                  const SizedBox(height: 18),
+
                   _buildSectionCard(
                     context,
                     Icons.school,
                     'Mentorship Needs',
-                    startup['mentorship_needs'] ?? 'No mentorship needs provided',
+                    startup['mentorship_needs'] ??
+                        'No mentorship needs provided',
                     Colors.orange,
                   ),
-                  const SizedBox(height: 24),
-                  // Social Links Section
-                  if ((startup['linkedin'] != null && startup['linkedin'].isNotEmpty) ||
-                      (startup['instagram'] != null && startup['instagram'].isNotEmpty) ||
-                      (startup['facebook'] != null && startup['facebook'].isNotEmpty))
+
+                  const SizedBox(height: 26),
+
+                  if ((startup['linkedin']?.isNotEmpty ?? false) ||
+                      (startup['instagram']?.isNotEmpty ?? false) ||
+                      (startup['facebook']?.isNotEmpty ?? false))
                     _buildSocialLinksSection(context, startup),
                 ],
               ),
@@ -1583,7 +1790,13 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
     );
   }
 
-  Widget _buildStatCard(BuildContext context, IconData icon, String value, String label, Color color) {
+  Widget _buildStatCard(
+    BuildContext context,
+    IconData icon,
+    String value,
+    String label,
+    Color color,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -1605,16 +1818,16 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
           Text(
             value,
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
+              fontWeight: FontWeight.bold,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -1623,101 +1836,122 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
 
   Widget _buildInfoCardGrid(BuildContext context, dynamic startup) {
     final colorScheme = Theme.of(context).colorScheme;
-    return GridView.count(
-      crossAxisCount: 2,
+
+    return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 12,
-      mainAxisSpacing: 12,
-      childAspectRatio: 1.5,
-      children: [
-        _buildInfoCard(
-          context,
-          Icons.person,
-          'Founders',
-          startup['founders_names'] ?? 'Not specified',
-          colorScheme.primary,
-        ),
-        _buildInfoCard(
-          context,
-          Icons.calendar_today,
-          'Founded',
-          startup['founding_date'] ?? 'Not specified',
-          colorScheme.secondary,
-        ),
-        _buildInfoCard(
-          context,
-          Icons.trending_up,
-          'Stage',
-          startup['stage'] ?? 'Not specified',
-          Colors.green,
-        ),
-        _buildInfoCard(
-          context,
-          Icons.groups,
-          'Team Size',
-          startup['team_size']?.toString() ?? 'Not specified',
-          Colors.orange,
-        ),
-      ],
+      itemCount: 4,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 1,
+      ),
+      itemBuilder: (context, index) {
+        switch (index) {
+          case 0:
+            return _buildFormalInfoCard(
+              context,
+              Icons.person_outline,
+              'Founders',
+              startup['founders_names'] ?? 'Not specified',
+              colorScheme.primary,
+            );
+          case 1:
+            return _buildFormalInfoCard(
+              context,
+              Icons.calendar_month_outlined,
+              'Founded',
+              startup['founding_date'] ?? 'Not specified',
+              colorScheme.secondary,
+            );
+          case 2:
+            return _buildFormalInfoCard(
+              context,
+              Icons.trending_up_outlined,
+              'Stage',
+              startup['stage'] ?? 'Not specified',
+              Colors.green,
+            );
+          case 3:
+            return _buildFormalInfoCard(
+              context,
+              Icons.groups_3_outlined,
+              'Team Size',
+              startup['team_size']?.toString() ?? 'Not specified',
+              Colors.orange,
+            );
+          default:
+            return const SizedBox.shrink();
+        }
+      },
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, IconData icon, String label, String value, Color color) {
+  Widget _buildFormalInfoCard(
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value,
+    Color accentColor,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
+
     return Container(
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            color.withOpacity(0.1),
-            color.withOpacity(0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: color.withOpacity(0.3),
-          width: 1,
-        ),
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: accentColor.withOpacity(0.25), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
-      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: accentColor.withOpacity(0.12),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: color, size: 24),
+            child: Icon(icon, color: accentColor, size: 22),
           ),
-          const Spacer(),
+          const SizedBox(height: 12),
           Text(
             label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: colorScheme.onSurface,
-                ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSectionCard(BuildContext context, IconData icon, String title, String content, Color color) {
+  Widget _buildSectionCard(
+    BuildContext context,
+    IconData icon,
+    String title,
+    String content,
+    Color color,
+  ) {
     final colorScheme = Theme.of(context).colorScheme;
     return Card(
       elevation: 2,
@@ -1727,10 +1961,7 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              colorScheme.surface,
-              colorScheme.surfaceContainerLow,
-            ],
+            colors: [colorScheme.surface, colorScheme.surfaceContainerLow],
           ),
           borderRadius: BorderRadius.circular(16),
         ),
@@ -1753,9 +1984,9 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
                   child: Text(
                     title,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        ),
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.onSurface,
+                    ),
                   ),
                 ),
               ],
@@ -1764,9 +1995,9 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
             Text(
               content,
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    height: 1.6,
-                  ),
+                color: colorScheme.onSurfaceVariant,
+                height: 1.6,
+              ),
             ),
           ],
         ),
@@ -1775,52 +2006,55 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
   }
 
   Widget _buildSocialLinksSection(BuildContext context, dynamic startup) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     final List<Map<String, dynamic>> socialLinks = [];
-    
-    if (startup['linkedin'] != null && startup['linkedin'].isNotEmpty) {
-      socialLinks.add({
-        'icon': Icons.business,
-        'label': 'LinkedIn',
-        'url': startup['linkedin'],
-        'color': const Color(0xFF0077B5),
-      });
+
+    void addLink(String? value, IconData icon, String label, Color color) {
+      if (value != null && value.isNotEmpty) {
+        socialLinks.add({
+          "icon": icon,
+          "label": label,
+          "url": value,
+          "color": color,
+        });
+      }
     }
-    if (startup['instagram'] != null && startup['instagram'].isNotEmpty) {
-      socialLinks.add({
-        'icon': Icons.camera_alt,
-        'label': 'Instagram',
-        'url': startup['instagram'],
-        'color': const Color(0xFFE4405F),
-      });
-    }
-    if (startup['facebook'] != null && startup['facebook'].isNotEmpty) {
-      socialLinks.add({
-        'icon': Icons.facebook,
-        'label': 'Facebook',
-        'url': startup['facebook'],
-        'color': const Color(0xFF1877F2),
-      });
-    }
+
+    addLink(
+      startup['linkedin'],
+      Icons.business,
+      "LinkedIn",
+      const Color(0xFF0077B5),
+    );
+    addLink(
+      startup['instagram'],
+      Icons.camera_alt,
+      "Instagram",
+      const Color(0xFFE4405F),
+    );
+    addLink(
+      startup['facebook'],
+      Icons.facebook,
+      "Facebook",
+      const Color(0xFF1877F2),
+    );
+    addLink(startup['company_website'], Icons.link, "Website", Colors.teal);
 
     if (socialLinks.isEmpty) return const SizedBox.shrink();
 
     return Card(
-      elevation: 2,
+      elevation: 3,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           gradient: LinearGradient(
+            colors: [scheme.surface, scheme.surfaceContainerLow],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              colorScheme.surface,
-              colorScheme.surfaceContainerLow,
-            ],
           ),
           borderRadius: BorderRadius.circular(16),
         ),
-        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1829,53 +2063,54 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
+                    color: scheme.primaryContainer,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(
-                    Icons.share,
-                    color: colorScheme.onPrimaryContainer,
-                    size: 24,
-                  ),
+                  child: Icon(Icons.share, color: scheme.onPrimaryContainer),
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  'Social Links',
+                  "Social Links",
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurface,
-                      ),
+                    fontWeight: FontWeight.bold,
+                    color: scheme.onSurface,
+                  ),
                 ),
               ],
             ),
+
             const SizedBox(height: 16),
+
             Wrap(
               spacing: 12,
               runSpacing: 12,
               children: socialLinks.map((link) {
                 return InkWell(
+                  borderRadius: BorderRadius.circular(14),
                   onTap: () => _launchUrl(link['url']),
-                  borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: (link['color'] as Color).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: (link['color'] as Color).withOpacity(0.3),
-                        width: 1,
                       ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(link['icon'], color: link['color'], size: 20),
+                        Icon(link['icon'], color: link['color'], size: 22),
                         const SizedBox(width: 8),
                         Text(
                           link['label'],
                           style: TextStyle(
                             color: link['color'],
                             fontWeight: FontWeight.w600,
+                            fontSize: 14,
                           ),
                         ),
                       ],
