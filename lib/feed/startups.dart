@@ -1533,7 +1533,7 @@ Future<void> _launchUrl(String url) async {
     final startup = widget.startup;
     final fullLogoUrl = startup['full_logo_url'];
     final likeCount = startup['likes_count']?.toString() ?? '0';
-    final followCount = startup['follow_count']?.toString() ?? '0';
+    final followCount = startup['followers_count']?.toString() ?? '0';
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -1639,7 +1639,7 @@ Future<void> _launchUrl(String url) async {
                               width: 150,
                               height: 150,
                               decoration: BoxDecoration(
-                                color: colorScheme.surfaceVariant,
+                                color: colorScheme.surfaceContainerHighest,
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(

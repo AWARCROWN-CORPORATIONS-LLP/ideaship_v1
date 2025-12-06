@@ -352,41 +352,115 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
   }
 
   Future<void> _fetchAndNavigateToThread(int threadId) async {
-    if (_username == null || _username!.isEmpty) return;
+    if (_username == null || _username!.isEmpty) {
+      _showErrorBanner('Please log in to view threads');
+      return;
+    }
 
     try {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ),
+                SizedBox(width: 12),
+                Text('Loading thread...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Use the same endpoint format as the app uses
       final response = await http.get(
         Uri.parse('https://server.awarcrown.com/threads/$threadId'),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final thread = Thread.fromJson(data);
+      if (response.statusCode == 404) {
+        _showErrorBanner('Thread not found');
+        return;
+      }
 
-        final prefs = await SharedPreferences.getInstance();
-        final userId = prefs.getInt('user_id');
+      if (response.statusCode != 200) {
+        _showErrorBanner('Failed to load thread. Please try again.');
+        return;
+      }
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Opening thread...')),
-          );
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ThreadDetailScreen(
-                thread: thread,
-                username: _username!,
-                userId: userId ?? 0,
-              ),
+      final data = json.decode(response.body);
+      
+      // Check for error in response
+      if (data['error'] != null) {
+        _showErrorBanner(data['error']);
+        return;
+      }
+
+      // Parse thread data - view.php returns thread object directly
+      final threadData = data is Map<String, dynamic> ? data : <String, dynamic>{};
+      
+      // Ensure required fields exist
+      if (threadData['thread_id'] == null && threadData['id'] != null) {
+        threadData['thread_id'] = threadData['id'];
+      }
+      if (threadData['category_name'] == null && threadData['category'] != null) {
+        threadData['category_name'] = threadData['category'];
+      }
+      if (threadData['creator_username'] == null && threadData['creator'] != null) {
+        threadData['creator_username'] = threadData['creator'];
+      }
+      if (threadData['creator_role'] == null && threadData['role'] != null) {
+        threadData['creator_role'] = threadData['role'];
+      }
+      if (threadData['inspired_count'] == null) {
+        threadData['inspired_count'] = 0;
+      }
+      if (threadData['comment_count'] == null) {
+        threadData['comment_count'] = threadData['comments'] != null 
+            ? (threadData['comments'] as List).length 
+            : 0;
+      }
+      if (threadData['tags'] == null) {
+        threadData['tags'] = [];
+      }
+      if (threadData['user_has_inspired'] == null) {
+        threadData['user_has_inspired'] = false;
+      }
+      if (threadData['visibility'] == null) {
+        threadData['visibility'] = 'public';
+      }
+
+      final thread = Thread.fromJson(threadData, isFromCache: false);
+
+      if (thread.id == 0) {
+        _showErrorBanner('Invalid thread data received');
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id') ?? 0;
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ThreadDetailScreen(
+              thread: thread,
+              username: _username!,
+              userId: userId,
             ),
-          );
-        }
-      } else {
-        _showErrorBanner('Failed to load thread');
+          ),
+        );
       }
     } catch (e) {
       debugPrint('Error fetching thread: $e');
-      _showErrorBanner('Error loading thread: $e');
+      if (mounted) {
+        _showErrorBanner('Error loading thread: ${e.toString()}');
+      }
     }
   }
 
@@ -772,7 +846,7 @@ class _DashboardPageState extends State<DashboardPage> with TickerProviderStateM
         if (index == 4) {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => SettingsPage(onThemeChanged: _toggleTheme)),
+            MaterialPageRoute(builder: (context) => const SettingsPage()),
           ).then((_) {
             _loadThemePreference();
           });

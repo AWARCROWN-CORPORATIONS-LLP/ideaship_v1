@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart'; // Required for MediaType
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:convert';
 import 'dart:io';
-// Ensure this import path is correct in your project structure
-import '../feed/publicprofile.dart'; 
+import 'dart:async';
+import 'dart:math' as math;
+import '../feed/publicprofile.dart';
+import '../feed/posts.dart';
 
 class UserProfile extends StatefulWidget {
   const UserProfile({super.key});
@@ -16,19 +19,33 @@ class UserProfile extends StatefulWidget {
   State<UserProfile> createState() => _UserProfileState();
 }
 
-class _UserProfileState extends State<UserProfile> {
+class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin {
   String? _username;
   String? _email;
   String? _role;
   String? _profilePicture;
   Map<String, dynamic>? _profileData;
-  bool _isDarkMode = false;
   bool _isLoading = true;
   bool _isEditing = false;
+  int _selectedTab = 0;
+  
+  // Posts data
+  List<dynamic> _myPosts = [];
+  List<dynamic> _savedPosts = [];
+  bool _isLoadingPosts = false;
+  bool _isLoadingSaved = false;
+  String? _postsError;
+  String? _savedError;
+  int? _nextCursorId;
+  int? _savedNextCursorId;
+  bool _hasMorePosts = true;
+  bool _hasMoreSaved = true;
+  final ScrollController _scrollController = ScrollController();
   
   final _formKey = GlobalKey<FormState>();
   XFile? _selectedImage;
   final Map<String, TextEditingController> _controllers = {};
+  late TabController _tabController;
   
   // Initialize all sections as expanded
   final Map<String, bool> _expandedSections = {
@@ -42,48 +59,37 @@ class _UserProfileState extends State<UserProfile> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        setState(() => _selectedTab = _tabController.index);
+        if (_tabController.index == 1 && _myPosts.isEmpty && !_isLoadingPosts && _postsError == null) {
+          _fetchMyPosts();
+        } else if (_tabController.index == 2 && _savedPosts.isEmpty && !_isLoadingSaved && _savedError == null) {
+          _fetchSavedPosts();
+        }
+      }
+    });
     _loadUserData();
-    _loadThemePreference();
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
+    _scrollController.dispose();
     _controllers.forEach((_, controller) => controller.dispose());
     super.dispose();
   }
 
-  Future<void> _loadThemePreference() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (mounted) {
-        setState(() {
-          _isDarkMode = prefs.getBool('isDarkMode') ?? false;
-        });
+  void _onScroll() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 300) {
+      if (_selectedTab == 1 && _hasMorePosts && _postsError == null) {
+        _fetchMoreMyPosts();
+      } else if (_selectedTab == 2 && _hasMoreSaved && _savedError == null) {
+        _fetchMoreSavedPosts();
       }
-    } catch (e) {
-      debugPrint('Error loading theme preference: $e');
-    }
-  }
-
-  // Combined and fixed navigation logic
-  Future<void> _navigateToProfile(String targetUsername) async {
-    if (targetUsername.isEmpty) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    final myUsername = prefs.getString('username') ?? '';
-
-    if (!mounted) return;
-
-    if (targetUsername == myUsername) {
-      // Do nothing if tapping on own name
-      return;
-    } else {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PublicProfilePage(targetUsername: targetUsername),
-        ),
-      );
     }
   }
 
@@ -110,7 +116,7 @@ class _UserProfileState extends State<UserProfile> {
         Uri.parse('https://server.awarcrown.com/accessprofile/userprofile_info'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'username': _username}),
-      );
+      ).timeout(const Duration(seconds: 15));
 
       if (!mounted) return;
 
@@ -121,7 +127,6 @@ class _UserProfileState extends State<UserProfile> {
             _profileData = jsonResponse['data'] as Map<String, dynamic>?;
             _role = _profileData?['role']?.toString();
             
-            // Construct full profile picture URL
             final profilePath = _profileData?['profile_picture']?.toString();
             _profilePicture = profilePath != null && profilePath.isNotEmpty
                 ? 'https://server.awarcrown.com/accessprofile/uploads/$profilePath'
@@ -145,14 +150,180 @@ class _UserProfileState extends State<UserProfile> {
       debugPrint('Error loading user data: $e');
       if (mounted) {
         setState(() => _isLoading = false);
-        _showErrorDialog('Error loading profile: $e');
+        _showErrorDialog('Error loading profile: ${_getErrorMessage(e)}');
       }
+    }
+  }
+
+  String _getErrorMessage(dynamic e) {
+    if (e is SocketException) {
+      return 'No internet connection. Please check your network.';
+    } else if (e is TimeoutException) {
+      return 'Request timed out. Please try again.';
+    } else if (e is http.ClientException) {
+      return 'Network error occurred. Please try again.';
+    } else {
+      return 'An unexpected error occurred. Please try again.';
+    }
+  }
+
+  Future<void> _fetchMyPosts({int? cursorId}) async {
+    if (_username == null || _username!.isEmpty) return;
+    if (_isLoadingPosts) return;
+    
+    setState(() {
+      _isLoadingPosts = true;
+      _postsError = null;
+    });
+
+    try {
+      final params = {'username': _username!};
+      if (cursorId != null) params['cursorId'] = cursorId.toString();
+      final queryString = params.entries
+          .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
+          .join('&');
+      final url = 'https://server.awarcrown.com/accessprofile/fetch_user_posts?$queryString';
+      
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode != 200) {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+
+      final data = json.decode(response.body);
+      if (data is! Map<String, dynamic>) {
+        throw FormatException('Invalid JSON structure');
+      }
+      
+      if (mounted) {
+        setState(() {
+          final newPosts = data['posts'] ?? [];
+          if (cursorId == null) {
+            _myPosts = newPosts;
+          } else {
+            final postsToAdd = newPosts.where((newPost) =>
+                !_myPosts.any((existing) => existing['post_id'] == newPost['post_id'])).toList();
+            _myPosts.addAll(postsToAdd);
+          }
+          _nextCursorId = data['nextCursorId'];
+          _hasMorePosts = _nextCursorId != null;
+          _isLoadingPosts = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching my posts: $e');
+      if (mounted) {
+        setState(() {
+          _postsError = _getErrorMessage(e);
+          _isLoadingPosts = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchMoreMyPosts() async {
+    if (_nextCursorId != null) {
+      await _fetchMyPosts(cursorId: _nextCursorId);
+    }
+  }
+
+  Future<void> _fetchSavedPosts({int? cursorId}) async {
+    if (_username == null || _username!.isEmpty) return;
+    if (_isLoadingSaved) return;
+    
+    setState(() {
+      _isLoadingSaved = true;
+      _savedError = null;
+    });
+
+    try {
+      // Try to fetch from API first
+      final params = {'username': _username!};
+      if (cursorId != null) params['cursorId'] = cursorId.toString();
+      final queryString = params.entries
+          .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
+          .join('&');
+      final url = 'https://server.awarcrown.com/feed/get_saved_posts?$queryString';
+      
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic>) {
+          if (mounted) {
+            setState(() {
+              final newPosts = data['posts'] ?? [];
+              if (cursorId == null) {
+                _savedPosts = newPosts;
+              } else {
+                final postsToAdd = newPosts.where((newPost) =>
+                    !_savedPosts.any((existing) => existing['post_id'] == newPost['post_id'])).toList();
+                _savedPosts.addAll(postsToAdd);
+              }
+              _savedNextCursorId = data['nextCursorId'];
+              _hasMoreSaved = _savedNextCursorId != null;
+              _isLoadingSaved = false;
+            });
+          }
+          return;
+        }
+      }
+      
+      // Fallback: Load from local cache if API fails
+      final prefs = await SharedPreferences.getInstance();
+      final savedStr = prefs.getString('saved_posts');
+      if (savedStr != null && cursorId == null) {
+        final savedList = json.decode(savedStr) as List;
+        if (savedList.isNotEmpty && mounted) {
+          // Fetch post details for saved post IDs
+          final savedIds = savedList.cast<int>();
+          final posts = <dynamic>[];
+          for (var postId in savedIds) {
+            try {
+              final postResponse = await http.get(
+                Uri.parse('https://server.awarcrown.com/feed/get_post?post_id=$postId&username=${Uri.encodeComponent(_username!)}'),
+              ).timeout(const Duration(seconds: 5));
+              if (postResponse.statusCode == 200) {
+                final postData = json.decode(postResponse.body);
+                if (postData['post'] != null) {
+                  posts.add(postData['post']);
+                }
+              }
+            } catch (e) {
+              debugPrint('Error fetching post $postId: $e');
+            }
+          }
+          if (mounted) {
+            setState(() {
+              _savedPosts = posts;
+              _hasMoreSaved = false;
+              _isLoadingSaved = false;
+            });
+          }
+          return;
+        }
+      }
+      
+      throw Exception('No saved posts found');
+    } catch (e) {
+      debugPrint('Error fetching saved posts: $e');
+      if (mounted) {
+        setState(() {
+          _savedError = _getErrorMessage(e);
+          _isLoadingSaved = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchMoreSavedPosts() async {
+    if (_savedNextCursorId != null) {
+      await _fetchSavedPosts(cursorId: _savedNextCursorId);
     }
   }
 
   void _initializeControllers() {
     _controllers.clear();
-    // Helper to safely get string
     String getVal(String key) => _profileData?[key]?.toString() ?? '';
 
     _controllers['role'] = TextEditingController(text: _role ?? '');
@@ -162,6 +333,8 @@ class _UserProfileState extends State<UserProfile> {
     _controllers['dob'] = TextEditingController(text: getVal('dob'));
     _controllers['address'] = TextEditingController(text: getVal('address'));
     _controllers['nationality'] = TextEditingController(text: getVal('nationality'));
+    _controllers['bio'] = TextEditingController(text: getVal('bio'));
+    _controllers['website'] = TextEditingController(text: getVal('website'));
 
     if (_role == 'student') {
       _controllers['student_id'] = TextEditingController(text: getVal('student_id'));
@@ -227,12 +400,7 @@ class _UserProfileState extends State<UserProfile> {
       if (response.statusCode == 200) {
         final jsonResponse = json.decode(response.body);
         if (jsonResponse['success'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(jsonResponse['message'] ?? 'Profile updated successfully'),
-              backgroundColor: _buildColorScheme().primary,
-            ),
-          );
+          _showSuccess('Profile updated successfully');
           setState(() => _isEditing = false);
           await _loadUserData();
         } else {
@@ -242,7 +410,7 @@ class _UserProfileState extends State<UserProfile> {
         _showErrorDialog('Failed to update profile: ${response.statusCode}');
       }
     } catch (e) {
-      if (mounted) _showErrorDialog('Error updating profile: $e');
+      if (mounted) _showErrorDialog('Error updating profile: ${_getErrorMessage(e)}');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -253,7 +421,7 @@ class _UserProfileState extends State<UserProfile> {
       final picker = ImagePicker();
       final image = await picker.pickImage(
         source: ImageSource.gallery,
-        maxWidth: 512, // Slightly increased for better quality on modern phones
+        maxWidth: 512,
         maxHeight: 512,
         imageQuality: 85,
       );
@@ -270,12 +438,10 @@ class _UserProfileState extends State<UserProfile> {
           _showErrorDialog('Image size exceeds 5MB limit.');
           return;
         }
-        setState(() {
-          _selectedImage = image;
-        });
+        setState(() => _selectedImage = image);
       }
     } catch (e) {
-      _showErrorDialog('Error picking image: $e');
+      _showErrorDialog('Error picking image: ${_getErrorMessage(e)}');
     }
   }
 
@@ -288,7 +454,6 @@ class _UserProfileState extends State<UserProfile> {
     setState(() => _isLoading = true);
 
     try {
-      debugPrint('Uploading image from path: ${_selectedImage!.path}');
       final request = http.MultipartRequest(
         'POST',
         Uri.parse('https://server.awarcrown.com/accessprofile/upload_picture'),
@@ -325,33 +490,8 @@ class _UserProfileState extends State<UserProfile> {
 
       if (!mounted) return;
 
-      // Handle response
-      if (response.headers['content-type']?.contains('application/json') != true) {
-        // Fallback or error if not JSON
-        try {
-           final jsonCheck = json.decode(responseBody);
-           // If it didn't throw, proceed
-           _handleUploadResponse(response.statusCode, jsonCheck);
-        } catch (_) {
-           _showErrorDialog('Server returned unexpected data.');
-        }
-        setState(() => _isLoading = false);
-        return;
-      }
-
       final jsonResponse = json.decode(responseBody);
-      _handleUploadResponse(response.statusCode, jsonResponse);
-
-    } catch (e) {
-      debugPrint('Error uploading profile picture: $e');
-      if (mounted) _showErrorDialog('Error uploading profile picture: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  void _handleUploadResponse(int statusCode, Map<String, dynamic> jsonResponse) {
-      if (statusCode == 200 && jsonResponse['success'] == true) {
+      if (response.statusCode == 200 && jsonResponse['success'] == true) {
         setState(() {
           final profilePath = jsonResponse['profile_path']?.toString();
           _profilePicture = profilePath != null && profilePath.isNotEmpty
@@ -359,15 +499,17 @@ class _UserProfileState extends State<UserProfile> {
               : null;
           _selectedImage = null;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(jsonResponse['message'] ?? 'Profile picture updated'),
-            backgroundColor: _buildColorScheme().primary,
-          ),
-        );
+        _showSuccess('Profile picture updated');
+        await _loadUserData();
       } else {
-        _showErrorDialog(jsonResponse['message'] ?? 'Failed to upload: $statusCode');
+        _showErrorDialog(jsonResponse['message'] ?? 'Failed to upload: ${response.statusCode}');
       }
+    } catch (e) {
+      debugPrint('Error uploading profile picture: $e');
+      if (mounted) _showErrorDialog('Error uploading profile picture: ${_getErrorMessage(e)}');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   void _showErrorDialog(String message) {
@@ -376,593 +518,1003 @@ class _UserProfileState extends State<UserProfile> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Error', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: SingleChildScrollView(child: Text(message)),
+        title: const Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red, size: 28),
+            SizedBox(width: 12),
+            Expanded(child: Text('Error')),
+          ],
+        ),
+        content: Text(message),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK', style: TextStyle(fontWeight: FontWeight.w600)),
+            child: const Text('OK'),
           ),
         ],
       ),
     );
   }
 
-  ColorScheme _buildColorScheme() {
-    final primaryColor = const Color(0xFF0077B5);
-    return _isDarkMode
-        ? ColorScheme.dark(
-            primary: primaryColor,
-            onPrimary: Colors.white,
-            surface: const Color(0xFF1A1A1A),
-            onSurface: Colors.white,
-            surfaceContainer: const Color(0xFF2A2A2A),
-            onSurfaceVariant: Colors.grey[400]!,
-            outline: Colors.grey[700]!,
-            error: Colors.redAccent,
-            onError: Colors.white,
-            secondary: Colors.grey[600]!,
-            onSecondary: Colors.white,
-          )
-        : ColorScheme.light(
-            primary: primaryColor,
-            onPrimary: Colors.white,
-            surface: Colors.white,
-            onSurface: Colors.black87,
-            surfaceContainer: Colors.grey[50]!,
-            onSurfaceVariant: Colors.black54,
-            outline: Colors.grey[300]!,
-            error: Colors.redAccent,
-            onError: Colors.white,
-            secondary: Colors.grey[600]!,
-            onSecondary: Colors.white,
-          );
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
-  Widget _buildProfileField(String label, dynamic value, String fieldKey,
-      {bool isRequired = false, bool isMultiline = false, bool isNumeric = false, bool alwaysReadOnly = false, String? Function(String? value)? customValidator}) {
-    final colorScheme = _buildColorScheme();
+  void _showProfileImage() {
+    if (_profilePicture == null) return;
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.95),
+      barrierDismissible: true,
+      builder: (context) {
+        return GestureDetector(
+          onTap: () => Navigator.pop(context),
+          child: Center(
+            child: Hero(
+              tag: 'profile_image_$_profilePicture',
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 3.0,
+                child: CachedNetworkImage(
+                  imageUrl: _profilePicture!,
+                  fit: BoxFit.contain,
+                  placeholder: (context, url) => const Center(
+                    child: CircularProgressIndicator(),
+                  ),
+                  errorWidget: (context, url, error) => const Icon(
+                    Icons.error_outline,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  String _formatTime(String? timeString) {
+    if (timeString == null || timeString.isEmpty) return 'Unknown';
+    try {
+      DateTime date = DateTime.parse(timeString).toLocal();
+      Duration diff = DateTime.now().difference(date);
+      if (diff.inSeconds < 0) return '0s';
+      if (diff.inSeconds < 60) return '${diff.inSeconds}secs ago';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}mins ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      if (diff.inDays < 7) return '${diff.inDays}days ago';
+      if (diff.inDays < 30) return '${(diff.inDays / 7).floor()}weeks ago';
+      if (diff.inDays < 365) return '${(diff.inDays / 30).floor()}months ago';
+      return '${(diff.inDays / 365).floor()}y';
+    } catch (e) {
+      return timeString;
+    }
+  }
+
+  Widget _buildProfileHeader() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              GestureDetector(
+                onTap: _showProfileImage,
+                child: Hero(
+                  tag: 'profile_image_$_profilePicture',
+                  child: Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey.shade200, width: 2),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: CircleAvatar(
+                      radius: 43,
+                      backgroundImage: _selectedImage != null
+                          ? FileImage(File(_selectedImage!.path))
+                          : _profilePicture != null
+                              ? CachedNetworkImageProvider(_profilePicture!)
+                              : null,
+                      backgroundColor: Colors.grey.shade100,
+                      child: _profilePicture == null && _selectedImage == null
+                          ? Icon(Icons.person, size: 45, color: Colors.grey.shade400)
+                          : null,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 20),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        if (_username != null && _username!.isNotEmpty) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => PublicProfilePage(targetUsername: _username!),
+                            ),
+                          );
+                        }
+                      },
+                      child: Row(
+                        children: [
+                          Text(
+                            _username ?? 'User',
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1A1A1A),
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Icon(Icons.open_in_new, size: 16, color: Colors.grey.shade600),
+                        ],
+                      ),
+                    ),
+                    if (_email != null && _email!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _email!,
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: Colors.grey.shade600,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 8),
+                    if (_role == 'student')
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${_profileData?['major'] ?? 'Student'} at ${_profileData?['institution'] ?? 'Not specified'}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.blue.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      )
+                    else if (_role == 'Company/HR')
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.purple.shade50,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          '${_profileData?['contact_designation'] ?? 'HR'} at ${_profileData?['company_name'] ?? 'Not specified'}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.purple.shade700,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    if (_profileData?['bio'] != null && _profileData!['bio'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _profileData!['bio'],
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade700,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                    if (_profileData?['website'] != null && _profileData!['website'].toString().isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.link, size: 14, color: Colors.blue.shade600),
+                          const SizedBox(width: 4),
+                          Text(
+                            _profileData!['website'],
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.blue.shade600,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: _StatButton(
+                  label: 'Posts',
+                  count: _myPosts.length,
+                  onTap: () {
+                    _tabController.animateTo(1);
+                  },
+                ),
+              ),
+              Container(width: 1, height: 40, color: Colors.grey.shade200),
+              Expanded(
+                child: _StatButton(
+                  label: 'Saved',
+                  count: _savedPosts.length,
+                  onTap: () {
+                    _tabController.animateTo(2);
+                  },
+                ),
+              ),
+            ],
+          ),
+          if (_isEditing) ...[
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: _pickImage,
+                    icon: const Icon(Icons.camera_alt, size: 18),
+                    label: const Text('Change Photo'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                if (_selectedImage != null) ...[
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _uploadProfilePicture,
+                      icon: const Icon(Icons.save, size: 18),
+                      label: const Text('Save Photo'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _StatButton({required String label, required int count, required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            _formatCount(count),
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 18,
+              color: Color(0xFF1A1A1A),
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              color: Colors.grey.shade600,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatCount(int count) {
+    if (count >= 1000000) {
+      return '${(count / 1000000).toStringAsFixed(1)}M';
+    } else if (count >= 1000) {
+      return '${(count / 1000).toStringAsFixed(1)}K';
+    }
+    return count.toString();
+  }
+
+  Widget _buildProfileInfoTab() {
+    if (_profileData == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: Text('No profile data available'),
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildInfoSection(
+              'Basic Information',
+              Icons.info_outline,
+              [
+                _buildInfoField('Full Name', 'full_name', isRequired: true),
+                if (_role == 'student')
+                  _buildInfoField('Student ID', 'student_id', isRequired: true),
+              ],
+            ),
+            const SizedBox(height: 16),
+            _buildInfoSection(
+              'Personal Information',
+              Icons.person_outline,
+              [
+                _buildInfoField('Email', 'email', alwaysReadOnly: true),
+                _buildInfoField('Phone', 'phone'),
+                _buildInfoField('Date of Birth', 'dob'),
+                _buildInfoField('Address', 'address', isMultiline: true),
+                _buildInfoField('Nationality', 'nationality'),
+                _buildInfoField('Bio', 'bio', isMultiline: true),
+                _buildInfoField('Website', 'website'),
+              ],
+            ),
+            if (_role == 'student') ...[
+              const SizedBox(height: 16),
+              _buildInfoSection(
+                'Education',
+                Icons.school_outlined,
+                [
+                  _buildInfoField('Institution', 'institution', alwaysReadOnly: true),
+                  _buildInfoField('Academic Level', 'academic_level', alwaysReadOnly: true),
+                  _buildInfoField('Major', 'major', alwaysReadOnly: true),
+                  _buildInfoField('Expected Passout Year', 'expected_passout_year', isNumeric: true, alwaysReadOnly: true),
+                  _buildInfoField('LinkedIn', 'linkedin'),
+                  _buildInfoField('Portfolio', 'portfolio'),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildInfoSection(
+                'Preferences',
+                Icons.favorite_outline,
+                [
+                  _buildInfoField('Skills Development', 'skills_dev', isMultiline: true),
+                  _buildInfoField('Interests', 'interests', isMultiline: true),
+                ],
+              ),
+            ] else if (_role == 'Company/HR') ...[
+              const SizedBox(height: 16),
+              _buildInfoSection(
+                'Company Details',
+                Icons.business_outlined,
+                [
+                  _buildInfoField('Company Name', 'company_name', isRequired: true),
+                  _buildInfoField('Contact Person Name', 'contact_person_name'),
+                  _buildInfoField('Contact Designation', 'contact_designation'),
+                  _buildInfoField('Contact Email', 'contact_email', alwaysReadOnly: true),
+                  _buildInfoField('Contact Phone', 'contact_phone', alwaysReadOnly: true),
+                  _buildInfoField('Company Address', 'company_address', isMultiline: true),
+                  _buildInfoField('Industry', 'industry'),
+                  _buildInfoField('Company Size', 'company_size', isNumeric: true),
+                  _buildInfoField('Website', 'website'),
+                  _buildInfoField('LinkedIn Profile', 'linkedin_profile'),
+                  _buildInfoField('Budget', 'budget', isNumeric: true),
+                  _buildInfoField('Company Culture', 'company_culture', isMultiline: true),
+                ],
+              ),
+              const SizedBox(height: 16),
+              _buildInfoSection(
+                'Preferences & Compliance',
+                Icons.verified_user_outlined,
+                [
+                  _buildInfoField('Preferred Talent Sources', 'preferred_talent_sources', isMultiline: true),
+                  _buildInfoField('Training Programs', 'training_programs', isMultiline: true),
+                  _buildInfoField('Candidate Preferences', 'candidate_preferences', isMultiline: true),
+                  _buildInfoField('Diversity Goals', 'diversity_goals', isMultiline: true),
+                  _buildInfoField('Location Preferences', 'location_preferences'),
+                  _buildInfoField('Business Registration', 'business_registration'),
+                  _buildInfoField('Authorized Signatory', 'authorized_signatory'),
+                  _buildInfoField('EIN', 'ein'),
+                  _buildInfoField('Reference Contact', 'reference_contact'),
+                ],
+              ),
+            ],
+            if (_isEditing) ...[
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _updateProfile,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Save Changes'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        setState(() {
+                          _isEditing = false;
+                          _selectedImage = null;
+                        });
+                        _initializeControllers();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Cancel'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoSection(String title, IconData icon, List<Widget> fields) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF007AFF).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(icon, color: const Color(0xFF007AFF), size: 20),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ...fields,
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoField(String label, String fieldKey, {
+    bool isRequired = false,
+    bool isMultiline = false,
+    bool isNumeric = false,
+    bool alwaysReadOnly = false,
+  }) {
     final effectiveReadOnly = alwaysReadOnly || !_isEditing;
     
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: TextFormField(
         controller: _controllers[fieldKey],
         maxLines: isMultiline ? 3 : 1,
         readOnly: effectiveReadOnly,
         keyboardType: isNumeric ? TextInputType.number : TextInputType.text,
         inputFormatters: isNumeric
-            ? [FilteringTextInputFormatter.digitsOnly] // Use digitsOnly for simple integers, or regex for decimals
+            ? [FilteringTextInputFormatter.digitsOnly]
             : fieldKey == 'phone' || fieldKey == 'contact_phone'
                 ? [FilteringTextInputFormatter.allow(RegExp(r'^\+?[\d\s-]*$'))]
                 : null,
         decoration: InputDecoration(
           labelText: label + (isRequired && !effectiveReadOnly ? ' *' : ''),
-          labelStyle: TextStyle(
-            color: effectiveReadOnly ? colorScheme.onSurfaceVariant : colorScheme.onSurface,
-            fontWeight: FontWeight.w500,
-          ),
           filled: true,
-          fillColor: effectiveReadOnly ? colorScheme.surfaceContainer : colorScheme.surface,
+          fillColor: effectiveReadOnly ? Colors.grey.shade50 : Colors.white,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: colorScheme.outline, width: 1),
+            borderSide: BorderSide(color: Colors.grey.shade200),
           ),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: colorScheme.outline, width: 1),
+            borderSide: BorderSide(color: Colors.grey.shade200),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: colorScheme.primary, width: 2),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: colorScheme.error, width: 1),
-          ),
-          disabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: colorScheme.outline, width: 1),
+            borderSide: const BorderSide(color: Color(0xFF007AFF), width: 2),
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          errorStyle: TextStyle(color: colorScheme.error, fontSize: 12),
         ),
         style: TextStyle(
-          fontSize: 16,
-          color: effectiveReadOnly ? colorScheme.onSurfaceVariant : colorScheme.onSurface,
+          fontSize: 15,
+          color: effectiveReadOnly ? Colors.grey.shade600 : Colors.black87,
         ),
         validator: effectiveReadOnly ? null : (value) {
           if (isRequired && (value == null || value.trim().isEmpty)) {
             return '$label is required';
           }
-          if (isNumeric && value != null && value.isNotEmpty && double.tryParse(value) == null) {
-            return '$label must be a valid number';
-          }
-          if (customValidator != null) {
-            return customValidator(value);
-          }
           return null;
         },
-        autovalidateMode: effectiveReadOnly ? AutovalidateMode.disabled : AutovalidateMode.onUserInteraction,
       ),
     );
   }
 
-  Widget _buildSection(String title, List<Widget> fields, String sectionKey, {IconData? icon}) {
-    final colorScheme = _buildColorScheme();
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      elevation: 1,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ExpansionTile(
-        initiallyExpanded: _expandedSections[sectionKey] ?? false,
-        onExpansionChanged: (expanded) {
-          setState(() {
-            _expandedSections[sectionKey] = expanded;
-          });
-        },
-        leading: icon != null ? Icon(icon, color: colorScheme.primary, size: 24) : null,
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: colorScheme.onSurface,
+  Widget _buildPostsTab() {
+    if (_postsError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              Text(
+                _postsError!,
+                style: TextStyle(color: Colors.grey.shade600),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => _fetchMyPosts(),
+                child: const Text('Retry'),
+              ),
+            ],
           ),
         ),
-        tilePadding: const EdgeInsets.symmetric(horizontal: 16.0),
-        childrenPadding: const EdgeInsets.all(16.0),
-        collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        children: fields,
-      ),
-    );
-  }
+      );
+    }
 
-  Widget _buildProfileContent() {
-    final colorScheme = _buildColorScheme();
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        // Header Card
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: _isDarkMode
-                  ? [Colors.black87, Colors.grey[900]!]
-                  : [Colors.blue[50]!, Colors.white],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          padding: const EdgeInsets.all(16.0),
-          margin: const EdgeInsets.symmetric(horizontal: 8.0),
+    if (_isLoadingPosts && _myPosts.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_myPosts.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
           child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              CircleAvatar(
-                radius: 60,
-                backgroundColor: colorScheme.primary,
-                backgroundImage: _selectedImage != null
-                    ? FileImage(File(_selectedImage!.path))
-                    : _profilePicture != null
-                        ? NetworkImage(_profilePicture!)
-                        : null,
-                child: _profilePicture == null && _selectedImage == null
-                    ? Text(
-                        _username?.isNotEmpty == true ? _username!.substring(0, 1).toUpperCase() : 'U',
-                        style: const TextStyle(fontSize: 40, color: Colors.white),
-                      )
-                    : null,
-              ),
-              const SizedBox(height: 12),
-              GestureDetector(
-                onTap: () {
-                  _navigateToProfile(_username ?? '');
-                },
-                child: Text(
-                  _username ?? 'User',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurface,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
+              Icon(Icons.post_add, size: 64, color: Colors.grey.shade300),
+              const SizedBox(height: 16),
               Text(
-                _email ?? 'Not specified',
-                style: TextStyle(fontSize: 16, color: colorScheme.onSurfaceVariant),
+                'No posts yet',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
-                _role == 'student'
-                    ? '${_profileData?['major'] ?? 'Student'} at ${_profileData?['institution'] ?? 'Not specified'}'
-                    : '${_profileData?['contact_designation'] ?? 'HR'} at ${_profileData?['company_name'] ?? 'Not specified'}',
-                style: TextStyle(fontSize: 14, color: colorScheme.onSurfaceVariant, fontStyle: FontStyle.italic),
+                'Start sharing your ideas!',
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _fetchMyPosts(),
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: _myPosts.length + (_hasMorePosts ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == _myPosts.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return _buildPostCard(_myPosts[index], index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildSavedPostsTab() {
+    if (_savedError != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.grey.shade400),
+              const SizedBox(height: 16),
+              Text(
+                _savedError!,
+                style: TextStyle(color: Colors.grey.shade600),
                 textAlign: TextAlign.center,
               ),
-              if (_isEditing) ...[
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      _pickImage();
-                    },
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('Select Profile Picture'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: colorScheme.primary,
-                      foregroundColor: colorScheme.onPrimary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-                if (_selectedImage != null) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        HapticFeedback.mediumImpact();
-                        _uploadProfilePicture();
-                      },
-                      icon: const Icon(Icons.save),
-                      label: const Text('Save Profile Picture'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: colorScheme.onPrimary,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
               const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => _fetchSavedPosts(),
+                child: const Text('Retry'),
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        // Form Fields
-        Form(
-          key: _formKey,
+      );
+    }
+
+    if (_isLoadingSaved && _savedPosts.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_savedPosts.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              if (_profileData != null) ...[
-                _buildSection(
-                  'Basic Information',
-                  [
-                    _buildProfileField(
-                      'Role',
-                      _role ?? 'Not specified',
-                      'role',
-                      isRequired: true,
-                      alwaysReadOnly: true,
-                      customValidator: (value) => value != 'student' && value != 'Company/HR' ? 'Role must be "student" or "Company/HR"' : null,
-                    ),
-                    _buildProfileField('Full Name', _profileData?['full_name'] ?? 'Not specified', 'full_name', isRequired: true),
-                    if (_role == 'student')
-                      _buildProfileField('Student ID', _profileData?['student_id'] ?? 'Not specified', 'student_id', isRequired: true),
-                  ],
-                  'basic',
-                  icon: Icons.info_outline,
+              Icon(Icons.bookmark_border, size: 64, color: Colors.grey.shade300),
+              const SizedBox(height: 16),
+              Text(
+                'No saved posts',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade700,
                 ),
-                _buildSection(
-                  'Personal Information',
-                  [
-                    _buildProfileField(
-                      'Email',
-                      _profileData?['email'] ?? 'Not specified',
-                      'email',
-                      alwaysReadOnly: true,
-                      customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value) ? 'Enter valid email' : null,
-                    ),
-                    _buildProfileField(
-                      'Phone',
-                      _profileData?['phone'] ?? 'Not specified',
-                      'phone',
-                      alwaysReadOnly: true,
-                      customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^\+\d{10,15}$').hasMatch(value) ? 'Enter valid phone number (e.g., +1234567890)' : null,
-                    ),
-                    _buildProfileField(
-                      'Date of Birth',
-                      _profileData?['dob'] ?? 'Not specified',
-                      'dob',
-                      customValidator: (value) {
-                        if (value != null && value.isNotEmpty) {
-                          final regex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
-                          if (!regex.hasMatch(value)) return 'Enter valid date (YYYY-MM-DD)';
-                          final parts = value.split('-');
-                          final year = int.tryParse(parts[0]);
-                          if (year == null || year < 1900 || year > DateTime.now().year) return 'Invalid year';
-                        }
-                        return null;
-                      },
-                    ),
-                    _buildProfileField('Address', _profileData?['address'] ?? 'Not specified', 'address', isMultiline: true),
-                    _buildProfileField('Nationality', _profileData?['nationality'] ?? 'Not specified', 'nationality'),
-                  ],
-                  'personal',
-                  icon: Icons.person_outline,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Posts you save will appear here',
+                style: TextStyle(color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => _fetchSavedPosts(),
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        itemCount: _savedPosts.length + (_hasMoreSaved ? 1 : 0),
+        itemBuilder: (context, index) {
+          if (index == _savedPosts.length) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+          return _buildPostCard(_savedPosts[index], index);
+        },
+      ),
+    );
+  }
+
+  Widget _buildPostCard(dynamic post, int index) {
+    final postId = post['post_id'];
+    final imageUrl = post['media_url'] != null && post['media_url'].isNotEmpty
+        ? 'https://server.awarcrown.com/feed/${post['media_url']}'
+        : null;
+    final screenWidth = MediaQuery.of(context).size.width - 40;
+    const double aspectRatio = 1.0;
+
+    return GestureDetector(
+      onTap: () async {
+        // Navigate to comments page
+        try {
+          final response = await http.get(
+            Uri.parse('https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username ?? '')}'),
+          ).timeout(const Duration(seconds: 10));
+          
+          if (response.statusCode == 200 && mounted) {
+            final data = json.decode(response.body);
+            final comments = data['comments'] ?? [];
+            final prefs = await SharedPreferences.getInstance();
+            final userId = prefs.getInt('user_id');
+            
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CommentsPage(
+                  post: post,
+                  comments: comments,
+                  username: _username ?? '',
+                  userId: userId,
                 ),
-                if (_role == 'student') ...[
-                  _buildSection(
-                    'Education',
-                    [
-                      _buildProfileField('Institution', _profileData?['institution'] ?? 'Not specified', 'institution', alwaysReadOnly: true),
-                      _buildProfileField('Academic Level', _profileData?['academic_level'] ?? 'Not specified', 'academic_level', alwaysReadOnly: true),
-                      _buildProfileField('Major', _profileData?['major'] ?? 'Not specified', 'major', alwaysReadOnly: true),
-                      _buildProfileField(
-                        'Expected Passout Year',
-                        _profileData?['expected_passout_year'] ?? 'Not specified',
-                        'expected_passout_year',
-                        isNumeric: true,
-                        alwaysReadOnly: true,
-                        customValidator: (value) {
-                          if (value != null && value.isNotEmpty) {
-                            final year = int.tryParse(value);
-                            if (year == null || year < DateTime.now().year || year > DateTime.now().year + 10) {
-                              return 'Enter a valid year (${DateTime.now().year}-${DateTime.now().year + 10})';
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint('Error fetching comments: $e');
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 12, 12),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      final username = post['username'];
+                      if (username != null && username.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PublicProfilePage(targetUsername: username),
+                          ),
+                        );
+                      }
+                    },
+                    child: CircleAvatar(
+                      radius: 22,
+                      backgroundImage: post['profile_picture'] != null
+                          ? CachedNetworkImageProvider(
+                              'https://server.awarcrown.com/accessprofile/uploads/${post['profile_picture']}')
+                          : null,
+                      backgroundColor: Colors.grey.shade100,
+                      child: post['profile_picture'] == null
+                          ? Icon(Icons.person, size: 22, color: Colors.grey.shade400)
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        GestureDetector(
+                          onTap: () {
+                            final username = post['username'];
+                            if (username != null && username.isNotEmpty) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => PublicProfilePage(targetUsername: username),
+                                ),
+                              );
                             }
-                          }
-                          return null;
-                        },
-                      ),
-                      _buildProfileField(
-                        'LinkedIn',
-                        _profileData?['linkedin'] ?? 'Not specified',
-                        'linkedin',
-                        customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^https?://(www\.)?linkedin\.com/.+$').hasMatch(value)
-                            ? 'Enter valid LinkedIn URL'
-                            : null,
-                      ),
-                      _buildProfileField(
-                        'Portfolio',
-                        _profileData?['portfolio'] ?? 'Not specified',
-                        'portfolio',
-                        customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^https?://.+$').hasMatch(value) ? 'Enter valid URL' : null,
-                      ),
-                    ],
-                    'education',
-                    icon: Icons.school_outlined,
-                  ),
-                  _buildSection(
-                    'Preferences & Other',
-                    [
-                      _buildProfileField('Skills Development', _profileData?['skills_dev'] ?? 'Not specified', 'skills_dev', isMultiline: true),
-                      _buildProfileField('Interests', _profileData?['interests'] ?? 'Not specified', 'interests', isMultiline: true),
-                    ],
-                    'preferences',
-                    icon: Icons.favorite_outline,
-                  ),
-                ] else if (_role == 'Company/HR') ...[
-                  _buildSection(
-                    'Company Details',
-                    [
-                      _buildProfileField('Company Name', _profileData?['company_name'] ?? 'Not specified', 'company_name', isRequired: true),
-                      _buildProfileField('Contact Person Name', _profileData?['contact_person_name'] ?? 'Not specified', 'contact_person_name'),
-                      _buildProfileField('Contact Designation', _profileData?['contact_designation'] ?? 'Not specified', 'contact_designation'),
-                      _buildProfileField(
-                        'Contact Email',
-                        _profileData?['contact_email'] ?? 'Not specified',
-                        'contact_email',
-                        alwaysReadOnly: true,
-                        customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value) ? 'Enter valid email' : null,
-                      ),
-                      _buildProfileField(
-                        'Contact Phone',
-                        _profileData?['contact_phone'] ?? 'Not specified',
-                        'contact_phone',
-                        alwaysReadOnly: true,
-                        customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^\+\d{10,15}$').hasMatch(value) ? 'Enter valid phone number (e.g., +1234567890)' : null,
-                      ),
-                      _buildProfileField('Company Address', _profileData?['company_address'] ?? 'Not specified', 'company_address', isMultiline: true),
-                      _buildProfileField('Industry', _profileData?['industry'] ?? 'Not specified', 'industry'),
-                      _buildProfileField(
-                        'Company Size',
-                        _profileData?['company_size'] ?? 'Not specified',
-                        'company_size',
-                        isNumeric: true,
-                        customValidator: (value) => value != null && value.isNotEmpty && (int.tryParse(value) == null || int.parse(value) < 0)
-                            ? 'Enter valid company size'
-                            : null,
-                      ),
-                      _buildProfileField(
-                        'Website',
-                        _profileData?['website'] ?? 'Not specified',
-                        'website',
-                        customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^https?://.+$').hasMatch(value) ? 'Enter valid URL' : null,
-                      ),
-                      _buildProfileField(
-                        'LinkedIn Profile',
-                        _profileData?['linkedin_profile'] ?? 'Not specified',
-                        'linkedin_profile',
-                        customValidator: (value) => value != null && value.isNotEmpty && !RegExp(r'^https?://(www\.)?linkedin\.com/.+$').hasMatch(value)
-                            ? 'Enter valid LinkedIn URL'
-                            : null,
-                      ),
-                      _buildProfileField(
-                        'Budget',
-                        _profileData?['budget'] ?? 'Not specified',
-                        'budget',
-                        isNumeric: true,
-                        customValidator: (value) => value != null && value.isNotEmpty && (double.tryParse(value) == null || double.parse(value) < 0)
-                            ? 'Enter valid budget'
-                            : null,
-                      ),
-                      _buildProfileField('Company Culture', _profileData?['company_culture'] ?? 'Not specified', 'company_culture', isMultiline: true),
-                      _buildProfileField('Preferred Talent Sources', _profileData?['preferred_talent_sources'] ?? 'Not specified', 'preferred_talent_sources', isMultiline: true),
-                      _buildProfileField('Training Programs', _profileData?['training_programs'] ?? 'Not specified', 'training_programs', isMultiline: true),
-                    ],
-                    'company',
-                    icon: Icons.business_outlined,
-                  ),
-                  _buildSection(
-                    'Preferences & Compliance',
-                    [
-                      _buildProfileField('Candidate Preferences', _profileData?['candidate_preferences'] ?? 'Not specified', 'candidate_preferences', isMultiline: true),
-                      _buildProfileField('Diversity Goals', _profileData?['diversity_goals'] ?? 'Not specified', 'diversity_goals', isMultiline: true),
-                      _buildProfileField('Location Preferences', _profileData?['location_preferences'] ?? 'Not specified', 'location_preferences'),
-                      _buildProfileField('Business Registration', _profileData?['business_registration'] ?? 'Not specified', 'business_registration'),
-                      _buildProfileField('Authorized Signatory', _profileData?['authorized_signatory'] ?? 'Not specified', 'authorized_signatory'),
-                      _buildProfileField('EIN', _profileData?['ein'] ?? 'Not specified', 'ein'),
-                      _buildProfileField('Reference Contact', _profileData?['reference_contact'] ?? 'Not specified', 'reference_contact'),
-                      _buildProfileField('Website Domain Verification', _profileData?['website_domain_verification'] ?? 'Not specified', 'website_domain_verification'),
-                      _buildProfileField('Email Verification', _profileData?['email_verification'] ?? 'Not specified', 'email_verification'),
-                    ],
-                    'preferences',
-                    icon: Icons.verified_user_outlined,
+                          },
+                          child: Text(
+                            post['username'] ?? 'Unknown',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 15,
+                              color: Color(0xFF1A1A1A),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _formatTime(post['created_at']),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
-              ],
-              if (_isEditing) ...[
-                const SizedBox(height: 24),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                  child: Column(
-                    children: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            HapticFeedback.mediumImpact();
-                            _updateProfile();
-                          },
-                          icon: const Icon(Icons.save),
-                          label: const Text('Save Profile'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: colorScheme.onPrimary,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: 2,
-                          ),
-                        ),
+              ),
+            ),
+            if (post['content'] != null && post['content'].isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Text(
+                  post['content'],
+                  style: TextStyle(
+                    fontSize: 15,
+                    height: 1.5,
+                    color: Colors.grey.shade800,
+                  ),
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            if (imageUrl != null)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                child: AspectRatio(
+                  aspectRatio: aspectRatio,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      fit: BoxFit.cover,
+                      memCacheWidth: (screenWidth * MediaQuery.of(context).devicePixelRatio).round(),
+                      memCacheHeight: (screenWidth * aspectRatio * MediaQuery.of(context).devicePixelRatio).round(),
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey.shade100,
+                        child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
                       ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            setState(() {
-                              _isEditing = false;
-                              _selectedImage = null;
-                            });
-                            // Reset controllers
-                            _initializeControllers();
-                          },
-                          icon: const Icon(Icons.cancel),
-                          label: const Text('Cancel'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: colorScheme.primary,
-                            side: BorderSide(color: colorScheme.primary, width: 1.5),
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
+                      errorWidget: (context, url, error) => Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(16),
                         ),
+                        child: Icon(Icons.image_not_supported, color: Colors.grey.shade400, size: 48),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ],
-            ],
-          ),
+              ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+              child: Row(
+                children: [
+                  Icon(Icons.favorite, size: 20, color: Colors.red.shade400),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${post['like_count'] ?? 0}',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                  ),
+                  const SizedBox(width: 16),
+                  Icon(Icons.mode_comment_outlined, size: 20, color: Colors.grey.shade600),
+                  const SizedBox(width: 6),
+                  Text(
+                    '${post['comment_count'] ?? 0}',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                  ),
+                  const Spacer(),
+                  if (_selectedTab == 2)
+                    Icon(Icons.bookmark, size: 20, color: Colors.amber.shade700),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 32),
-      ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = _buildColorScheme();
-    final themeData = ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-      scaffoldBackgroundColor: colorScheme.surface,
-      appBarTheme: AppBarTheme(
-        backgroundColor: colorScheme.surface,
-        elevation: 0,
-        titleTextStyle: TextStyle(
-          color: colorScheme.onSurface,
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        appBar: AppBar(
+          title: const Text('Profile'),
+          backgroundColor: Colors.white,
+          elevation: 0,
         ),
-        iconTheme: IconThemeData(color: colorScheme.onSurface),
-      ),
-    );
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    return Theme(
-      data: themeData,
-      child: Scaffold(
-        body: _isLoading
-            ? Center(child: CircularProgressIndicator(color: colorScheme.primary))
-            : RefreshIndicator(
-                onRefresh: _loadUserData,
-                color: colorScheme.primary,
-                child: CustomScrollView(
-                  // AlwaysScrollableScrollPhysics ensures refresh works even if content is short
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  slivers: [
-                    SliverAppBar(
-                      floating: false,
-                      pinned: true,
-                      leading: IconButton(
-                        icon: const Icon(Icons.arrow_back),
-                        onPressed: () {
-                          HapticFeedback.lightImpact();
-                          Navigator.pop(context);
-                        },
-                      ),
-                      title: Text(
-                        'Profile',
-                        style: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      actions: [
-                        if (!_isLoading && _profileData != null)
-                          IconButton(
-                            icon: Icon(_isEditing ? Icons.save : Icons.edit),
-                            onPressed: () {
-                              HapticFeedback.lightImpact();
-                              if (_isEditing) {
-                                _updateProfile();
-                              } else {
-                                setState(() => _isEditing = true);
-                              }
-                            },
-                          ),
-                      ],
-                    ),
-                    // Use SliverToBoxAdapter for content. 
-                    // Do NOT use SliverFillRemaining wrapped around a ScrollView.
-                    SliverToBoxAdapter(
-                      child: _buildProfileContent(),
-                    ),
-                  ],
-                ),
-              ),
-        floatingActionButton: !_isEditing && !_isLoading && _profileData != null
-            ? FloatingActionButton(
-                onPressed: () {
-                  HapticFeedback.mediumImpact();
-                  setState(() => _isEditing = true);
-                },
-                backgroundColor: colorScheme.primary,
-                child: const Icon(Icons.edit),
-              )
-            : null,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
+      appBar: AppBar(
+        title: const Text(
+          'Profile',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
+            color: Color(0xFF1A1A1A),
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Color(0xFF1A1A1A)),
+        actions: [
+          if (!_isEditing)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: () => setState(() => _isEditing = true),
+              tooltip: 'Edit Profile',
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                setState(() {
+                  _isEditing = false;
+                  _selectedImage = null;
+                });
+                _initializeControllers();
+              },
+              tooltip: 'Cancel',
+            ),
+        ],
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: const Color(0xFF007AFF),
+          unselectedLabelColor: Colors.grey.shade600,
+          indicatorColor: const Color(0xFF007AFF),
+          indicatorWeight: 3,
+          tabs: const [
+            Tab(text: 'Profile'),
+            Tab(text: 'My Posts'),
+            Tab(text: 'Saved'),
+          ],
+        ),
+      ),
+      body: Column(
+        children: [
+          if (!_isEditing) _buildProfileHeader(),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _buildProfileInfoTab(),
+                _buildPostsTab(),
+                _buildSavedPostsTab(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

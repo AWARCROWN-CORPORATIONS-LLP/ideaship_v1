@@ -187,13 +187,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   final _appLinks = AppLinks();
   String? username;
+  Uri? _pendingDeepLink; // Store deep link until user is logged in
+  bool _isUserLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
     globalInstance = this;
     WidgetsBinding.instance.addObserver(this);
-    loadUsername();
+    _checkLoginStatus();
     initDeepLinks();
   }
 
@@ -203,23 +205,49 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  
+  // Check if user is logged in
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    final profileCompleted = prefs.getBool('profileCompleted') ?? false;
+    username = prefs.getString('username') ?? "";
+    _isUserLoggedIn = token != null && profileCompleted && username!.isNotEmpty;
+    
+    // Process pending deep link if user is now logged in
+    if (_isUserLoggedIn && _pendingDeepLink != null) {
+      handleDeepLink(_pendingDeepLink!);
+      _pendingDeepLink = null;
+    }
+  }
+
+  // Reload username (called when user logs in)
   Future<void> loadUsername() async {
     final prefs = await SharedPreferences.getInstance();
     username = prefs.getString('username') ?? "";
+    _isUserLoggedIn = username!.isNotEmpty;
+    
+    // Process pending deep link if user is now logged in
+    if (_isUserLoggedIn && _pendingDeepLink != null) {
+      handleDeepLink(_pendingDeepLink!);
+      _pendingDeepLink = null;
+    }
   }
 
-  
+  // Initialize deep links
   Future<void> initDeepLinks() async {
     try {
       final initial = await _appLinks.getInitialLink();
-      if (initial != null) handleDeepLink(initial);
+      if (initial != null) {
+        debugPrint("Initial deep link: $initial");
+        handleDeepLink(initial);
+      }
     } catch (e) {
       debugPrint("Initial deep link error: $e");
     }
 
     _appLinks.uriLinkStream.listen((uri) {
       try {
+        debugPrint("Deep link stream: $uri");
         handleDeepLink(uri);
       } catch (e) {
         debugPrint("Deep link stream error: $e");
@@ -227,116 +255,321 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     });
   }
 
+  // Handle deep link with improved parsing
   void handleDeepLink(Uri uri) {
-  debugPrint("Deep link received → $uri");
+    debugPrint("Deep link received → $uri");
 
- 
-  if (uri.host == "server.awarcrown.com") {
-
-  
-    if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == "post") {
-      navigateToPost(int.parse(uri.pathSegments[1]));
+    // Check if user is logged in
+    if (!_isUserLoggedIn || username == null || username!.isEmpty) {
+      debugPrint("User not logged in, storing deep link for later");
+      _pendingDeepLink = uri;
+      return;
     }
 
-    
-    else if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == "thread") {
-      navigateToThread(int.parse(uri.pathSegments[1]));
-    }
+    // Support multiple URL formats
+    // Format 1: https://server.awarcrown.com/threads/123
+    // Format 2: https://server.awarcrown.com/thread/123
+    // Format 3: https://server.awarcrown.com/post/123
+    // Format 4: https://server.awarcrown.com/posts/123
 
-    else {
-      debugPrint("Unhandled deep link path: ${uri.path}");
+    if (uri.host == "server.awarcrown.com" || uri.host.contains("awarcrown.com") || uri.host=="share.awarcrown.com") {
+      final pathSegments = uri.pathSegments;
+      
+      if (pathSegments.isEmpty) {
+        debugPrint("Empty path segments");
+        return;
+      }
+
+      final firstSegment = pathSegments[0].toLowerCase();
+      
+      // Handle thread links
+      if (firstSegment == "thread" || firstSegment == "threads") {
+        if (pathSegments.length >= 2) {
+          final threadId = int.tryParse(pathSegments[1]);
+          if (threadId != null && threadId > 0) {
+            navigateToThread(threadId);
+          } else {
+            debugPrint("Invalid thread ID: ${pathSegments[1]}");
+            showError("Invalid thread link");
+          }
+        } else {
+          debugPrint("Missing thread ID in path");
+          showError("Invalid thread link format");
+        }
+      }
+      // Handle post links
+      else if (firstSegment == "post" || firstSegment == "posts") {
+        if (pathSegments.length >= 2) {
+          final postId = int.tryParse(pathSegments[1]);
+          if (postId != null && postId > 0) {
+            navigateToPost(postId);
+          } else {
+            debugPrint("Invalid post ID: ${pathSegments[1]}");
+            showError("Invalid post link");
+          }
+        } else {
+          debugPrint("Missing post ID in path");
+          showError("Invalid post link format");
+        }
+      }
+      // Handle query parameters (alternative format)
+      else if (uri.queryParameters.containsKey('thread_id')) {
+        final threadId = int.tryParse(uri.queryParameters['thread_id'] ?? '');
+        if (threadId != null && threadId > 0) {
+          navigateToThread(threadId);
+        }
+      } else if (uri.queryParameters.containsKey('post_id')) {
+        final postId = int.tryParse(uri.queryParameters['post_id'] ?? '');
+        if (postId != null && postId > 0) {
+          navigateToPost(postId);
+        }
+      }
+      else {
+        debugPrint("Unhandled deep link path: ${uri.path}");
+        showError("Unsupported link format");
+      }
+    } else {
+      debugPrint("Unhandled deep link host: ${uri.host}");
     }
   }
-
-  else {
-    debugPrint("Unhandled deep link host: ${uri.host}");
-  }
-}
 
   
   Future<void> navigateToPost(int postId) async {
-    if (username == null || username!.isEmpty) return;
+    if (username == null || username!.isEmpty) {
+      debugPrint("Cannot navigate to post: username is empty");
+      showError("Please log in to view posts");
+      return;
+    }
 
     if (!await hasInternet()) {
-      showError("No internet connection");
+      showError("No internet connection. Please check your network.");
       return;
     }
 
-    final url = Uri.parse(
-      "https://server.awarcrown.com/feed/fetch_single_post?post_id=$postId&username=${Uri.encodeComponent(username!)}",
-    );
+    try {
+      // Show loading indicator
+      final ctx = navigatorKey.currentContext;
+      if (ctx != null) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ),
+                SizedBox(width: 12),
+                Text('Loading post...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
 
-    final response = await retryRequest(url);
-    if (response == null || response.statusCode != 200) {
-      showError("Unable to load post");
-      return;
+      final url = Uri.parse(
+        "https://server.awarcrown.com/feed/fetch_single_post?post_id=$postId&username=${Uri.encodeComponent(username!)}",
+      );
+
+      final response = await retryRequest(url);
+      if (response == null || response.statusCode != 200) {
+        if (response?.statusCode == 404) {
+          showError("Post not found");
+        } else {
+          showError("Unable to load post. Please try again.");
+        }
+        return;
+      }
+
+      final data = jsonDecode(response.body);
+      if (data['error'] != null) {
+        showError(data['error']);
+        return;
+      }
+
+      final post = data['post'];
+      if (post == null || post.isEmpty) {
+        showError("Post not found");
+        return;
+      }
+
+      // Fetch comments
+      final commentsUrl = Uri.parse(
+        "https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(username!)}",
+      );
+
+      final commentsResponse = await retryRequest(commentsUrl);
+      List<dynamic> comments = [];
+
+      if (commentsResponse?.statusCode == 200) {
+        final commentsData = jsonDecode(commentsResponse!.body);
+        comments = commentsData['comments'] ?? [];
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id') ?? 0;
+
+      // Navigate to post
+      safeNavigate(
+        CommentsPage(
+          post: post,
+          comments: comments,
+          username: username!,
+          userId: userId,
+        ),
+      );
+    } catch (e) {
+      debugPrint("Error navigating to post: $e");
+      showError("Failed to load post: ${e.toString()}");
     }
-
-    final data = jsonDecode(response.body);
-    final post = data['post'];
-
-    if (post == null) {
-      showError("Post not found");
-      return;
-    }
-
-    final commentsUrl = Uri.parse(
-      "https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(username!)}",
-    );
-
-    final commentsResponse = await retryRequest(commentsUrl);
-    List<dynamic> comments = [];
-
-    if (commentsResponse?.statusCode == 200) {
-      comments = jsonDecode(commentsResponse!.body)['comments'] ?? [];
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('user_id');
-
-    safeNavigate(
-      CommentsPage(
-        post: post,
-        comments: comments,
-        username: username!,
-        userId: userId,
-      ),
-    );
   }
 
   
   Future<void> navigateToThread(int threadId) async {
+    if (username == null || username!.isEmpty) {
+      debugPrint("Cannot navigate to thread: username is empty");
+      showError("Please log in to view threads");
+      return;
+    }
+
     if (!await hasInternet()) {
-      showError("No internet");
+      showError("No internet connection. Please check your network.");
       return;
     }
 
-    final url = Uri.parse("https://server.awarcrown.com/threads/$threadId");
-    final response = await retryRequest(url);
+    try {
+      // Show loading indicator
+      final ctx = navigatorKey.currentContext;
+      if (ctx != null) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                ),
+                SizedBox(width: 12),
+                Text('Loading thread...'),
+              ],
+            ),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
 
-    if (response == null || response.statusCode != 200) {
-      showError("Thread not found");
-      return;
+      // Use the same endpoint format as the app uses
+      final url = Uri.parse("https://server.awarcrown.com/threads/$threadId");
+      final response = await retryRequest(url);
+
+      if (response == null) {
+        showError("Network error. Please check your connection.");
+        return;
+      }
+
+      if (response.statusCode == 404) {
+        showError("Thread not found");
+        return;
+      }
+
+      if (response.statusCode != 200) {
+        showError("Failed to load thread. Please try again.");
+        return;
+      }
+
+      final data = jsonDecode(response.body);
+      
+      // Check for error in response
+      if (data['error'] != null) {
+        showError(data['error']);
+        return;
+      }
+
+      // Parse thread data - view.php returns thread object directly
+      // But we need to ensure it has all required fields
+      final threadData = data is Map<String, dynamic> ? data : <String, dynamic>{};
+      
+      // Ensure required fields exist
+      if (threadData['thread_id'] == null && threadData['id'] != null) {
+        threadData['thread_id'] = threadData['id'];
+      }
+      if (threadData['category_name'] == null && threadData['category'] != null) {
+        threadData['category_name'] = threadData['category'];
+      }
+      if (threadData['creator_username'] == null && threadData['creator'] != null) {
+        threadData['creator_username'] = threadData['creator'];
+      }
+      if (threadData['creator_role'] == null && threadData['role'] != null) {
+        threadData['creator_role'] = threadData['role'];
+      }
+      if (threadData['inspired_count'] == null) {
+        threadData['inspired_count'] = 0;
+      }
+      if (threadData['comment_count'] == null) {
+        threadData['comment_count'] = threadData['comments'] != null 
+            ? (threadData['comments'] as List).length 
+            : 0;
+      }
+      if (threadData['tags'] == null) {
+        threadData['tags'] = [];
+      }
+      if (threadData['user_has_inspired'] == null) {
+        threadData['user_has_inspired'] = false;
+      }
+      if (threadData['visibility'] == null) {
+        threadData['visibility'] = 'public';
+      }
+
+      final thread = Thread.fromJson(threadData, isFromCache: false);
+
+      if (thread.id == 0) {
+        showError("Invalid thread data received");
+        return;
+      }
+
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getInt('user_id') ?? 0;
+
+      // Navigate to thread
+      safeNavigate(
+        ThreadDetailScreen(
+          thread: thread,
+          username: username!,
+          userId: userId,
+        ),
+      );
+    } catch (e) {
+      debugPrint("Error navigating to thread: $e");
+      showError("Failed to load thread: ${e.toString()}");
     }
-
-    final data = jsonDecode(response.body);
-    final thread = Thread.fromJson(data);
-
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getInt('user_id') ?? 0;
-
-    safeNavigate(
-      ThreadDetailScreen(thread: thread, username: username ?? "", userId: userId),
-    );
   }
 
   void showError(String msg) {
     final ctx = navigatorKey.currentContext;
     if (ctx != null) {
+      ScaffoldMessenger.of(ctx).hideCurrentSnackBar();
       ScaffoldMessenger.of(ctx).showSnackBar(
-        SnackBar(content: Text(msg), backgroundColor: Colors.red),
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.error_outline, color: Colors.white, size: 20),
+              const SizedBox(width: 8),
+              Expanded(child: Text(msg)),
+            ],
+          ),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
+  }
+  
+  // Public method to reload username (called after login)
+  Future<void> reloadUsername() async {
+    await loadUsername();
   }
 
   
@@ -407,9 +640,12 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (!mounted) return;
 
+      // Reload username in MyApp to process any pending deep links
       if (token != null && profileCompleted) {
+        _MyAppState.globalInstance?.reloadUsername();
         safeReplace(const DashboardPage());
       } else if (token != null) {
+        _MyAppState.globalInstance?.reloadUsername();
         safeReplace(const RoleSelectionPage());
       } else {
         safeReplace(const AuthLogReg());

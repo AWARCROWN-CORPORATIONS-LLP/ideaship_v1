@@ -1592,6 +1592,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     }
   }
+  
 
   Future<void> _toggleLike(int postId, int index) async {
     if (!mounted) return;
