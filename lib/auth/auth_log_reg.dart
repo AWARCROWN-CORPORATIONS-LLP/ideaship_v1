@@ -288,7 +288,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
 
     setState(() => _isLoading = true);
     try {
-      final url = Uri.parse("https://server.awarcrown.com/api?action=resend-verification");
+      final url = Uri.parse("https://vanguard.awarcrown.com/auth/api?action=resend-verification");
       final response = await http.post(
         url,
         body: {"email": email},

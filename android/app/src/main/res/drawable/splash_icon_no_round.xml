@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- This prevents rounding by using a layer-list -->
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/android12splash"
+            android:tileMode="disabled"
+            android:antialias="true"
+            android:filter="true" />
+    </item>
+</layer-list>
+

@@ -7,6 +7,9 @@
         <item name="android:windowFullscreen">false</item>
         <item name="android:windowDrawsSystemBarBackgrounds">false</item>
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <!-- Prevent image compression and ensure proper display -->
+        <item name="android:windowIsTranslucent">false</item>
+        <item name="android:windowNoTitle">true</item>
     </style>
     <!-- Normal theme once Flutter loads -->
     <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
