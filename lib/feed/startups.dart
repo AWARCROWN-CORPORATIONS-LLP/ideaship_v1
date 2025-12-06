@@ -10,6 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:shimmer/shimmer.dart';
 
+
 enum SortOption { none, mostLiked, mostFollowed, newest }
 
 class StartupsPage extends StatefulWidget {
@@ -1223,17 +1224,163 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
     }
   }
 
+  Future<String?> _getShareLink(String startupId) async {
+    if (userId == null || userId!.isEmpty) return null;
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://server.awarcrown.com/feed/stups/share_startup'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'startup_id=${Uri.encodeComponent(startupId)}&user_id=${Uri.encodeComponent(userId!)}',
+      ).timeout(const Duration(seconds: 10));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic> && data['status'] == 'success') {
+          return data['share_url'] ?? '';
+        } else {
+          _showError(data['message'] ?? 'Failed to generate share link');
+        }
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      _showError('Failed to generate share link: ${_getErrorMessage(e)}');
+    }
+    return null;
+  }
+
+  String _getErrorMessage(dynamic e) {
+    if (e is SocketException) {
+      return 'No internet connection.';
+    } else if (e is TimeoutException) {
+      return 'Request timed out.';
+    } else if (e is http.ClientException) {
+      return 'Network error.';
+    } else {
+      return e.toString();
+    }
+  }
+
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.errorContainer,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+      ),
+    );
+  }
+
+  void _showShareSheet(dynamic startup) async {
+    final startupId = startup['startup_id'];
+    final shareUrl = await _getShareLink(startupId);
+    if (shareUrl == null || shareUrl.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [colorScheme.surface, colorScheme.surfaceContainer],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Share this startup',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              SelectableText(
+                shareUrl,
+                style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: _AnimatedButton(
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: shareUrl));
+                        _showSuccess('Link copied!');
+                        Navigator.pop(context);
+                      },
+                      icon: Icons.copy,
+                      label: 'Copy Link',
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _AnimatedButton(
+                      onPressed: () {
+                        Share.share(shareUrl, subject: 'Check out this startup on Awarcrown');
+                        Navigator.pop(context);
+                      },
+                      icon: Icons.share,
+                      label: 'Share externally',
+                      color: Colors.purple,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final startup = widget.startup;
     final fullLogoUrl = startup['full_logo_url'];
+    final likeCount = startup['like_count']?.toString() ?? '0';
+    final followCount = startup['follow_count']?.toString() ?? '0';
 
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: Text(startup['startup_name'] ?? 'Startup Details'),
-        backgroundColor: colorScheme.surface,
+        title: const Text('Startup Details'),
+        backgroundColor: Colors.transparent,
         elevation: 0,
+        flexibleSpace: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                colorScheme.surface.withOpacity(0.95),
+                colorScheme.surface.withOpacity(0.0),
+              ],
+            ),
+          ),
+        ),
         actions: [
           if (userId != null)
             _AnimatedButton(
@@ -1248,113 +1395,187 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
           ),
           _AnimatedButton(
             icon: Icons.share,
-            onPressed: () {
-              // Implement share sheet if needed
-            },
+            onPressed: () => _showShareSheet(startup),
           ),
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Hero(
-                tag: 'startup_logo_${startup['startup_id']}',
-                child: fullLogoUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(50),
-                        child: CachedNetworkImage(
-                          imageUrl: fullLogoUrl,
-                          width: 120,
-                          height: 120,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Shimmer.fromColors(
-                            baseColor: Colors.grey[300]!,
-                            highlightColor: Colors.grey[100]!,
-                            child: Container(
-                              width: 120,
-                              height: 120,
-                              color: Colors.white,
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => const Icon(Icons.business, size: 120),
-                        ),
-                      )
-                    : const CircleAvatar(
-                        radius: 60,
-                        child: Icon(Icons.business, size: 60),
-                      ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Center(
-              child: Text(
-                startup['startup_name'] ?? 'Unnamed Startup',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.onSurface,
-                    ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Center(
-              child: Text(
-                startup['industry'] ?? '',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: colorScheme.primary,
-                      fontStyle: FontStyle.italic,
-                    ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Card(
-              elevation: 4,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildInfoRow('Founders', startup['founders_names'] ?? 'Not specified'),
-                    _buildInfoRow('Founded', startup['founding_date'] ?? 'Not specified'),
-                    _buildInfoRow('Stage', startup['stage'] ?? 'Not specified'),
-                    _buildInfoRow('Team Size', startup['team_size']?.toString() ?? 'Not specified'),
+            
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    colorScheme.primaryContainer,
+                    colorScheme.secondaryContainer.withOpacity(0.5),
                   ],
                 ),
               ),
+              padding: const EdgeInsets.only(top: 100, bottom: 32, left: 16, right: 16),
+              child: Column(
+                children: [
+                  // Logo with shadow
+                  Hero(
+                    tag: 'startup_logo_${startup['startup_id']}',
+                    child: Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        ],
+                      ),
+                      child: fullLogoUrl != null
+                          ? ClipRRect(
+                              borderRadius: BorderRadius.circular(80),
+                              child: CachedNetworkImage(
+                                imageUrl: fullLogoUrl,
+                                width: 160,
+                                height: 160,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => Shimmer.fromColors(
+                                  baseColor: Colors.grey[300]!,
+                                  highlightColor: Colors.grey[100]!,
+                                  child: Container(
+                                    width: 160,
+                                    height: 160,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  width: 160,
+                                  height: 160,
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surfaceContainer,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(Icons.business, size: 80, color: colorScheme.onSurfaceVariant),
+                                ),
+                              ),
+                            )
+                          : Container(
+                              width: 160,
+                              height: 160,
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainer,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(Icons.business, size: 80, color: colorScheme.onSurfaceVariant),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    startup['startup_name'] ?? 'Unnamed Startup',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: colorScheme.primary.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      startup['industry'] ?? '',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: colorScheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  // Stats Row
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildStatCard(
+                        context,
+                        Icons.favorite,
+                        likeCount,
+                        'Likes',
+                        Colors.red,
+                      ),
+                      const SizedBox(width: 16),
+                      _buildStatCard(
+                        context,
+                        Icons.people,
+                        followCount,
+                        'Followers',
+                        colorScheme.primary,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 24),
-            _buildSection('Description', startup['description'] ?? 'No description provided'),
-            _buildSection('Business Vision', startup['business_vision'] ?? 'No vision provided'),
-            _buildSection('Funding Goals', startup['funding_goals'] ?? 'No funding goals provided'),
-            _buildSection('Mentorship Needs', startup['mentorship_needs'] ?? 'No mentorship needs provided'),
-            const SizedBox(height: 24),
-            _buildSectionTitle('Social Links'),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                if (startup['linkedin'] != null && startup['linkedin'].isNotEmpty)
-                  _AnimatedButton(
-                    icon: Icons.link,
-                    onPressed: () => _launchUrl(startup['linkedin']),
-                    color: Colors.blue,
+            // Content Section
+            Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Quick Info Cards Grid
+                  _buildInfoCardGrid(context, startup),
+                  const SizedBox(height: 24),
+                  // Description Section
+                  _buildSectionCard(
+                    context,
+                    Icons.description,
+                    'Description',
+                    startup['description'] ?? 'No description provided',
+                    colorScheme.primary,
                   ),
-                if (startup['instagram'] != null && startup['instagram'].isNotEmpty)
-                  _AnimatedButton(
-                    icon: Icons.camera_alt,
-                    onPressed: () => _launchUrl(startup['instagram']),
-                    color: Colors.pink,
+                  const SizedBox(height: 16),
+                  // Business Vision Section
+                  _buildSectionCard(
+                    context,
+                    Icons.visibility,
+                    'Business Vision',
+                    startup['business_vision'] ?? 'No vision provided',
+                    colorScheme.secondary,
                   ),
-                if (startup['facebook'] != null && startup['facebook'].isNotEmpty)
-                  _AnimatedButton(
-                    icon: Icons.facebook,
-                    onPressed: () => _launchUrl(startup['facebook']),
-                    color: Colors.blue[800],
+                  const SizedBox(height: 16),
+                  // Funding Goals Section
+                  _buildSectionCard(
+                    context,
+                    Icons.attach_money,
+                    'Funding Goals',
+                    startup['funding_goals'] ?? 'No funding goals provided',
+                    Colors.green,
                   ),
-              ],
+                  const SizedBox(height: 16),
+                  // Mentorship Needs Section
+                  _buildSectionCard(
+                    context,
+                    Icons.school,
+                    'Mentorship Needs',
+                    startup['mentorship_needs'] ?? 'No mentorship needs provided',
+                    Colors.orange,
+                  ),
+                  const SizedBox(height: 24),
+                  // Social Links Section
+                  if ((startup['linkedin'] != null && startup['linkedin'].isNotEmpty) ||
+                      (startup['instagram'] != null && startup['instagram'].isNotEmpty) ||
+                      (startup['facebook'] != null && startup['facebook'].isNotEmpty))
+                    _buildSocialLinksSection(context, startup),
+                ],
+              ),
             ),
           ],
         ),
@@ -1362,53 +1583,310 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 100,
-            child: Text(
-              label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-            ),
+  Widget _buildStatCard(BuildContext context, IconData icon, String value, String label, Color color) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-          Expanded(child: Text(value, style: Theme.of(context).textTheme.bodyMedium)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: color, size: 28),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSection(String title, String content) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildInfoCardGrid(BuildContext context, dynamic startup) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisSpacing: 12,
+      mainAxisSpacing: 12,
+      childAspectRatio: 1.5,
       children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+        _buildInfoCard(
+          context,
+          Icons.person,
+          'Founders',
+          startup['founders_names'] ?? 'Not specified',
+          colorScheme.primary,
         ),
-        const SizedBox(height: 8),
-        Text(
-          content,
-          style: Theme.of(context).textTheme.bodyMedium,
+        _buildInfoCard(
+          context,
+          Icons.calendar_today,
+          'Founded',
+          startup['founding_date'] ?? 'Not specified',
+          colorScheme.secondary,
         ),
-        const SizedBox(height: 16),
+        _buildInfoCard(
+          context,
+          Icons.trending_up,
+          'Stage',
+          startup['stage'] ?? 'Not specified',
+          Colors.green,
+        ),
+        _buildInfoCard(
+          context,
+          Icons.groups,
+          'Team Size',
+          startup['team_size']?.toString() ?? 'Not specified',
+          Colors.orange,
+        ),
       ],
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: Theme.of(context).colorScheme.primary,
+  Widget _buildInfoCard(BuildContext context, IconData icon, String label, String value, Color color) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withOpacity(0.1),
+            color.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 24),
           ),
+          const Spacer(),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.onSurface,
+                ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionCard(BuildContext context, IconData icon, String title, String content, Color color) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surfaceContainerLow,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: color, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              content,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.6,
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSocialLinksSection(BuildContext context, dynamic startup) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final List<Map<String, dynamic>> socialLinks = [];
+    
+    if (startup['linkedin'] != null && startup['linkedin'].isNotEmpty) {
+      socialLinks.add({
+        'icon': Icons.business,
+        'label': 'LinkedIn',
+        'url': startup['linkedin'],
+        'color': const Color(0xFF0077B5),
+      });
+    }
+    if (startup['instagram'] != null && startup['instagram'].isNotEmpty) {
+      socialLinks.add({
+        'icon': Icons.camera_alt,
+        'label': 'Instagram',
+        'url': startup['instagram'],
+        'color': const Color(0xFFE4405F),
+      });
+    }
+    if (startup['facebook'] != null && startup['facebook'].isNotEmpty) {
+      socialLinks.add({
+        'icon': Icons.facebook,
+        'label': 'Facebook',
+        'url': startup['facebook'],
+        'color': const Color(0xFF1877F2),
+      });
+    }
+
+    if (socialLinks.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              colorScheme.surface,
+              colorScheme.surfaceContainerLow,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.share,
+                    color: colorScheme.onPrimaryContainer,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Social Links',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                      ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: socialLinks.map((link) {
+                return InkWell(
+                  onTap: () => _launchUrl(link['url']),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: (link['color'] as Color).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: (link['color'] as Color).withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(link['icon'], color: link['color'], size: 20),
+                        const SizedBox(width: 8),
+                        Text(
+                          link['label'],
+                          style: TextStyle(
+                            color: link['color'],
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

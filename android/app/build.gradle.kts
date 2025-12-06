@@ -1,8 +1,18 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
-   id("com.google.gms.google-services")
+    id("com.google.gms.google-services")
+}
+
+// Load keystore
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
 android {
@@ -17,28 +27,37 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
-    lint {
-        abortOnError = false
-    }
-
     kotlinOptions {
         jvmTarget = JavaVersion.VERSION_11.toString()
     }
-defaultConfig {
-    applicationId = "com.awarcrown.ideaship"
-    minSdk = 23
-    targetSdk = 34
-    versionCode = 1
-    versionName = "1.0"
-    multiDexEnabled=true
-    testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-}
 
+    defaultConfig {
+        applicationId = "com.awarcrown.ideaship"
+        minSdk = 23
+        targetSdk = 35
+        versionCode = 3
+        versionName = "1.0.1"
+        multiDexEnabled = true
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
 
+    
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"]?.toString() ?: ""
+            keyPassword = keystoreProperties["keyPassword"]?.toString() ?: ""
+            storePassword = keystoreProperties["storePassword"]?.toString() ?: ""
+            storeFile = rootProject.file(
+                keystoreProperties["storeFile"]?.toString() ?: "upload-keystore.jks"
+            )
+        }
+    }
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+             isShrinkResources = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
@@ -57,6 +76,4 @@ dependencies {
     implementation("com.google.android.gms:play-services-base:18.2.0")
     implementation("com.google.android.gms:play-services-maps:18.1.0")
     implementation("com.google.android.gms:play-services-location:21.0.1")
-    
-
 }

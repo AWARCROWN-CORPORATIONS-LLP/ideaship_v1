@@ -1410,7 +1410,7 @@ class _PublicProfilePageState extends State<PublicProfilePage> with TickerProvid
   }
 }
 
-/// Skeleton shimmer loader widget like Instagram profile
+
 class SkeletonLoader extends StatelessWidget {
   const SkeletonLoader({super.key});
 
