@@ -288,7 +288,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
 
     setState(() => _isLoading = true);
     try {
-      final url = Uri.parse("https://vanguard.awarcrown.com/auth/api?action=resend-verification");
+      final url = Uri.parse("https://server.awarcrown.com/auth/api?action=resend-verification");
       final response = await http.post(
         url,
         body: {"email": email},
@@ -347,7 +347,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
         return false;
       }
 
-      final url = Uri.parse("https://vanguard.awarcrown.com/auth/api?action=refresh");
+      final url = Uri.parse("https://server.awarcrown.com/auth/api?action=refresh");
       final response = await http.post(
         url,
         body: json.encode({"refresh_token": refreshToken}),
@@ -467,7 +467,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
 
                           setState(() => _isLoading = true);
                           try {
-                            final url = Uri.parse("https://vanguard.awarcrown.com/auth/api?action=forgot-password");
+                            final url = Uri.parse("https://server.awarcrown.com/auth/api?action=forgot-password");
                             final response = await http.post(
                               url,
                               body: {"email": emailController.text.trim()},
@@ -546,7 +546,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
     setState(() => _isLoading = true);
 
     try {
-      final url = Uri.parse("https://vanguard.awarcrown.com/auth/api?action=login");
+      final url = Uri.parse("https://server.awarcrown.com/auth/api?action=login");
       final response = await http.post(
         url,
         body: {
@@ -675,7 +675,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
     final String registeredEmail = _regEmailController.text.trim();
 
     try {
-      final url = Uri.parse("https://vanguard.awarcrown.com/auth/api?action=register");
+      final url = Uri.parse("https://server.awarcrown.com/auth/api?action=register");
       final response = await http.post(
         url,
         body: {

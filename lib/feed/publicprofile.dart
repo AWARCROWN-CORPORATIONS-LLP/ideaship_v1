@@ -2017,6 +2017,7 @@ class _FollowersFollowingSheetState extends State<_FollowersFollowingSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // ignore: unused_local_variable
     final colorScheme = Theme.of(context).colorScheme;
     final height = MediaQuery.of(context).size.height * 0.85;
 

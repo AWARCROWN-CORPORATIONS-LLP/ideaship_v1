@@ -592,6 +592,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       }
 
       final streamedResponse = await request.send();
+      // ignore: unused_local_variable
       final responseBody = await streamedResponse.stream.bytesToString();
 
       if (streamedResponse.statusCode == 200 ||

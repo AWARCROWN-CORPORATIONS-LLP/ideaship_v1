@@ -2656,3 +2656,48 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     }
   }
 }
+
+class PostCardWrapper extends StatelessWidget {
+  final dynamic post;
+
+  const PostCardWrapper({super.key, required this.post});
+
+  @override
+  Widget build(BuildContext context) {
+    return Builder(
+      builder: (context) {
+        try {
+          // reuse existing class by attaching it into PostsPage logic
+          return PostsPageStateHelper.buildSinglePost(context, post);
+        } catch (_) {
+          return const SizedBox();
+        }
+      },
+    );
+  }
+}
+class PostsPageStateHelper {
+  static Widget buildSinglePost(BuildContext context, dynamic post) {
+    final state = context.findAncestorStateOfType<_PostsPageState>();
+
+    if (state == null) {
+      return const SizedBox();
+    }
+
+    // Inject temporary list with one item
+    final idx = state.posts.indexWhere(
+      (p) => p['post_id'].toString() == post['post_id'].toString(),
+    );
+
+    if (idx == -1) {
+      state.posts.add(post);
+    }
+
+    final index = state.posts.indexWhere(
+      (p) => p['post_id'].toString() == post['post_id'].toString(),
+    );
+
+    return state._buildPostItem(index);
+  }
+}
+
