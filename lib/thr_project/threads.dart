@@ -15,6 +15,7 @@ import 'package:lottie/lottie.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'create_roundtable_dialog.dart';
+
 class Thread {
   final int id;
   final String title;
@@ -79,7 +80,11 @@ class Thread {
       isFromCache: isFromCache ?? this.isFromCache,
     );
   }
-  factory Thread.fromJson(Map<String, dynamic> json, {bool isFromCache = false}) {
+
+  factory Thread.fromJson(
+    Map<String, dynamic> json, {
+    bool isFromCache = false,
+  }) {
     try {
       return Thread(
         id: json['thread_id'] ?? 0,
@@ -91,7 +96,8 @@ class Thread {
         inspiredCount: json['inspired_count'] ?? 0,
         commentCount: json['comment_count'] ?? 0,
         tags: (json['tags'] as List<dynamic>?)?.cast<String>() ?? [],
-        createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
+        createdAt:
+            DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
         isInspiredByMe: json['user_has_inspired'] ?? false,
         visibility: json['visibility'] ?? 'public',
         inviteCode: json['invite_code'],
@@ -99,10 +105,25 @@ class Thread {
       );
     } catch (e) {
       debugPrint('Error parsing Thread from JSON: $e');
-      return Thread(id: 0, title: '', body: '', category: '', creator: '', creatorRole: '', inspiredCount: 0, commentCount: 0, tags: [], createdAt: DateTime.now(), isInspiredByMe: false, visibility: 'public', isFromCache: isFromCache);
+      return Thread(
+        id: 0,
+        title: '',
+        body: '',
+        category: '',
+        creator: '',
+        creatorRole: '',
+        inspiredCount: 0,
+        commentCount: 0,
+        tags: [],
+        createdAt: DateTime.now(),
+        isInspiredByMe: false,
+        visibility: 'public',
+        isFromCache: isFromCache,
+      );
     }
   }
 }
+
 class Comment {
   final int id;
   final int? parentId;
@@ -122,18 +143,29 @@ class Comment {
     this.isFromCache = false,
     this.imageUrl,
   });
-  factory Comment.fromJson(Map<String, dynamic> json, {bool isFromCache = false}) {
+  factory Comment.fromJson(
+    Map<String, dynamic> json, {
+    bool isFromCache = false,
+  }) {
     try {
       // Recursively parse replies if present (nested structure from backend)
-      final List<Comment> replyComments = (json['replies'] as List<dynamic>? ?? [])
-          .map((r) => Comment.fromJson(r as Map<String, dynamic>, isFromCache: isFromCache))
-          .toList();
+      final List<Comment> replyComments =
+          (json['replies'] as List<dynamic>? ?? [])
+              .map(
+                (r) => Comment.fromJson(
+                  r as Map<String, dynamic>,
+                  isFromCache: isFromCache,
+                ),
+              )
+              .toList();
       return Comment(
         id: json['comment_id'] as int? ?? 0,
         parentId: json['parent_comment_id'] as int?,
         body: json['comment_body'] as String? ?? '',
         commenter: json['commenter_username'] as String? ?? '',
-        createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ?? DateTime.now(),
+        createdAt:
+            DateTime.tryParse(json['created_at'] as String? ?? '') ??
+            DateTime.now(),
         replies: replyComments,
         isFromCache: isFromCache,
         imageUrl: json['image_url'] as String?,
@@ -151,6 +183,7 @@ class Comment {
     }
   }
 }
+
 class RoundTablePainter extends CustomPainter {
   final double rotation;
   RoundTablePainter({this.rotation = 0.0});
@@ -186,10 +219,12 @@ class RoundTablePainter extends CustomPainter {
     }
     canvas.restore();
   }
+
   @override
   bool shouldRepaint(covariant RoundTablePainter oldDelegate) =>
       oldDelegate.rotation != rotation;
 }
+
 class AnimatedRoundTableIcon extends StatefulWidget {
   final double size;
   final Color color;
@@ -201,6 +236,7 @@ class AnimatedRoundTableIcon extends StatefulWidget {
   @override
   State<AnimatedRoundTableIcon> createState() => _AnimatedRoundTableIconState();
 }
+
 class _AnimatedRoundTableIconState extends State<AnimatedRoundTableIcon>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
@@ -215,16 +251,15 @@ class _AnimatedRoundTableIconState extends State<AnimatedRoundTableIcon>
     _rotationAnimation = Tween<double>(
       begin: 0.0,
       end: 2 * pi,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.linear,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.linear));
   }
+
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -238,11 +273,13 @@ class _AnimatedRoundTableIconState extends State<AnimatedRoundTableIcon>
     );
   }
 }
+
 class OnboardingTourScreen extends StatefulWidget {
   const OnboardingTourScreen({super.key});
   @override
   State<OnboardingTourScreen> createState() => _OnboardingTourScreenState();
 }
+
 class _OnboardingTourScreenState extends State<OnboardingTourScreen>
     with TickerProviderStateMixin {
   late PageController _pageController;
@@ -271,6 +308,7 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
     );
     _tableController.forward().then((_) => _chairsController.forward());
   }
+
   @override
   void dispose() {
     _pageController.dispose();
@@ -278,6 +316,7 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
     _chairsController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -291,7 +330,9 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
               }
               _tableController.reset();
               _chairsController.reset();
-              _tableController.forward().then((_) => _chairsController.forward());
+              _tableController.forward().then(
+                (_) => _chairsController.forward(),
+              );
             },
             children: [
               // Page 1: Welcome to Roundtable
@@ -302,17 +343,23 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
                     FadeTransition(
                       opacity: _tableAnimation,
                       child: ScaleTransition(
-                        scale: _tableAnimation,
+                        scale: Tween<double>(
+                          begin: 0.6,
+                          end: 1.0,
+                        ).animate(_tableAnimation),
                         child: const AnimatedRoundTableIcon(size: 150),
                       ),
                     ),
                     const SizedBox(height: 32),
-                    Text('Gather \'Round!',
-                        style: Theme.of(context).textTheme.headlineMedium),
+                    Text(
+                      'Gather \'Round!',
+                      style: Theme.of(context).textTheme.headlineMedium,
+                    ),
                     Text('Join discussions like a virtual roundtable.'),
                   ],
                 ),
               ),
+
               // Page 2: Create & Engage
               Center(
                 child: Column(
@@ -321,18 +368,24 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
                     FadeTransition(
                       opacity: _tableAnimation,
                       child: ScaleTransition(
-                        scale: _tableAnimation,
+                        scale: Tween<double>(
+                          begin: 0.6,
+                          end: 1.0,
+                        ).animate(_tableAnimation),
                         child: const AnimatedRoundTableIcon(size: 150),
                       ),
                     ),
                     const SizedBox(height: 32),
-                    Text('Start Conversations',
-                        style: Theme.of(context).textTheme.headlineSmall),
+                    Text(
+                      'Start Conversations',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
                     Text('Create threads and watch ideas circle the table.'),
                   ],
                 ),
               ),
-              // Page 3: Collaborate (Removing this page)
+
+              // Page 3: Join Discussion
               Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -340,19 +393,26 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
                     FadeTransition(
                       opacity: _tableAnimation,
                       child: ScaleTransition(
-                        scale: _tableAnimation,
+                        scale: Tween<double>(
+                          begin: 0.6,
+                          end: 1.0,
+                        ).animate(_tableAnimation),
                         child: const AnimatedRoundTableIcon(size: 150),
                       ),
                     ),
                     const SizedBox(height: 32),
-                    Text('Pull Up a Chair',
-                        style: Theme.of(context).textTheme.headlineSmall),
-                    Text('Join discussions with a simple tap.'), // Generic enough to keep
+                    Text(
+                      'Pull Up a Chair',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    Text('Join discussions with a simple tap.'),
                   ],
                 ),
               ),
             ],
           ),
+
+          // Page Indicator
           Positioned(
             bottom: 50,
             left: 0,
@@ -360,19 +420,22 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
-                  3, // Kept at 3, but you might want to reduce this if you remove Page 3
-                  (index) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        height: 8,
-                        width: currentPage == index ? 24 : 8,
-                        decoration: BoxDecoration(
-                          color: currentPage == index ? Colors.blue : Colors.grey,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                      )),
+                3,
+                (index) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  height: 8,
+                  width: currentPage == index ? 24 : 8,
+                  decoration: BoxDecoration(
+                    color: currentPage == index ? Colors.blue : Colors.grey,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
             ),
           ),
+
+          // Next Button
           Positioned(
             bottom: 100,
             right: 20,
@@ -385,7 +448,8 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
-                          builder: (context) => const ThreadsScreen()),
+                        builder: (context) => const ThreadsScreen(),
+                      ),
                     );
                   }
                 } catch (e) {
@@ -393,7 +457,8 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                          content: Text('Error completing onboarding: $e')),
+                        content: Text('Error completing onboarding: $e'),
+                      ),
                     );
                   }
                 }
@@ -406,11 +471,13 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
     );
   }
 }
+
 class ThreadsScreen extends StatefulWidget {
   const ThreadsScreen({super.key});
   @override
   _ThreadsScreenState createState() => _ThreadsScreenState();
 }
+
 class _ThreadsScreenState extends State<ThreadsScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
@@ -463,7 +530,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
   bool _isOnline = false;
   final Set<int> _deletingThreadIds = <int>{};
   final Set<int> _bookmarkedThreadIds = <int>{}; // Local bookmarks
-  
+
   @override
   void initState() {
     super.initState();
@@ -489,7 +556,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     _startAutoUpdate();
     _initConnectivity();
   }
-  
+
   // Load bookmarks from local storage
   Future<void> _loadBookmarks() async {
     try {
@@ -497,14 +564,18 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       final bookmarksStr = prefs.getString('bookmarked_threads');
       if (bookmarksStr != null) {
         final List<dynamic> bookmarks = json.decode(bookmarksStr);
-        _bookmarkedThreadIds.addAll(bookmarks.map((id) => int.tryParse(id.toString()) ?? 0).where((id) => id > 0));
+        _bookmarkedThreadIds.addAll(
+          bookmarks
+              .map((id) => int.tryParse(id.toString()) ?? 0)
+              .where((id) => id > 0),
+        );
         if (mounted) setState(() {});
       }
     } catch (e) {
       debugPrint('Error loading bookmarks: $e');
     }
   }
-  
+
   // Save bookmarks to local storage
   Future<void> _saveBookmarks() async {
     try {
@@ -515,7 +586,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       debugPrint('Error saving bookmarks: $e');
     }
   }
-  
+
   // Toggle bookmark
   Future<void> _toggleBookmark(int threadId) async {
     setState(() {
@@ -529,18 +600,19 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     });
     await _saveBookmarks();
   }
-  
+
   // Share thread
   Future<void> _shareThread(Thread thread) async {
     try {
       final threadUrl = 'https://server.awarcrown.com/threads/${thread.id}';
-      final shareText = 'Check out this discussion: "${thread.title}"\n\n${thread.body.substring(0, thread.body.length > 100 ? 100 : thread.body.length)}...\n\n$threadUrl';
+      final shareText =
+          'Check out this discussion: "${thread.title}"\n\n${thread.body.substring(0, thread.body.length > 100 ? 100 : thread.body.length)}...\n\n$threadUrl';
       await Share.share(shareText, subject: thread.title);
     } catch (e) {
       _showError('Failed to share thread');
     }
   }
-  
+
   // Calculate reading time
   String _getReadingTime(String text) {
     final wordCount = text.split(RegExp(r'\s+')).length;
@@ -548,6 +620,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     if (readingTime < 1) return '< 1 min';
     return '$readingTime min';
   }
+
   void _onTabChanged() {
     if (_tabController.index != _tabController.previousIndex) {
       final newIsMyView = _tabController.index == 1;
@@ -559,18 +632,22 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
   }
+
   void _loadTabDataIfNeeded(bool isMy) {
     final isEmpty = isMy ? myThreads.isEmpty : discoverThreads.isEmpty;
     if (isEmpty) {
       _fetchThreads(reset: true, isMy: isMy);
     }
   }
+
   Future<void> _initConnectivity() async {
     final connectivity = Connectivity();
     final results = await connectivity.checkConnectivity();
     _isOnline = results.any((result) => result != ConnectivityResult.none);
     if (mounted) setState(() {});
-    _connectivitySubscription = connectivity.onConnectivityChanged.listen((List<ConnectivityResult> results) {
+    _connectivitySubscription = connectivity.onConnectivityChanged.listen((
+      List<ConnectivityResult> results,
+    ) {
       final wasOnline = _isOnline;
       _isOnline = results.any((result) => result != ConnectivityResult.none);
       if (mounted && _isOnline && !wasOnline) {
@@ -579,6 +656,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     });
   }
+
   bool get isOnline => _isOnline;
   Future<bool> _isDeviceOnline() async {
     try {
@@ -589,6 +667,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       return false;
     }
   }
+
   void _startAutoUpdate() {
     _autoUpdateTimer = Timer.periodic(_autoUpdateInterval, (timer) async {
       if (mounted && isOnline) {
@@ -599,17 +678,21 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     });
   }
+
   void _setupScrollListeners() {
     _discoverScrollController.addListener(_onDiscoverScroll);
     _myScrollController.addListener(_onMyScroll);
   }
+
   void _onDiscoverScroll() {
     _discoverScrollDebounceTimer?.cancel();
     _discoverScrollDebounceTimer = Timer(const Duration(milliseconds: 300), () {
       if (!_discoverScrollController.hasClients) return;
       final position = _discoverScrollController.position;
       if (position.pixels >= position.maxScrollExtent - 200) {
-        if (!discoverLoadingMore && !discoverHasError && !discoverHasReachedMax) {
+        if (!discoverLoadingMore &&
+            !discoverHasError &&
+            !discoverHasReachedMax) {
           if (_isSearching) {
             _searchMoreThreads(_searchController.text);
           } else {
@@ -619,6 +702,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     });
   }
+
   void _onMyScroll() {
     _myScrollDebounceTimer?.cancel();
     _myScrollDebounceTimer = Timer(const Duration(milliseconds: 300), () {
@@ -631,6 +715,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     });
   }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -647,6 +732,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     _httpClient?.close();
     super.dispose();
   }
+
   Future<void> _checkOnboarding() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -661,6 +747,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       debugPrint('Error checking onboarding: $e');
     }
   }
+
   Future<void> _initializeData() async {
     try {
       await _loadUsernameAndUserId();
@@ -680,6 +767,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
   }
+
   Future<void> _loadUsernameAndUserId() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -696,13 +784,17 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
   }
+
   Future<void> _fetchUserId() async {
     if (username == null || username!.isEmpty) return;
     try {
-      final response = await http.get(
-        Uri.parse(
-            'https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(username!)}'),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(username!)}',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && data['error'] == null) {
@@ -731,6 +823,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       _showError(_getErrorMessage(e));
     }
   }
+
   Future<void> _setupFCM() async {
     try {
       await Firebase.initializeApp();
@@ -743,11 +836,13 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       debugPrint('User granted permission: ${settings.authorizationStatus}');
       String? token = await fcm.getToken();
       if (username != null) {
-        await http.post(
-          Uri.parse('https://server.awarcrown.com/threads/update_token'),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({'username': username, 'token': token}),
-        ).timeout(const Duration(seconds: 10));
+        await http
+            .post(
+              Uri.parse('https://server.awarcrown.com/threads/update_token'),
+              headers: {'Content-Type': 'application/json'},
+              body: json.encode({'username': username, 'token': token}),
+            )
+            .timeout(const Duration(seconds: 10));
       }
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
         debugPrint('Got foreground message: ${message.notification?.title}');
@@ -755,7 +850,8 @@ class _ThreadsScreenState extends State<ThreadsScreen>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                  '${message.notification?.title}: ${message.notification?.body}'),
+                '${message.notification?.title}: ${message.notification?.body}',
+              ),
               action: SnackBarAction(
                 label: 'Refresh',
                 onPressed: () {
@@ -775,6 +871,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       debugPrint('Error setting up FCM: $e');
     }
   }
+
   String _getErrorMessage(dynamic e) {
     if (e is SocketException) {
       return 'No internet connection. Please check your connection and try again.';
@@ -786,6 +883,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       return 'An unexpected error occurred. Please try again.';
     }
   }
+
   void _showError(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -797,6 +895,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
+
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -808,14 +907,17 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
+
   Future<String?> _getThreadCode(int threadId) async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString('code_$threadId');
   }
+
   Future<void> _setThreadCode(int threadId, String code) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('code_$threadId', code);
   }
+
   Future<void> _fetchThreads({bool reset = false, required bool isMy}) async {
     if (username == null || username!.isEmpty) return;
     final bool online = await _isDeviceOnline();
@@ -863,7 +965,9 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     // Get target vars
     List<Thread> targetThreads = isMy ? myThreads : discoverThreads;
     int targetOffset = isMy ? myOffset : discoverOffset;
-    List<Animation<double>> targetAnimations = isMy ? mySlideAnimations : discoverSlideAnimations;
+    List<Animation<double>> targetAnimations = isMy
+        ? mySlideAnimations
+        : discoverSlideAnimations;
     if (reset) {
       targetOffset = 0;
       if (useCacheOnly) {
@@ -887,7 +991,8 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     bool fetchSuccess = false;
     if (!useCacheOnly) {
       try {
-        String uriStr = 'https://server.awarcrown.com/threads/list?sort=$sort&limit=$limit&offset=$targetOffset';
+        String uriStr =
+            'https://server.awarcrown.com/threads/list?sort=$sort&limit=$limit&offset=$targetOffset';
         if (isMy) {
           uriStr += '&username=${Uri.encodeComponent(username!)}';
         }
@@ -902,7 +1007,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             newThreads.add(thread);
             _threadCache[thread.id] = thread;
             lastFetchTime = DateTime.now();
-                    }
+          }
           fetchSuccess = true;
         } else if (response.statusCode == 404) {
           if (isMy) {
@@ -911,7 +1016,9 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             discoverHasReachedMax = true;
           }
         } else {
-          throw Exception('Server error: ${response.statusCode} - ${response.body}');
+          throw Exception(
+            'Server error: ${response.statusCode} - ${response.body}',
+          );
         }
       } catch (e) {
         debugPrint('Fetch error: $e');
@@ -919,7 +1026,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
     if (useCacheOnly || !fetchSuccess) {
-      final cachedKeys = _threadCache.keys.skip(targetOffset).take(limit).toList();
+      final cachedKeys = _threadCache.keys
+          .skip(targetOffset)
+          .take(limit)
+          .toList();
       for (final key in cachedKeys) {
         final cachedThread = _threadCache[key];
         if (cachedThread != null) {
@@ -932,11 +1042,13 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             if (isMy) {
               myLoading = false;
               myHasError = true;
-              myErrorMessage = 'No cached data available. Please connect to internet.';
+              myErrorMessage =
+                  'No cached data available. Please connect to internet.';
             } else {
               discoverLoading = false;
               discoverHasError = true;
-              discoverErrorMessage = 'No cached data available. Please connect to internet.';
+              discoverErrorMessage =
+                  'No cached data available. Please connect to internet.';
             }
           });
         }
@@ -1020,9 +1132,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       _discoverLastFetchTime = lastFetchTime;
     }
   }
+
   Future<void> _fetchMoreThreads({required bool isMy}) async {
     await _fetchThreads(reset: false, isMy: isMy);
   }
+
   Future<void> _searchThreads(String query, {bool reset = false}) async {
     if (isMyView) return;
     final bool online = await _isDeviceOnline();
@@ -1049,15 +1163,18 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     if (!useCacheOnly) {
       try {
         final uri = Uri.parse(
-            'https://server.awarcrown.com/threads/search?query=${Uri.encodeComponent(query)}&limit=$limit&offset=$discoverOffset');
-        final response = await http.get(uri).timeout(const Duration(seconds: 15));
+          'https://server.awarcrown.com/threads/search?query=${Uri.encodeComponent(query)}&limit=$limit&offset=$discoverOffset',
+        );
+        final response = await http
+            .get(uri)
+            .timeout(const Duration(seconds: 15));
         if (response.statusCode == 200) {
           final List<dynamic> data = json.decode(response.body);
           for (final jsonItem in data) {
             final thread = Thread.fromJson(jsonItem, isFromCache: false);
             newThreads.add(thread);
             _threadCache[thread.id] = thread;
-                    }
+          }
           fetchSuccess = true;
         } else {
           throw Exception('Search error: ${response.statusCode}');
@@ -1069,12 +1186,17 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     }
     if (useCacheOnly || !fetchSuccess) {
       final cachedThreads = _threadCache.values
-          .where((t) => t.title.toLowerCase().contains(query.toLowerCase()) ||
-              t.body.toLowerCase().contains(query.toLowerCase()))
+          .where(
+            (t) =>
+                t.title.toLowerCase().contains(query.toLowerCase()) ||
+                t.body.toLowerCase().contains(query.toLowerCase()),
+          )
           .skip(discoverOffset)
           .take(limit)
           .toList();
-      newThreads = cachedThreads.map((t) => t.copyWith(isFromCache: true)).toList();
+      newThreads = cachedThreads
+          .map((t) => t.copyWith(isFromCache: true))
+          .toList();
     }
     final prefs = await SharedPreferences.getInstance();
     for (final thread in newThreads) {
@@ -1109,16 +1231,20 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     if (useCacheOnly && newThreads.isNotEmpty && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('Search results from cache. Connect for fresh data.'),
+          content: const Text(
+            'Search results from cache. Connect for fresh data.',
+          ),
           backgroundColor: Colors.orange,
           duration: const Duration(seconds: 3),
         ),
       );
     }
   }
+
   Future<void> _searchMoreThreads(String query) async {
     await _searchThreads(query, reset: false);
   }
+
   Future<void> _onSearchChanged(String query) async {
     if (query.isEmpty) {
       setState(() {
@@ -1129,6 +1255,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       await _searchThreads(query, reset: true);
     }
   }
+
   void _clearSearch() {
     _searchController.clear();
     setState(() {
@@ -1136,6 +1263,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       searchResults.clear();
     });
   }
+
   Future<void> _joinWithCode() async {
     final TextEditingController codeController = TextEditingController();
     showDialog(
@@ -1150,7 +1278,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                 color: const Color(0xFF4A90E2).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.lock_open_rounded, color: Color(0xFF4A90E2), size: 24),
+              child: const Icon(
+                Icons.lock_open_rounded,
+                color: Color(0xFF4A90E2),
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -1172,9 +1304,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             labelText: 'Enter Invite Code',
             hintText: 'e.g., ABC123',
             prefixIcon: const Icon(Icons.vpn_key_rounded),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
             filled: true,
             fillColor: const Color(0xFFF9FAFB),
           ),
@@ -1211,6 +1341,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
+
   Future<void> _joinPrivateThread(String code) async {
     final bool online = await _isDeviceOnline();
     if (!online) {
@@ -1218,9 +1349,13 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       return;
     }
     try {
-      final response = await http.get(
-        Uri.parse('https://server.awarcrown.com/threads/join-by-code?code=${Uri.encodeComponent(code)}'),
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .get(
+            Uri.parse(
+              'https://server.awarcrown.com/threads/join-by-code?code=${Uri.encodeComponent(code)}',
+            ),
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         final thread = Thread.fromJson(data, isFromCache: false);
@@ -1237,13 +1372,14 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             ),
           );
         }
-            } else {
+      } else {
         _showError('Invalid code or thread not found');
       }
     } catch (e) {
       _showError('Failed to join: $_getErrorMessage(e)');
     }
   }
+
   void _scheduleRetry(Future<void> Function() retryFunction) {
     if (_retryCount >= _maxRetries) return;
     _retryTimer?.cancel();
@@ -1264,14 +1400,23 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       );
     }
   }
+
   Future<bool> _createThread(
-      String title, String body, String category, List<String> tags, String visibility) async {
+    String title,
+    String body,
+    String category,
+    List<String> tags,
+    String visibility,
+  ) async {
     final bool online = await _isDeviceOnline();
     if (!online) {
       _showError('Please connect to internet to create a roundtable.');
       return false;
     }
-    if (userId == null || userId == 0 || username == null || username!.isEmpty) {
+    if (userId == null ||
+        userId == 0 ||
+        username == null ||
+        username!.isEmpty) {
       if (mounted) {
         _showError('Please wait to create a roundtable');
       }
@@ -1286,18 +1431,21 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         'tags': tags,
         'visibility': visibility,
       });
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/threads/create'),
-        headers: {'Content-Type': 'application/json'},
-        body: bodyData,
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/threads/create'),
+            headers: {'Content-Type': 'application/json'},
+            body: bodyData,
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         debugPrint('Create response: ${response.body}');
-      
+
         // Check for 'success' key *and* 'thread_id' key
-        if (data is Map<String, dynamic> && data['success'] == true && data.containsKey('thread_id')) {
-        
+        if (data is Map<String, dynamic> &&
+            data['success'] == true &&
+            data.containsKey('thread_id')) {
           // --- THIS IS THE FIX ---
           // Safely parse the thread_id, which might be a String ("72") or int (72)
           final int? newId = int.tryParse(data['thread_id'].toString());
@@ -1330,7 +1478,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             await _setThreadCode(newId, inviteCode);
             _showPrivateThreadDialog(title, inviteCode);
           }
-        
+
           if (mounted) {
             setState(() {
               discoverThreads.insert(0, newThread);
@@ -1351,7 +1499,9 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         }
       } else {
         // Handle non-200 server responses
-        debugPrint('Create failed with status: ${response.statusCode}, body: ${response.body}');
+        debugPrint(
+          'Create failed with status: ${response.statusCode}, body: ${response.body}',
+        );
         throw Exception('Failed to create roundtable: ${response.statusCode}');
       }
     } catch (e) {
@@ -1363,6 +1513,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       return false; // Return failure
     }
   }
+
   void _showPrivateThreadDialog(String title, String code) {
     showDialog(
       context: context,
@@ -1376,7 +1527,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                 color: const Color(0xFF10B981).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.check_circle_rounded, color: Color(0xFF10B981), size: 24),
+              child: const Icon(
+                Icons.check_circle_rounded,
+                color: Color(0xFF10B981),
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -1404,7 +1559,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Colors.grey[600]),
+                  Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 18,
+                    color: Colors.grey[600],
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1427,11 +1586,17 @@ class _ThreadsScreenState extends State<ThreadsScreen>
               decoration: BoxDecoration(
                 color: const Color(0xFF4A90E2).withOpacity(0.05),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFF4A90E2).withOpacity(0.2)),
+                border: Border.all(
+                  color: const Color(0xFF4A90E2).withOpacity(0.2),
+                ),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.lock_rounded, size: 20, color: const Color(0xFF4A90E2)),
+                  Icon(
+                    Icons.lock_rounded,
+                    size: 20,
+                    color: const Color(0xFF4A90E2),
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Column(
@@ -1459,7 +1624,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.copy_rounded, color: const Color(0xFF4A90E2)),
+                    icon: Icon(
+                      Icons.copy_rounded,
+                      color: const Color(0xFF4A90E2),
+                    ),
                     onPressed: () {
                       Clipboard.setData(ClipboardData(text: code));
                       ScaffoldMessenger.of(context).showSnackBar(
@@ -1467,7 +1635,9 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                           content: const Text('Code copied!'),
                           backgroundColor: const Color(0xFF4A90E2),
                           behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
                         ),
                       );
                     },
@@ -1506,6 +1676,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
+
   Future<void> _toggleInspire(int threadId) async {
     final bool online = await _isDeviceOnline();
     if (!online) {
@@ -1530,12 +1701,16 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         'username': username,
         if (code != null) 'code': code,
       });
-      final uri = Uri.parse('https://server.awarcrown.com/threads/inspire?id=$threadId');
-      final response = await http.post(
-        uri,
-        headers: {'Content-Type': 'application/json'},
-        body: bodyData,
-      ).timeout(const Duration(seconds: 10));
+      final uri = Uri.parse(
+        'https://server.awarcrown.com/threads/inspire?id=$threadId',
+      );
+      final response = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: bodyData,
+          )
+          .timeout(const Duration(seconds: 10));
       final prefs = await SharedPreferences.getInstance();
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
@@ -1546,10 +1721,14 @@ class _ThreadsScreenState extends State<ThreadsScreen>
           }
           if (data.containsKey('user_has_inspired')) {
             thread.isInspiredByMe = data['user_has_inspired'] as bool;
-            _threadCache[threadId]?.isInspiredByMe = data['user_has_inspired'] as bool;
+            _threadCache[threadId]?.isInspiredByMe =
+                data['user_has_inspired'] as bool;
           }
           await prefs.setBool('inspired_$threadId', thread.isInspiredByMe);
-          _showSuccess(data['message'] ?? (newInspired ? 'Inspired this discussion!' : 'Uninspired.'));
+          _showSuccess(
+            data['message'] ??
+                (newInspired ? 'Inspired this discussion!' : 'Uninspired.'),
+          );
         } else {
           thread.isInspiredByMe = oldInspired;
           thread.inspiredCount = oldCount;
@@ -1575,6 +1754,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
     }
   }
+
   Future<bool> _deleteThread(int threadId) async {
     if (_deletingThreadIds.contains(threadId)) {
       return false; // Already deleting, avoid multiple calls
@@ -1584,7 +1764,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       _showError('Please connect to internet to delete the roundtable.');
       return false;
     }
-    if (userId == null || userId == 0 || username == null || username!.isEmpty) {
+    if (userId == null ||
+        userId == 0 ||
+        username == null ||
+        username!.isEmpty) {
       _showError('User authentication required to delete.');
       return false;
     }
@@ -1594,11 +1777,13 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         'user_id': userId,
         'username': username,
       });
-      final response = await http.post(
-        Uri.parse('https://server.awarcrown.com/threads/delete'),
-        headers: {'Content-Type': 'application/json'},
-        body: bodyData,
-      ).timeout(const Duration(seconds: 10));
+      final response = await http
+          .post(
+            Uri.parse('https://server.awarcrown.com/threads/delete'),
+            headers: {'Content-Type': 'application/json'},
+            body: bodyData,
+          )
+          .timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && data['success'] == true) {
@@ -1643,6 +1828,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       return false;
     }
   }
+
   void _showDeleteConfirmation(int threadId, String title) {
     showDialog(
       context: context,
@@ -1656,7 +1842,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                 color: Colors.red.shade50,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(Icons.delete_outline_rounded, color: Colors.red.shade600, size: 24),
+              child: Icon(
+                Icons.delete_outline_rounded,
+                color: Colors.red.shade600,
+                size: 24,
+              ),
             ),
             const SizedBox(width: 12),
             const Expanded(
@@ -1693,7 +1883,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
               ),
               child: Row(
                 children: [
-                  Icon(Icons.chat_bubble_outline_rounded, size: 18, color: Colors.grey[600]),
+                  Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 18,
+                    color: Colors.grey[600],
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -1747,43 +1941,57 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
+
   void _showCreateDialog() {
-    showCreateRoundtableDialog(
-      context: context,
-      onCreate: _createThread,
-    );
+    showCreateRoundtableDialog(context: context, onCreate: _createThread);
   }
+
   List<Thread> _getCurrentThreads(bool isDiscover) {
-    if (!isDiscover || !_isSearching) return isDiscover ? discoverThreads : myThreads;
+    if (!isDiscover || !_isSearching)
+      return isDiscover ? discoverThreads : myThreads;
     return searchResults;
   }
+
   bool _getCurrentLoading(bool isDiscover) {
-    if (!isDiscover || !_isSearching) return isDiscover ? discoverLoading : myLoading;
+    if (!isDiscover || !_isSearching)
+      return isDiscover ? discoverLoading : myLoading;
     return discoverLoading;
   }
+
   bool _getCurrentHasError(bool isDiscover) {
-    if (!isDiscover || !_isSearching) return isDiscover ? discoverHasError : myHasError;
+    if (!isDiscover || !_isSearching)
+      return isDiscover ? discoverHasError : myHasError;
     return discoverHasError;
   }
+
   String? _getCurrentErrorMessage(bool isDiscover) {
-    if (!isDiscover || !_isSearching) return isDiscover ? discoverErrorMessage : myErrorMessage;
+    if (!isDiscover || !_isSearching)
+      return isDiscover ? discoverErrorMessage : myErrorMessage;
     return discoverErrorMessage;
   }
+
   bool _getCurrentLoadingMore(bool isDiscover) {
-    if (!isDiscover || !_isSearching) return isDiscover ? discoverLoadingMore : myLoadingMore;
+    if (!isDiscover || !_isSearching)
+      return isDiscover ? discoverLoadingMore : myLoadingMore;
     return discoverLoadingMore;
   }
+
   bool _getCurrentHasReachedMax(bool isDiscover) {
-    if (!isDiscover || !_isSearching) return isDiscover ? discoverHasReachedMax : myHasReachedMax;
+    if (!isDiscover || !_isSearching)
+      return isDiscover ? discoverHasReachedMax : myHasReachedMax;
     return discoverHasReachedMax;
   }
+
   List<Animation<double>> _getCurrentSlideAnimations(bool isDiscover) {
-    if (!isDiscover || !_isSearching) return isDiscover ? discoverSlideAnimations : mySlideAnimations;
+    if (!isDiscover || !_isSearching)
+      return isDiscover ? discoverSlideAnimations : mySlideAnimations;
     return discoverSlideAnimations;
   }
+
   ScrollController _getCurrentScrollController(bool isDiscover) {
     return isDiscover ? _discoverScrollController : _myScrollController;
   }
+
   @override
   Widget build(BuildContext context) {
     final padding = 16.0;
@@ -1828,11 +2036,20 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                     ElevatedButton.icon(
                       onPressed: _loadUsernameAndUserId,
                       icon: const Icon(Icons.refresh, size: 20),
-                      label: const Text('Retry', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                      label: const Text(
+                        'Retry',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF4A90E2),
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 14,
+                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -1852,7 +2069,9 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     const accentColor = Color(0xFF4A90E2);
     const surfaceColor = Color(0xFFF5F7FA);
     const cardColor = Colors.white;
-    final bool usingCache = (isMyView ? myThreads : discoverThreads).any((t) => t.isFromCache);
+    final bool usingCache = (isMyView ? myThreads : discoverThreads).any(
+      (t) => t.isFromCache,
+    );
     return Scaffold(
       backgroundColor: surfaceColor,
       appBar: AppBar(
@@ -1879,8 +2098,14 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                 unselectedLabelColor: Colors.white.withOpacity(0.7),
                 indicatorColor: Colors.white,
                 indicatorWeight: 3,
-                labelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                unselectedLabelStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                labelStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
                 tabs: const [
                   Tab(text: 'Discover'),
                   Tab(text: 'My Roundtables'),
@@ -1904,7 +2129,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                 await _fetchThreads(reset: true, isMy: false);
                 await _fetchThreads(reset: true, isMy: true);
               },
-              icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 22),
+              icon: const Icon(
+                Icons.refresh_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
               tooltip: 'Refresh',
             ),
             IconButton(
@@ -1913,12 +2142,22 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                   _isSearching = true;
                 });
               },
-              icon: const Icon(Icons.search_rounded, color: Colors.white, size: 22),
+              icon: const Icon(
+                Icons.search_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
               tooltip: 'Search',
             ),
             PopupMenuButton<String>(
-              icon: const Icon(Icons.tune_rounded, color: Colors.white, size: 22),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              icon: const Icon(
+                Icons.tune_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
               color: Colors.white,
               onSelected: (value) {
                 setState(() {
@@ -1927,10 +2166,18 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                 _fetchThreads(reset: true, isMy: false);
               },
               itemBuilder: (context) => ['Recent', 'Trending', 'Innovative']
-                  .map((s) => PopupMenuItem(
-                        value: s.toLowerCase(),
-                        child: Text(s, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
-                      ))
+                  .map(
+                    (s) => PopupMenuItem(
+                      value: s.toLowerCase(),
+                      child: Text(
+                        s,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  )
                   .toList(),
             ),
             Padding(
@@ -1943,7 +2190,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                     color: accentColor.withOpacity(0.25),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.add_rounded, color: Colors.white, size: 22),
+                  child: const Icon(
+                    Icons.add_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                 ),
                 tooltip: 'Create Roundtable',
               ),
@@ -1953,7 +2204,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             padding: const EdgeInsets.only(right: 4),
             child: IconButton(
               onPressed: _joinWithCode,
-              icon: const Icon(Icons.lock_open_rounded, color: Colors.white, size: 22),
+              icon: const Icon(
+                Icons.lock_open_rounded,
+                color: Colors.white,
+                size: 22,
+              ),
               tooltip: 'Join Private Thread',
             ),
           ),
@@ -1974,7 +2229,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.cloud_off_rounded, size: 16, color: Colors.orange.shade700),
+                  Icon(
+                    Icons.cloud_off_rounded,
+                    size: 16,
+                    color: Colors.orange.shade700,
+                  ),
                   const SizedBox(width: 8),
                   Text(
                     'Showing cached data. Pull to refresh for latest.',
@@ -2037,13 +2296,18 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                 onPressed: _showCreateDialog,
                 backgroundColor: Colors.transparent,
                 elevation: 0,
-                child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
+                child: const Icon(
+                  Icons.add_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
               ),
             )
           : null,
       extendBody: true,
     );
   }
+
   Widget _buildTabContent({
     required bool isDiscover,
     required double padding,
@@ -2057,10 +2321,13 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     final String? localError = _getCurrentErrorMessage(isDiscover);
     final bool localLoadingMore = _getCurrentLoadingMore(isDiscover);
     _getCurrentHasReachedMax(isDiscover);
-    final List<Animation<double>> localSlideAnimations = _getCurrentSlideAnimations(isDiscover);
-    final ScrollController localScrollController = _getCurrentScrollController(isDiscover);
+    final List<Animation<double>> localSlideAnimations =
+        _getCurrentSlideAnimations(isDiscover);
+    final ScrollController localScrollController = _getCurrentScrollController(
+      isDiscover,
+    );
     localThreads.any((t) => t.isFromCache);
-  
+
     Future<void> onRefresh() async {
       if (localIsSearching) {
         await _onSearchChanged(_searchController.text);
@@ -2068,6 +2335,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       }
       await _fetchThreads(reset: true, isMy: !isDiscover);
     }
+
     return localLoading
         ? RefreshIndicator(
             onRefresh: onRefresh,
@@ -2075,7 +2343,12 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             strokeWidth: 3,
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: EdgeInsets.fromLTRB(padding, padding, padding, padding + 80),
+              padding: EdgeInsets.fromLTRB(
+                padding,
+                padding,
+                padding,
+                padding + 80,
+              ),
               itemCount: 6,
               itemBuilder: (context, index) => Shimmer.fromColors(
                 baseColor: Colors.grey[200]!,
@@ -2099,163 +2372,214 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             ),
           )
         : localHasError
-            ? RefreshIndicator(
-                onRefresh: () => _initializeData(),
-                color: const Color(0xFF4A90E2),
-                strokeWidth: 3,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(40),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(Icons.error_outline_rounded, size: 64, color: Colors.red.shade400),
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            localError ?? 'An unknown error occurred',
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF1E3A5F),
-                            ),
-                          ),
-                          const SizedBox(height: 32),
-                          ElevatedButton.icon(
-                            onPressed: _initializeData,
-                            icon: const Icon(Icons.refresh_rounded, size: 20),
-                            label: const Text('Retry', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4A90E2),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              elevation: 2,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              )
-            : localThreads.isEmpty
-                ? RefreshIndicator(
-                    onRefresh: onRefresh,
-                    color: const Color(0xFF4A90E2),
-                    strokeWidth: 3,
-                    child: SingleChildScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(40),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const AnimatedRoundTableIcon(size: 100, color: Color(0xFF4A90E2)),
-                              const SizedBox(height: 24),
-                              Text(
-                                localIsSearching ? 'No results found' : (!isDiscover ? 'No roundtables created yet' : 'No roundtables yet'),
-                                style: const TextStyle(
-                                  fontSize: 22,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1E3A5F),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                localIsSearching
-                                    ? 'Try a different search term.'
-                                    : (!isDiscover ? 'Start your first discussion!' : 'Start the conversation!'),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Color(0xFF6B7280),
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 32),
-                              ElevatedButton.icon(
-                                onPressed: localIsSearching
-                                    ? _clearSearch
-                                    : _showCreateDialog,
-                                icon: Icon(localIsSearching ? Icons.clear_rounded : Icons.add_rounded, size: 20),
-                                label: Text(
-                                  localIsSearching ? 'Clear Search' : 'Create Roundtable',
-                                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF4A90E2),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  elevation: 2,
-                                ),
-                              ),
-                            ],
-                          ),
+        ? RefreshIndicator(
+            onRefresh: () => _initializeData(),
+            color: const Color(0xFF4A90E2),
+            strokeWidth: 3,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.error_outline_rounded,
+                          size: 64,
+                          color: Colors.red.shade400,
                         ),
                       ),
-                    ),
-                  )
-                : RefreshIndicator(
-                    onRefresh: onRefresh,
-                    color: const Color(0xFF4A90E2),
-                    strokeWidth: 3,
-                    child: ListView.builder(
-                      controller: localScrollController,
-                      padding: EdgeInsets.fromLTRB(padding, padding, padding, padding + 100),
-                      itemCount: localThreads.length + (localLoadingMore ? 1 : 0),
-                      itemBuilder: (context, index) {
-                        if (index == localThreads.length) {
-                          return Center(
-                            child: Padding(
-                              padding: const EdgeInsets.all(20),
-                              child: CircularProgressIndicator(
-                                valueColor: AlwaysStoppedAnimation<Color>(const Color(0xFF4A90E2)),
-                                strokeWidth: 3,
-                              ),
-                            ),
-                          );
-                        }
-                        final thread = localThreads[index];
-                        final slideAnimation = localSlideAnimations.length > index
-                            ? localSlideAnimations[index]
-                            : const AlwaysStoppedAnimation(0.0);
-                        return AnimatedBuilder(
-                          animation: slideAnimation,
-                          builder: (context, child) {
-                            return Opacity(
-                              opacity: (slideAnimation.value + 1.0).clamp(0.4, 1.0),
-                              child: Transform.translate(
-                                offset: Offset((slideAnimation.value * 50).clamp(-50.0, 0.0), 0),
-                                child: _buildThreadCard(
-                                  thread,
-                                  username ?? '',
-                                  cardColor,
-                                  isMy: !isDiscover,
-                                ),
-                              ),
-                            );
-                          },
-                        );
-                      },
+                      const SizedBox(height: 24),
+                      Text(
+                        localError ?? 'An unknown error occurred',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1E3A5F),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+                      ElevatedButton.icon(
+                        onPressed: _initializeData,
+                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                        label: const Text(
+                          'Retry',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4A90E2),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 14,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          )
+        : localThreads.isEmpty
+        ? RefreshIndicator(
+            onRefresh: onRefresh,
+            color: const Color(0xFF4A90E2),
+            strokeWidth: 3,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const AnimatedRoundTableIcon(
+                        size: 100,
+                        color: Color(0xFF4A90E2),
+                      ),
+                      const SizedBox(height: 24),
+                      Text(
+                        localIsSearching
+                            ? 'No results found'
+                            : (!isDiscover
+                                  ? 'No roundtables created yet'
+                                  : 'No roundtables yet'),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1E3A5F),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        localIsSearching
+                            ? 'Try a different search term.'
+                            : (!isDiscover
+                                  ? 'Start your first discussion!'
+                                  : 'Start the conversation!'),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF6B7280),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      ElevatedButton.icon(
+                        onPressed: localIsSearching
+                            ? _clearSearch
+                            : _showCreateDialog,
+                        icon: Icon(
+                          localIsSearching
+                              ? Icons.clear_rounded
+                              : Icons.add_rounded,
+                          size: 20,
+                        ),
+                        label: Text(
+                          localIsSearching
+                              ? 'Clear Search'
+                              : 'Create Roundtable',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4A90E2),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 14,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          )
+        : RefreshIndicator(
+            onRefresh: onRefresh,
+            color: const Color(0xFF4A90E2),
+            strokeWidth: 3,
+            child: ListView.builder(
+              controller: localScrollController,
+              padding: EdgeInsets.fromLTRB(
+                padding,
+                padding,
+                padding,
+                padding + 100,
+              ),
+              itemCount: localThreads.length + (localLoadingMore ? 1 : 0),
+              itemBuilder: (context, index) {
+                if (index == localThreads.length) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          const Color(0xFF4A90E2),
+                        ),
+                        strokeWidth: 3,
+                      ),
                     ),
                   );
+                }
+                final thread = localThreads[index];
+                final slideAnimation = localSlideAnimations.length > index
+                    ? localSlideAnimations[index]
+                    : const AlwaysStoppedAnimation(0.0);
+                return AnimatedBuilder(
+                  animation: slideAnimation,
+                  builder: (context, child) {
+                    return Opacity(
+                      opacity: (slideAnimation.value + 1.0).clamp(0.4, 1.0),
+                      child: Transform.translate(
+                        offset: Offset(
+                          (slideAnimation.value * 50).clamp(-50.0, 0.0),
+                          0,
+                        ),
+                        child: _buildThreadCard(
+                          thread,
+                          username ?? '',
+                          cardColor,
+                          isMy: !isDiscover,
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          );
   }
-  Widget _buildThreadCard(Thread thread, String currentUser, Color cardColor, {required bool isMy}) {
+
+  Widget _buildThreadCard(
+    Thread thread,
+    String currentUser,
+    Color cardColor, {
+    required bool isMy,
+  }) {
     final isDeleting = _deletingThreadIds.contains(thread.id);
     final cardWidget = Material(
       color: Colors.transparent,
@@ -2263,25 +2587,24 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         borderRadius: BorderRadius.circular(20),
         splashColor: const Color(0xFF4A90E2).withOpacity(0.08),
         highlightColor: const Color(0xFF4A90E2).withOpacity(0.04),
-        onTap: isDeleting ? null : () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ThreadDetailScreen(
-              thread: thread,
-              username: currentUser,
-              userId: userId ?? 0,
-            ),
-          ),
-        ),
+        onTap: isDeleting
+            ? null
+            : () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ThreadDetailScreen(
+                    thread: thread,
+                    username: currentUser,
+                    userId: userId ?? 0,
+                  ),
+                ),
+              ),
         child: Container(
           margin: const EdgeInsets.only(bottom: 16),
           decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: const Color(0xFFE5E9F0),
-              width: 1,
-            ),
+            border: Border.all(color: const Color(0xFFE5E9F0), width: 1),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.04),
@@ -2307,7 +2630,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                             color: const Color(0xFF4A90E2).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const AnimatedRoundTableIcon(size: 24, color: Color(0xFF4A90E2)),
+                          child: const AnimatedRoundTableIcon(
+                            size: 24,
+                            color: Color(0xFF4A90E2),
+                          ),
                         ),
                         const SizedBox(width: 14),
                         Expanded(
@@ -2333,7 +2659,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                                   if (thread.visibility == 'private')
                                     Container(
                                       margin: const EdgeInsets.only(left: 8),
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
                                         color: const Color(0xFFF3F4F6),
                                         borderRadius: BorderRadius.circular(8),
@@ -2341,7 +2670,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Icon(Icons.lock_rounded, size: 12, color: Colors.grey[600]),
+                                          Icon(
+                                            Icons.lock_rounded,
+                                            size: 12,
+                                            color: Colors.grey[600],
+                                          ),
                                           const SizedBox(width: 4),
                                           Text(
                                             'Private',
@@ -2380,7 +2713,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                       runSpacing: 8,
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF4A90E2).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
@@ -2394,24 +2730,36 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                             ),
                           ),
                         ),
-                        ...thread.tags.take(3).map((t) => Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                '#$t',
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: Color(0xFF059669),
+                        ...thread.tags
+                            .take(3)
+                            .map(
+                              (t) => Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: const Color(
+                                    0xFF10B981,
+                                  ).withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '#$t',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF059669),
+                                  ),
                                 ),
                               ),
-                            )),
+                            ),
                         if (thread.tags.length > 3)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF3F4F6),
                               borderRadius: BorderRadius.circular(8),
@@ -2427,7 +2775,9 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                           ),
                       ],
                     ),
-                    if (isMy && thread.visibility == 'private' && thread.inviteCode != null) ...[
+                    if (isMy &&
+                        thread.visibility == 'private' &&
+                        thread.inviteCode != null) ...[
                       const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -2438,7 +2788,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.lock_outline_rounded, size: 18, color: Colors.grey[600]),
+                            Icon(
+                              Icons.lock_outline_rounded,
+                              size: 18,
+                              color: Colors.grey[600],
+                            ),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
@@ -2451,9 +2805,15 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                               ),
                             ),
                             IconButton(
-                              icon: Icon(Icons.copy_rounded, size: 18, color: const Color(0xFF4A90E2)),
+                              icon: Icon(
+                                Icons.copy_rounded,
+                                size: 18,
+                                color: const Color(0xFF4A90E2),
+                              ),
                               onPressed: () {
-                                Clipboard.setData(ClipboardData(text: thread.inviteCode ?? ''));
+                                Clipboard.setData(
+                                  ClipboardData(text: thread.inviteCode ?? ''),
+                                );
                                 _showSuccess('Code copied!');
                               },
                               padding: EdgeInsets.zero,
@@ -2468,7 +2828,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF3F4F6),
                             borderRadius: BorderRadius.circular(8),
@@ -2476,7 +2839,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.person_outline_rounded, size: 14, color: Colors.grey[600]),
+                              Icon(
+                                Icons.person_outline_rounded,
+                                size: 14,
+                                color: Colors.grey[600],
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 thread.creator,
@@ -2491,7 +2858,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF3F4F6),
                             borderRadius: BorderRadius.circular(8),
@@ -2499,7 +2869,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.access_time_rounded, size: 14, color: Colors.grey[600]),
+                              Icon(
+                                Icons.access_time_rounded,
+                                size: 14,
+                                color: Colors.grey[600],
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 _getReadingTime(thread.body),
@@ -2514,7 +2888,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                         ),
                         const Spacer(),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                           decoration: BoxDecoration(
                             color: const Color(0xFFF3F4F6),
                             borderRadius: BorderRadius.circular(8),
@@ -2522,7 +2899,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.calendar_today_rounded, size: 14, color: Colors.grey[600]),
+                              Icon(
+                                Icons.calendar_today_rounded,
+                                size: 14,
+                                color: Colors.grey[600],
+                              ),
                               const SizedBox(width: 6),
                               Text(
                                 _formatDate(thread.createdAt),
@@ -2569,7 +2950,8 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                       _buildActionButton(
                         icon: Icons.delete_outline_rounded,
                         color: Colors.red.shade600,
-                        onTap: () => _showDeleteConfirmation(thread.id, thread.title),
+                        onTap: () =>
+                            _showDeleteConfirmation(thread.id, thread.title),
                       ),
                     ],
                   ],
@@ -2584,7 +2966,9 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                     ),
                     child: Center(
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.red.shade600),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.red.shade600,
+                        ),
                         strokeWidth: 3,
                       ),
                     ),
@@ -2595,7 +2979,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                   bottom: 12,
                   right: 12,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.orange.shade50,
                       borderRadius: BorderRadius.circular(8),
@@ -2603,7 +2990,11 @@ class _ThreadsScreenState extends State<ThreadsScreen>
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.cloud_off_rounded, size: 12, color: Colors.orange.shade700),
+                        Icon(
+                          Icons.cloud_off_rounded,
+                          size: 12,
+                          color: Colors.orange.shade700,
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           'Cached',
@@ -2652,7 +3043,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays == 0) {
       if (difference.inHours == 0) {
         if (difference.inMinutes == 0) {
@@ -2668,6 +3059,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     }
   }
 }
+
 class _ActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -2680,7 +3072,9 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     // ignore: unused_element_parameter
-    this.iconColor, this.iconSize, this.fontSize,
+    this.iconColor,
+    this.iconSize,
+    this.fontSize,
   });
   @override
   Widget build(BuildContext context) {

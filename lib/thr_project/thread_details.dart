@@ -42,16 +42,15 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
   late Animation<double> _detailFadeAnimation;
   final ScrollController _commentsScrollController = ScrollController();
   Timer? _commentsRetryTimer;
-  Timer? _commentPollingTimer; // Async polling timer
+  Timer? _commentPollingTimer; 
   int _commentsRetryCount = 0;
   static const int _commentsMaxRetries = 3;
   http.Client? _commentsHttpClient;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isOnline = false;
   final Set<int> _loadedCommentIds = <int>{};
-  int _lastCommentCount = 0; // Track comment count for async updates
+  int _lastCommentCount = 0; 
 
-  // Image upload state
   File? _selectedImage;
   bool _isUploadingImage = false;
   final ImagePicker _imagePicker = ImagePicker();
@@ -752,74 +751,80 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       ],
     );
   }
-
-  Widget _buildCommentsSection() {
-    if (isLoading) {
-      return ListView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: 3,
-        padding: EdgeInsets.zero,
-        itemBuilder: (context, index) => Shimmer.fromColors(
+Widget _buildCommentsSection() {
+  if (isLoading) {
+    return Column(
+      children: List.generate(
+        3,
+        (index) => Shimmer.fromColors(
           baseColor: Colors.grey[300]!,
           highlightColor: Colors.grey[100]!,
           child: Card(
             margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-            child: SizedBox(height: 80, child: Container(color: Colors.white)),
+            child: const SizedBox(height: 80),
           ),
         ),
-      );
-    } else if (hasError) {
-      return Padding(
-        padding: const EdgeInsets.all(16),
-        child: Center(
-          child: Column(
-            children: [
-              Icon(Icons.error_outline, size: 50, color: Colors.red[300]),
-              const SizedBox(height: 8),
-              Text(errorMessage ?? 'Failed to load comments'),
-              const SizedBox(height: 8),
-              ElevatedButton(
-                onPressed: _loadComments,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    } else if (comments.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 48.0),
-        child: Center(
-          child: Column(
-            children: [
-              const Icon(
-                Icons.comment_outlined,
-                size: 60,
-                color: Color(0xFF6B7280),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Be the first to comment',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: _primaryTextColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Pull up a chair and share your thoughts!',
-                style: TextStyle(fontSize: 14, color: _secondaryTextColor),
-              ),
-            ],
-          ),
-        ),
-      );
-    } else {
-      return _buildLinearCommentLayout();
-    }
+      ),
+    );
   }
+
+  if (hasError) {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.error_outline, size: 50, color: Colors.red[300]),
+            const SizedBox(height: 8),
+            Text(errorMessage ?? 'Failed to load comments'),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _loadComments,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  if (comments.isEmpty) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48.0),
+      child: Center(
+        child: Column(
+          children: [
+            const Icon(Icons.comment_outlined, size: 60, color: Color(0xFF6B7280)),
+            const SizedBox(height: 16),
+            Text(
+              'Be the first to comment',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: _primaryTextColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Pull up a chair and share your thoughts!',
+              style: TextStyle(fontSize: 14, color: _secondaryTextColor),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 🔥 FIXED COMMENT LIST (NO LISTVIEW!)
+  return Column(
+    children: comments.map((c) {
+      return _CommentCard(
+        comment: c,
+        onReply: _onReplyTapped,
+      );
+    }).toList(),
+  );
+}
 
   Widget _buildCommentInputBar() {
     return Container(

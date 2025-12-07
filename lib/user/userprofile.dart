@@ -166,60 +166,73 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
       return 'An unexpected error occurred. Please try again.';
     }
   }
+Future<void> _fetchMyPosts({int? cursorId}) async {
+  if (_username == null || _username!.isEmpty) return;
+  if (_isLoadingPosts) return;
+  
+  setState(() {
+    _isLoadingPosts = true;
+    _postsError = null;
+  });
 
-  Future<void> _fetchMyPosts({int? cursorId}) async {
-    if (_username == null || _username!.isEmpty) return;
-    if (_isLoadingPosts) return;
-    
-    setState(() {
-      _isLoadingPosts = true;
-      _postsError = null;
-    });
+  try {
+    // REQUIRED PARAMS
+    final params = {
+      'username': _username!,
+      'target_username': _username!, // 👈 Add this
+    };
 
-    try {
-      final params = {'username': _username!};
-      if (cursorId != null) params['cursorId'] = cursorId.toString();
-      final queryString = params.entries
-          .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
-          .join('&');
-      final url = 'https://server.awarcrown.com/accessprofile/fetch_user_posts?$queryString';
-      
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));
+    if (cursorId != null) {
+      params['cursorId'] = cursorId.toString();
+    }
 
-      if (response.statusCode != 200) {
-        throw Exception('Server error: ${response.statusCode}');
-      }
+    final queryString = params.entries
+        .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
+        .join('&');
 
-      final data = json.decode(response.body);
-      if (data is! Map<String, dynamic>) {
-        throw FormatException('Invalid JSON structure');
-      }
-      
-      if (mounted) {
-        setState(() {
-          final newPosts = data['posts'] ?? [];
-          if (cursorId == null) {
-            _myPosts = newPosts;
-          } else {
-            final postsToAdd = newPosts.where((newPost) =>
-                !_myPosts.any((existing) => existing['post_id'] == newPost['post_id'])).toList();
-            _myPosts.addAll(postsToAdd);
-          }
-          _nextCursorId = data['nextCursorId'];
-          _hasMorePosts = _nextCursorId != null;
-          _isLoadingPosts = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('Error fetching my posts: $e');
-      if (mounted) {
-        setState(() {
-          _postsError = _getErrorMessage(e);
-          _isLoadingPosts = false;
-        });
-      }
+    final url = 'https://server.awarcrown.com/accessprofile/fetch_user_posts?$queryString';
+
+    debugPrint("➡️ FETCH POSTS URL: $url");
+
+    final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));
+
+    if (response.statusCode != 200) {
+      throw Exception('Server error: ${response.statusCode}');
+    }
+
+    final data = json.decode(response.body);
+    if (data is! Map<String, dynamic>) {
+      throw FormatException('Invalid JSON structure');
+    }
+
+    if (mounted) {
+      setState(() {
+        final newPosts = data['posts'] ?? [];
+
+        if (cursorId == null) {
+          _myPosts = newPosts;
+        } else {
+          final postsToAdd = newPosts.where((newPost) =>
+            !_myPosts.any((existing) => existing['post_id'] == newPost['post_id'])
+          ).toList();
+          _myPosts.addAll(postsToAdd);
+        }
+
+        _nextCursorId = data['nextCursorId'];
+        _hasMorePosts = _nextCursorId != null;
+        _isLoadingPosts = false;
+      });
+    }
+  } catch (e) {
+    debugPrint('❌ Error fetching my posts: $e');
+    if (mounted) {
+      setState(() {
+        _postsError = _getErrorMessage(e);
+        _isLoadingPosts = false;
+      });
     }
   }
+}
 
   Future<void> _fetchMoreMyPosts() async {
     if (_nextCursorId != null) {
