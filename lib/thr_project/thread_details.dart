@@ -704,8 +704,9 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('inspired_$threadId', oldInspired);
       if (mounted) setState(() {});
-      if (mounted)
+      if (mounted) {
         _showError('Failed to toggle inspire: ${_getErrorMessage(e)}');
+      }
     }
   }
 

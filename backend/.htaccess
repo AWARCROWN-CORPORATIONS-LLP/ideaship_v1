@@ -1,0 +1,30 @@
+Options +FollowSymLinks
+
+# Specify custom error pages for various HTTP errors
+ErrorDocument 500 /500.shtml
+ErrorDocument 502 /500.shtml
+ErrorDocument 503 /500.shtml
+ErrorDocument 504 /500.shtml
+
+# Optionally, redirect 404 errors to a custom page
+ErrorDocument 404 /404.shtml
+
+# Block access to 403.shtml from a specific IP address
+<Files 403.shtml>
+    Order allow,deny
+    Allow from all
+    Deny from 198.12.238.178
+</Files>
+
+# Enable mod_rewrite
+RewriteEngine On
+
+# Hide .php extension
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteCond %{REQUEST_FILENAME}\.php -f
+RewriteRule ^([^\.]+)$ $1.php [NC,L]
+
+# Optional: Redirect users who try to access with the .php extension
+RewriteCond %{THE_REQUEST} \s/([^.]+)\.php[\s?] [NC]
+RewriteRule ^ /%1 [R=301,L]
+

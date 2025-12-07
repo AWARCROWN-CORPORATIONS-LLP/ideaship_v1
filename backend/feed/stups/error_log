@@ -1,0 +1,15 @@
+[06-Dec-2025 09:54:34 UTC] PHP Warning:  Undefined variable $conn in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/feed/stups/follow_startup.php on line 23
+[06-Dec-2025 09:54:34 UTC] PHP Fatal error:  Uncaught TypeError: mysqli_prepare(): Argument #1 ($mysql) must be of type mysqli, null given in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/feed/stups/follow_startup.php:23
+Stack trace:
+#0 /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/feed/stups/follow_startup.php(23): mysqli_prepare()
+#1 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/feed/stups/follow_startup.php on line 23
+[06-Dec-2025 09:56:03 UTC] [FOLLOW_EXCEPTION] Exception: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'user_id' in 'INSERT INTO'
+[06-Dec-2025 10:01:29 UTC] PHP Warning:  include(db_connect.php): Failed to open stream: No such file or directory in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/feed/stups/like_startup.php on line 3
+[06-Dec-2025 10:01:29 UTC] PHP Warning:  include(): Failed opening 'db_connect.php' for inclusion (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/feed/stups/like_startup.php on line 3
+[06-Dec-2025 10:01:29 UTC] PHP Warning:  Undefined variable $conn in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/feed/stups/like_startup.php on line 12
+[06-Dec-2025 10:01:29 UTC] PHP Fatal error:  Uncaught TypeError: mysqli_prepare(): Argument #1 ($mysql) must be of type mysqli, null given in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/feed/stups/like_startup.php:12
+Stack trace:
+#0 /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/feed/stups/like_startup.php(12): mysqli_prepare()
+#1 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/feed/stups/like_startup.php on line 12

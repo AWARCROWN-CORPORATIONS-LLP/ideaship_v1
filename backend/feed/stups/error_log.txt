@@ -1,0 +1,1 @@
+[14-Oct-2025 20:27:21 UTC] Database error: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'user_id' in 'WHERE'

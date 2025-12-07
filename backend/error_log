@@ -1,0 +1,35 @@
+[03-Oct-2025 07:48:19 UTC] PHP Fatal error:  Uncaught Error: Interface "Firebase\JWT\JWTExceptionWithPayloadInterface" not found in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/jwt/src/BeforeValidException.php:5
+Stack trace:
+#0 /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/api.php(8): require_once()
+#1 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/jwt/src/BeforeValidException.php on line 5
+[03-Oct-2025 07:50:50 UTC] PHP Fatal error:  Uncaught Error: Interface "Firebase\JWT\JWTExceptionWithPayloadInterface" not found in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/jwt/src/BeforeValidException.php:5
+Stack trace:
+#0 /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/api.php(8): require_once()
+#1 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/jwt/src/BeforeValidException.php on line 5
+[03-Oct-2025 08:35:30 UTC] PHP Fatal error:  Uncaught ArgumentCountError: Too few arguments to function handleLogin(), 2 passed in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/api.php on line 176 and exactly 3 expected in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/api.php:292
+Stack trace:
+#0 /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/api.php(176): handleLogin()
+#1 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/api.php on line 292
+[03-Oct-2025 08:36:27 UTC] PHP Fatal error:  Uncaught ArgumentCountError: Too few arguments to function handleLogin(), 2 passed in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/api.php on line 176 and exactly 3 expected in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/api.php:292
+Stack trace:
+#0 /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/api.php(176): handleLogin()
+#1 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/api.php on line 292
+[05-Nov-2025 17:03:11 UTC] PHP Warning:  require_once(/home/v6gkv3hx0rj5/public_html/vendor/autoload.php): Failed to open stream: No such file or directory in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/test.php on line 2
+[05-Nov-2025 17:03:11 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/v6gkv3hx0rj5/public_html/vendor/autoload.php' (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/test.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/test.php on line 2
+[05-Nov-2025 17:03:27 UTC] PHP Warning:  require_once(/home/v6gkv3hx0rj5/public_html/vendor/autoload.php): Failed to open stream: No such file or directory in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/test.php on line 2
+[05-Nov-2025 17:03:27 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/v6gkv3hx0rj5/public_html/vendor/autoload.php' (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/test.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/test.php on line 2
+[05-Nov-2025 17:03:29 UTC] PHP Warning:  require_once(/home/v6gkv3hx0rj5/public_html/vendor/autoload.php): Failed to open stream: No such file or directory in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/test.php on line 2
+[05-Nov-2025 17:03:29 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/v6gkv3hx0rj5/public_html/vendor/autoload.php' (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/test.php:2
+Stack trace:
+#0 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/test.php on line 2

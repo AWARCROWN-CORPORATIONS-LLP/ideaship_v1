@@ -1,0 +1,12 @@
+[04-Nov-2025 09:29:40 UTC] [Invite Lookup Error] SQLSTATE[42S02]: Base table or view not found: 1146 Table 'app_auth.categories' doesn't exist
+[04-Nov-2025 09:34:51 UTC] [Invite Lookup Error] SQLSTATE[42S02]: Base table or view not found: 1146 Table 'app_auth.categories' doesn't exist
+[04-Nov-2025 17:47:53 UTC] PHP Fatal error:  Uncaught PDOException: SQLSTATE[42S22]: Column not found: 1054 Unknown column 'creator_user_id' in 'SELECT' in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/threads/delete.php:27
+Stack trace:
+#0 /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/threads/delete.php(27): PDOStatement->execute()
+#1 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/threads/delete.php on line 27
+[06-Nov-2025 04:36:36 UTC] [Invite Lookup Error] SQLSTATE[42S02]: Base table or view not found: 1146 Table 'app_auth.categories' doesn't exist
+[06-Nov-2025 15:24:59 UTC] [Invite Lookup Error] SQLSTATE[42S02]: Base table or view not found: 1146 Table 'app_auth.categories' doesn't exist
+[05-Dec-2025 14:33:20 UTC] [Invite Lookup Error] SQLSTATE[42S02]: Base table or view not found: 1146 Table 'app_auth.categories' doesn't exist
+[05-Dec-2025 14:40:16 UTC] [Invite Lookup Error] SQLSTATE[42S02]: Base table or view not found: 1146 Table 'app_auth.categories' doesn't exist
+[06-Dec-2025 18:01:10 UTC] [Invite Lookup Error] SQLSTATE[42S02]: Base table or view not found: 1146 Table 'app_auth.categories' doesn't exist

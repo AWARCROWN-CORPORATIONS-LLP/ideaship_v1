@@ -1,0 +1,18 @@
+[2025-10-16 05:56:53] Profile picture updated successfully | Context: {"user_id":7,"file":"profile_7_1760594213.jpg"}
+[2025-10-16 06:06:25] Profile picture updated successfully | Context: {"user_id":7,"file":"profile_7_1760594785.jpg"}
+[2025-10-17 09:29:16] Profile picture updated successfully | Context: {"user_id":9,"file":"profile_9_1760693356.jpg"}
+[2025-11-01 06:56:36] Missing username | Context: {"POST":[]}
+[2025-11-01 06:56:39] Missing username | Context: {"POST":[]}
+[2025-11-01 06:56:43] Missing username | Context: {"POST":[]}
+[01-Nov-2025 08:56:16 UTC] fetch_user_posts error: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near ''11'' at line 24
+[01-Nov-2025 08:56:17 UTC] fetch_user_posts error: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near ''11'' at line 24
+[01-Nov-2025 08:56:19 UTC] fetch_user_posts error: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near ''11'' at line 24
+[01-Nov-2025 08:56:21 UTC] fetch_user_posts error: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near ''11'' at line 24
+[01-Nov-2025 08:56:23 UTC] fetch_user_posts error: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near ''11'' at line 24
+[01-Nov-2025 08:56:25 UTC] fetch_user_posts error: SQLSTATE[42000]: Syntax error or access violation: 1064 You have an error in your SQL syntax; check the manual that corresponds to your MariaDB server version for the right syntax to use near ''11'' at line 24
+[2025-11-01 09:27:56] Profile picture updated successfully | Context: {"user_id":8,"file":"profile_8_1761989276.jpg"}
+[2025-11-03 05:26:38] Profile picture updated successfully | Context: {"user_id":10,"file":"profile_10_1762147598.jpg"}
+[2025-11-04 09:35:23] Profile picture updated successfully | Context: {"user_id":16,"file":"profile_16_1762248923.jpg"}
+[2025-11-04 19:58:17] Profile picture updated successfully | Context: {"user_id":17,"file":"profile_17_1762286297.png"}
+[2025-11-19 09:10:34] Profile picture updated successfully | Context: {"user_id":16,"file":"profile_16_1763543434.jpg"}
+[2025-11-27 16:55:38] Profile picture updated successfully | Context: {"user_id":19,"file":"profile_19_1764262538.jpg"}

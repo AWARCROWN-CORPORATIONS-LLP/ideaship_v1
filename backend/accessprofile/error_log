@@ -1,0 +1,32 @@
+[15-Oct-2025 18:04:27 UTC] PHP Fatal error:  Uncaught PDOException: SQLSTATE[HY093]: Invalid parameter number: number of bound variables does not match number of tokens in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/accessprofile/user_info.php:51
+Stack trace:
+#0 /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/accessprofile/user_info.php(51): PDOStatement->execute()
+#1 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/accessprofile/user_info.php on line 51
+[16-Oct-2025 05:56:53 UTC] [2025-10-16 05:56:53] Profile picture updated successfully | Context: {"user_id":7,"file":"profile_7_1760594213.jpg"}
+
+[16-Oct-2025 06:06:25 UTC] [2025-10-16 06:06:25] Profile picture updated successfully | Context: {"user_id":7,"file":"profile_7_1760594785.jpg"}
+
+[17-Oct-2025 09:29:16 UTC] [2025-10-17 09:29:16] Profile picture updated successfully | Context: {"user_id":9,"file":"profile_9_1760693356.jpg"}
+
+[01-Nov-2025 06:56:36 UTC] [2025-11-01 06:56:36] Missing username | Context: {"POST":[]}
+
+[01-Nov-2025 06:56:39 UTC] [2025-11-01 06:56:39] Missing username | Context: {"POST":[]}
+
+[01-Nov-2025 06:56:43 UTC] [2025-11-01 06:56:43] Missing username | Context: {"POST":[]}
+
+[01-Nov-2025 07:25:12 UTC] Profile fetch failed: Username missing
+[01-Nov-2025 07:25:14 UTC] Profile fetch failed: Username missing
+[01-Nov-2025 07:25:15 UTC] Profile fetch failed: Username missing
+[01-Nov-2025 09:27:56 UTC] [2025-11-01 09:27:56] Profile picture updated successfully | Context: {"user_id":8,"file":"profile_8_1761989276.jpg"}
+
+[03-Nov-2025 05:26:38 UTC] [2025-11-03 05:26:38] Profile picture updated successfully | Context: {"user_id":10,"file":"profile_10_1762147598.jpg"}
+
+[04-Nov-2025 09:35:23 UTC] [2025-11-04 09:35:23] Profile picture updated successfully | Context: {"user_id":16,"file":"profile_16_1762248923.jpg"}
+
+[04-Nov-2025 19:58:17 UTC] [2025-11-04 19:58:17] Profile picture updated successfully | Context: {"user_id":17,"file":"profile_17_1762286297.png"}
+
+[19-Nov-2025 09:10:34 UTC] [2025-11-19 09:10:34] Profile picture updated successfully | Context: {"user_id":16,"file":"profile_16_1763543434.jpg"}
+
+[27-Nov-2025 16:55:38 UTC] [2025-11-27 16:55:38] Profile picture updated successfully | Context: {"user_id":19,"file":"profile_19_1764262538.jpg"}
+

@@ -1,0 +1,1 @@
+[12-Oct-2025 10:52:16 UTC] Database error: SQLSTATE[23000]: Integrity constraint violation: 1452 Cannot add or update a child row: a foreign key constraint fails (`app_auth`.`user_role`, CONSTRAINT `user_role_ibfk_1` FOREIGN KEY (`profile_id`) REFERENCES `student_profiles` (`user_id`) ON DELETE CASCADE)

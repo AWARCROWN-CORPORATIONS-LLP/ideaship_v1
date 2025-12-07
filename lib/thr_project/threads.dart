@@ -1947,44 +1947,51 @@ class _ThreadsScreenState extends State<ThreadsScreen>
   }
 
   List<Thread> _getCurrentThreads(bool isDiscover) {
-    if (!isDiscover || !_isSearching)
+    if (!isDiscover || !_isSearching) {
       return isDiscover ? discoverThreads : myThreads;
+    }
     return searchResults;
   }
 
   bool _getCurrentLoading(bool isDiscover) {
-    if (!isDiscover || !_isSearching)
+    if (!isDiscover || !_isSearching) {
       return isDiscover ? discoverLoading : myLoading;
+    }
     return discoverLoading;
   }
 
   bool _getCurrentHasError(bool isDiscover) {
-    if (!isDiscover || !_isSearching)
+    if (!isDiscover || !_isSearching) {
       return isDiscover ? discoverHasError : myHasError;
+    }
     return discoverHasError;
   }
 
   String? _getCurrentErrorMessage(bool isDiscover) {
-    if (!isDiscover || !_isSearching)
+    if (!isDiscover || !_isSearching) {
       return isDiscover ? discoverErrorMessage : myErrorMessage;
+    }
     return discoverErrorMessage;
   }
 
   bool _getCurrentLoadingMore(bool isDiscover) {
-    if (!isDiscover || !_isSearching)
+    if (!isDiscover || !_isSearching) {
       return isDiscover ? discoverLoadingMore : myLoadingMore;
+    }
     return discoverLoadingMore;
   }
 
   bool _getCurrentHasReachedMax(bool isDiscover) {
-    if (!isDiscover || !_isSearching)
+    if (!isDiscover || !_isSearching) {
       return isDiscover ? discoverHasReachedMax : myHasReachedMax;
+    }
     return discoverHasReachedMax;
   }
 
   List<Animation<double>> _getCurrentSlideAnimations(bool isDiscover) {
-    if (!isDiscover || !_isSearching)
+    if (!isDiscover || !_isSearching) {
       return isDiscover ? discoverSlideAnimations : mySlideAnimations;
+    }
     return discoverSlideAnimations;
   }
 
@@ -3072,9 +3079,7 @@ class _ActionButton extends StatelessWidget {
     required this.label,
     required this.onTap,
     // ignore: unused_element_parameter
-    this.iconColor,
-    this.iconSize,
-    this.fontSize,
+    this.iconColor, this.iconSize, this.fontSize,
   });
   @override
   Widget build(BuildContext context) {

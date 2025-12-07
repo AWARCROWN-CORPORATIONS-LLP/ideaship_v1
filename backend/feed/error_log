@@ -1,0 +1,28 @@
+[16-Nov-2025 02:51:41 UTC] 🔍 Encrypted URL: d3pqVGU0QzRHdjFhS3Y4MTFwaUpCL0FlMnZDNW9ZVStSU1R5WkFvcDhJcVBrVTNEUDhzMlFMdW1td0ZrMTFpTDo67b3kXtuSO44aOzcDOmTOUQ==
+[16-Nov-2025 02:51:41 UTC] 📂 Decrypted Path: Posts/6909fbcf65d7b_1000350864.jpg
+[16-Nov-2025 02:51:46 UTC] 🔍 Encrypted URL: c0NuN3QyZmd5T0pZQXowZXpNQXJEbkF1T21HNE1mcUpzUzA3TFNUVGtxUE8zdkEwclVjUFRneE5rQVVvd1U1Zjo60WkYsYhPuVcWnfsE/0xm3g==
+[16-Nov-2025 02:51:46 UTC] 📂 Decrypted Path: Posts/690a5552e8db2_1000350529.jpg
+[16-Nov-2025 02:51:51 UTC] 🔍 Encrypted URL: RVB2TkVLRHlRN2pHcS82d0RJZC96cTlsejA0c1l2T3E3a2dJOWlkNU1UbFoyMTVleWw4NEhoQU16TVZabzJWTTo6D32fx1F6IuoWVRxxAfM4nA==
+[16-Nov-2025 02:51:51 UTC] 📂 Decrypted Path: Posts/690b2606b3d1e_1000350864.jpg
+[04-Dec-2025 05:33:55 UTC] [report_69311d437955c7.52211514] Incoming report request received.
+[04-Dec-2025 05:33:55 UTC] [report_69311d437955c7.52211514] Invalid request method: GET
+[04-Dec-2025 05:33:56 UTC] [report_69311d4461d7c0.39855506] Incoming report request received.
+[04-Dec-2025 05:33:56 UTC] [report_69311d4461d7c0.39855506] Invalid request method: GET
+[04-Dec-2025 05:33:57 UTC] [report_69311d45299e75.89749196] Incoming report request received.
+[04-Dec-2025 05:33:57 UTC] [report_69311d45299e75.89749196] Invalid request method: GET
+[04-Dec-2025 05:45:57 UTC] [report_693120151a5c33.70855179] Incoming report request received.
+[04-Dec-2025 05:45:57 UTC] [report_693120151a5c33.70855179] Invalid request method: GET
+[04-Dec-2025 16:32:40 UTC] 🔐 Encrypted: Wi8zcURqZktHL20weVJEQWdjM0VDYi9FcEVzVjBZUXNGeTZ1QTV5d0NkRmljbkNic05nOVJFNkNZZEc0dk00Yjo6fsSqfmbocPgA3JWPHI269g==
+[04-Dec-2025 16:32:40 UTC] 📂 Decrypted path: Posts/693151203435d_1000360105.jpg
+[04-Dec-2025 16:42:47 UTC] 📂 Decrypted media path: Posts/691ef4fe63f49_1000198345.jpg
+[04-Dec-2025 16:42:56 UTC] 📂 Decrypted media path: Posts/691ef5175469d_1000198344.jpg
+[04-Dec-2025 16:43:02 UTC] 📂 Decrypted media path: Posts/691dc284c1e7d_1000198345.jpg
+[04-Dec-2025 22:44:52 Asia/Kolkata] 📂 Decrypted media path: Posts/6931bac59c317_1000361550.jpg
+[05-Dec-2025 19:54:18 Asia/Kolkata] 📂 Decrypted media path: Posts/693287ffd8f51_1000361687.jpg
+[06-Dec-2025 21:20:46 Asia/Kolkata] === followers.php called ===
+[06-Dec-2025 21:20:46 Asia/Kolkata] target_username = aditya_3515_
+[06-Dec-2025 21:20:46 Asia/Kolkata] current_username = aditya_3515_
+[06-Dec-2025 21:20:46 Asia/Kolkata] Target user ID = 16
+[06-Dec-2025 21:20:46 Asia/Kolkata] Current user ID = 16
+[06-Dec-2025 21:20:46 Asia/Kolkata] Executing followers SQL → target_id=16, current_id=16
+[06-Dec-2025 21:20:46 Asia/Kolkata] PDO Error: SQLSTATE[42S02]: Base table or view not found: 1146 Table 'app_auth.followers' doesn't exist

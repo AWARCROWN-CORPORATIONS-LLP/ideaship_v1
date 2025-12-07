@@ -1,0 +1,10 @@
+[03-Nov-2025 07:04:51 UTC] PHP Warning:  require_once(/home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/vendor/autoload.php): Failed to open stream: No such file or directory in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php on line 9
+[03-Nov-2025 07:04:51 UTC] PHP Fatal error:  Uncaught Error: Failed opening required '/home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/vendor/autoload.php' (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php:9
+Stack trace:
+#0 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php on line 9
+[06-Dec-2025 19:23:23 UTC] PHP Fatal error:  Cannot redeclare function outputSuccessModal() (previously declared in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php:85) in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php on line 127
+[06-Dec-2025 19:23:31 UTC] PHP Fatal error:  Cannot redeclare function outputSuccessModal() (previously declared in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php:85) in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php on line 127
+[06-Dec-2025 19:26:08 UTC] PHP Fatal error:  Cannot redeclare function outputSuccessModal() (previously declared in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php:85) in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php on line 127
+[06-Dec-2025 19:26:46 UTC] PHP Fatal error:  Cannot redeclare function outputSuccessModal() (previously declared in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php:85) in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php on line 127
+[06-Dec-2025 19:26:54 UTC] PHP Fatal error:  Cannot redeclare function outputSuccessModal() (previously declared in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php:85) in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php on line 127

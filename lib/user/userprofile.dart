@@ -179,7 +179,7 @@ Future<void> _fetchMyPosts({int? cursorId}) async {
     // REQUIRED PARAMS
     final params = {
       'username': _username!,
-      'target_username': _username!, // 👈 Add this
+      'target_username': _username!, 
     };
 
     if (cursorId != null) {
@@ -190,7 +190,7 @@ Future<void> _fetchMyPosts({int? cursorId}) async {
         .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
         .join('&');
 
-    final url = 'https://server.awarcrown.com/accessprofile/fetch_user_posts?$queryString';
+    final url = 'https://server.awarcrown.com/accessprofile/fetch_user_posts?action=my_posts&$queryString';
 
     debugPrint("➡️ FETCH POSTS URL: $url");
 
@@ -256,7 +256,7 @@ Future<void> _fetchMyPosts({int? cursorId}) async {
       final queryString = params.entries
           .map((e) => '${e.key}=${Uri.encodeComponent(e.value.toString())}')
           .join('&');
-      final url = 'https://server.awarcrown.com/feed/get_saved_posts?$queryString';
+      final url = 'https://server.awarcrown.com/accessprofile/fetch_user_posts?action=saved_posts&$queryString';
       
       final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));
 
@@ -294,12 +294,14 @@ Future<void> _fetchMyPosts({int? cursorId}) async {
           for (var postId in savedIds) {
             try {
               final postResponse = await http.get(
-                Uri.parse('https://server.awarcrown.com/feed/get_post?post_id=$postId&username=${Uri.encodeComponent(_username!)}'),
+                Uri.parse( 'https://server.awarcrown.com/accessprofile/fetch_user_posts?action=saved_posts&$queryString'),
+
               ).timeout(const Duration(seconds: 5));
               if (postResponse.statusCode == 200) {
                 final postData = json.decode(postResponse.body);
                 if (postData['post'] != null) {
                   posts.add(postData['post']);
+                 
                 }
               }
             } catch (e) {
