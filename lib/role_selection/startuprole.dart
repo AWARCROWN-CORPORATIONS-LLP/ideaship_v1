@@ -14,7 +14,16 @@ import 'package:intl/intl.dart';
 import '../dashboard.dart'; 
 
 class StartupRolePage extends StatefulWidget {
-  const StartupRolePage({super.key});
+  final String? initialUsername;
+  final String? initialEmail;
+  final String? initialId;
+
+  const StartupRolePage({
+    super.key,
+    this.initialUsername,
+    this.initialEmail,
+    this.initialId,
+  });
 
   @override
   State<StartupRolePage> createState() => _StartupRolePageState();
@@ -64,6 +73,16 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
   @override
   void initState() {
     super.initState();
+    // Prefill using values passed from role selection before SharedPreferences load.
+    if (widget.initialUsername != null ||
+        widget.initialEmail != null ||
+        widget.initialId != null) {
+      _username = widget.initialUsername ?? _username;
+      _email = widget.initialEmail ?? _email;
+      _id = widget.initialId ?? _id;
+      _usernameController.text = _username;
+      _emailController.text = _email;
+    }
     _pageController = PageController(initialPage: _currentStep);
     _formKeys = List.generate(3, (index) => GlobalKey<FormState>());
     _loadSessionData();
@@ -76,9 +95,9 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
     try {
       final prefs = await SharedPreferences.getInstance();
       setState(() {
-        _username = prefs.getString('username') ?? 'Unknown';
-        _email = prefs.getString('email') ?? 'Unknown';
-        _id = prefs.getString('id') ?? '0';
+        _username = widget.initialUsername ?? prefs.getString('username') ?? 'Unknown';
+        _email = widget.initialEmail ?? prefs.getString('email') ?? 'Unknown';
+        _id = widget.initialId ?? prefs.getString('id') ?? '0';
       });
       _usernameController.text = _username;
       _emailController.text = _email;

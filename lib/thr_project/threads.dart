@@ -320,153 +320,154 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Stack(
-        children: [
-          PageView(
-            controller: _pageController,
-            onPageChanged: (index) {
-              if (mounted) {
-                setState(() => currentPage = index);
-              }
-              _tableController.reset();
-              _chairsController.reset();
-              _tableController.forward().then(
-                (_) => _chairsController.forward(),
-              );
-            },
-            children: [
-              // Page 1: Welcome to Roundtable
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final double iconSize =
+                (constraints.maxWidth * 0.4).clamp(100.0, 180.0);
+            final EdgeInsets contentPadding = EdgeInsets.symmetric(
+              horizontal: constraints.maxWidth * 0.08,
+              vertical: 24,
+            );
+            return Stack(
+              children: [
+                PageView(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    if (mounted) {
+                      setState(() => currentPage = index);
+                    }
+                    _tableController.reset();
+                    _chairsController.reset();
+                    _tableController.forward().then(
+                      (_) => _chairsController.forward(),
+                    );
+                  },
                   children: [
-                    FadeTransition(
-                      opacity: _tableAnimation,
-                      child: ScaleTransition(
-                        scale: Tween<double>(
-                          begin: 0.6,
-                          end: 1.0,
-                        ).animate(_tableAnimation),
-                        child: const AnimatedRoundTableIcon(size: 150),
-                      ),
+                    _buildOnboardPage(
+                      context,
+                      iconSize,
+                      contentPadding,
+                      title: 'Gather \'Round!',
+                      subtitle: 'Join discussions like a virtual roundtable.',
                     ),
-                    const SizedBox(height: 32),
-                    Text(
-                      'Gather \'Round!',
-                      style: Theme.of(context).textTheme.headlineMedium,
+                    _buildOnboardPage(
+                      context,
+                      iconSize,
+                      contentPadding,
+                      title: 'Start Conversations',
+                      subtitle: 'Create threads and watch ideas circle the table.',
                     ),
-                    Text('Join discussions like a virtual roundtable.'),
+                    _buildOnboardPage(
+                      context,
+                      iconSize,
+                      contentPadding,
+                      title: 'Pull Up a Chair',
+                      subtitle: 'Join discussions with a simple tap.',
+                    ),
                   ],
                 ),
-              ),
 
-              // Page 2: Create & Engage
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    FadeTransition(
-                      opacity: _tableAnimation,
-                      child: ScaleTransition(
-                        scale: Tween<double>(
-                          begin: 0.6,
-                          end: 1.0,
-                        ).animate(_tableAnimation),
-                        child: const AnimatedRoundTableIcon(size: 150),
+                // Page Indicator
+                Positioned(
+                  bottom: 32,
+                  left: 0,
+                  right: 0,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(
+                      3,
+                      (index) => AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        height: 8,
+                        width: currentPage == index ? 24 : 8,
+                        decoration: BoxDecoration(
+                          color: currentPage == index ? Colors.blue : Colors.grey,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 32),
-                    Text(
-                      'Start Conversations',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    Text('Create threads and watch ideas circle the table.'),
-                  ],
-                ),
-              ),
-
-              // Page 3: Join Discussion
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    FadeTransition(
-                      opacity: _tableAnimation,
-                      child: ScaleTransition(
-                        scale: Tween<double>(
-                          begin: 0.6,
-                          end: 1.0,
-                        ).animate(_tableAnimation),
-                        child: const AnimatedRoundTableIcon(size: 150),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    Text(
-                      'Pull Up a Chair',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    Text('Join discussions with a simple tap.'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          // Page Indicator
-          Positioned(
-            bottom: 50,
-            left: 0,
-            right: 0,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                3,
-                (index) => AnimatedContainer(
-                  duration: const Duration(milliseconds: 300),
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  height: 8,
-                  width: currentPage == index ? 24 : 8,
-                  decoration: BoxDecoration(
-                    color: currentPage == index ? Colors.blue : Colors.grey,
-                    borderRadius: BorderRadius.circular(4),
                   ),
                 ),
+
+                // Next Button
+                Positioned(
+                  bottom: 86,
+                  right: 20,
+                  child: FloatingActionButton(
+                    onPressed: () async {
+                      try {
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool('hasSeenOnboarding', true);
+                        if (context.mounted) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const ThreadsScreen(),
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        debugPrint('Error saving onboarding preference: $e');
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Error completing onboarding: $e'),
+                            ),
+                          );
+                        }
+                      }
+                    },
+                    child: const Icon(Icons.arrow_forward),
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOnboardPage(
+    BuildContext context,
+    double iconSize,
+    EdgeInsets padding, {
+    required String title,
+    required String subtitle,
+  }) {
+    return Center(
+      child: Padding(
+        padding: padding,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            FadeTransition(
+              opacity: _tableAnimation,
+              child: ScaleTransition(
+                scale: Tween<double>(
+                  begin: 0.6,
+                  end: 1.0,
+                ).animate(_tableAnimation),
+                child: AnimatedRoundTableIcon(size: iconSize),
               ),
             ),
-          ),
-
-          // Next Button
-          Positioned(
-            bottom: 100,
-            right: 20,
-            child: FloatingActionButton(
-              onPressed: () async {
-                try {
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('hasSeenOnboarding', true);
-                  if (context.mounted) {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ThreadsScreen(),
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  debugPrint('Error saving onboarding preference: $e');
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error completing onboarding: $e'),
-                      ),
-                    );
-                  }
-                }
-              },
-              child: const Icon(Icons.arrow_forward),
+            const SizedBox(height: 28),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.headlineSmall,
             ),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -3020,9 +3021,8 @@ class _ThreadsScreenState extends State<ThreadsScreen>
         ),
       ),
     );
-    return isMy
-        ? cardWidget
-        : Hero(tag: 'thread_${thread.id}', child: cardWidget);
+    // Avoid hero animations that were causing full-screen transitions/overflows on first load.
+    return cardWidget;
   }
 
   Widget _buildActionButton({

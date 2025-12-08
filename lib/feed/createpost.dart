@@ -27,10 +27,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
   int _uploadedBytes = 0;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  // ISSUE 1 FIX: Use a regular http.Client or cancel the entire request/stream.
-  // The original implementation was attempting to cancel the stream of a completed
-  // http.StreamedResponse, which is incorrect. We'll use a standard variable
-  // to hold the subscription for cancellation.
+  
   StreamSubscription<List<int>>? _uploadSubscription;
   http.MultipartRequest? _currentRequest;
 

@@ -9,7 +9,16 @@ import 'dart:io';
 import '../dashboard.dart'; // Import Dashboard for navigation
 
 class StudentRolePage extends StatefulWidget {
-  const StudentRolePage({super.key});
+  final String? initialUsername;
+  final String? initialEmail;
+  final String? initialId;
+
+  const StudentRolePage({
+    super.key,
+    this.initialUsername,
+    this.initialEmail,
+    this.initialId,
+  });
 
   @override
   State<StudentRolePage> createState() => _StudentRolePageState();
@@ -48,6 +57,16 @@ class _StudentRolePageState extends State<StudentRolePage> {
   @override
   void initState() {
     super.initState();
+    // Prefill using values passed from role selection before hitting SharedPreferences.
+    if (widget.initialUsername != null ||
+        widget.initialEmail != null ||
+        widget.initialId != null) {
+      _username = widget.initialUsername ?? _username;
+      _email = widget.initialEmail ?? _email;
+      _id = widget.initialId ?? _id;
+      _usernameController.text = _username;
+      _emailController.text = _email;
+    }
     _loadSessionData();
     _dobController.text = DateFormat('yyyy-MM-dd').format(DateTime.now().subtract(const Duration(days: 7300)));
     _loadFormData(); // Load saved form data
@@ -58,9 +77,9 @@ class _StudentRolePageState extends State<StudentRolePage> {
     try {
       final prefs = await SharedPreferences.getInstance();
       setState(() {
-        _username = prefs.getString('username') ?? 'Unknown';
-        _email = prefs.getString('email') ?? 'Unknown';
-        _id = prefs.getString('id') ?? '0';
+        _username = widget.initialUsername ?? prefs.getString('username') ?? 'Unknown';
+        _email = widget.initialEmail ?? prefs.getString('email') ?? 'Unknown';
+        _id = widget.initialId ?? prefs.getString('id') ?? '0';
       });
       _usernameController.text = _username;
       _emailController.text = _email;

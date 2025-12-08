@@ -15,6 +15,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'threads.dart';
 
+// Resolve image paths that might already be absolute.
+String _resolveThreadImageUrl(String? path) {
+  if (path == null || path.isEmpty) return '';
+  if (path.startsWith('http')) return path;
+  return 'https://server.awarcrown.com/threads/uploads/$path';
+}
+
 class ThreadDetailScreen extends StatefulWidget {
   final Thread thread;
   final String username;
@@ -1132,7 +1139,7 @@ Widget _buildCommentsSection() {
             child: CustomScrollView(
               slivers: [
                 SliverAppBar(
-                  expandedHeight: 400,
+                  expandedHeight: 320,
                   floating: false,
                   pinned: true,
                   elevation: 0,
@@ -1142,106 +1149,103 @@ Widget _buildCommentsSection() {
                       horizontal: 16,
                       vertical: 12,
                     ),
-                    background: Hero(
-                      tag: 'thread_${widget.thread.id}',
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [gradientStart, gradientMid, gradientEnd],
-                            stops: [0.0, 0.5, 1.0],
-                          ),
+                    background: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [gradientStart, gradientMid, gradientEnd],
+                          stops: [0.0, 0.5, 1.0],
                         ),
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            16,
-                            MediaQuery.of(context).padding.top + 56,
-                            16,
-                            16,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _buildHeaderInfo(context),
-                              const SizedBox(height: 20),
-                              Text(
-                                widget.thread.title,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.w800,
-                                  height: 1.2,
-                                  letterSpacing: -0.5,
-                                ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          MediaQuery.of(context).padding.top + 56,
+                          16,
+                          16,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildHeaderInfo(context),
+                            const SizedBox(height: 20),
+                            Text(
+                              widget.thread.title,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                height: 1.2,
+                                letterSpacing: -0.5,
                               ),
-                              const SizedBox(height: 12),
-                              Text(
-                                widget.thread.body,
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 15,
-                                  height: 1.6,
-                                ),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              widget.thread.body,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 15,
+                                height: 1.6,
                               ),
-                              const SizedBox(height: 8),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.access_time,
-                                    size: 14,
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.access_time,
+                                  size: 14,
+                                  color: Colors.white.withOpacity(0.7),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _getReadingTime(widget.thread.body),
+                                  style: TextStyle(
                                     color: Colors.white.withOpacity(0.7),
+                                    fontSize: 12,
                                   ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _getReadingTime(widget.thread.body),
-                                    style: TextStyle(
-                                      color: Colors.white.withOpacity(0.7),
-                                      fontSize: 12,
-                                    ),
+                                ),
+                              ],
+                            ),
+                            _buildTags(),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceEvenly,
+                                children: [
+                                  _HeaderActionButton(
+                                    icon: isInspired
+                                        ? Icons.lightbulb
+                                        : Icons.lightbulb_outline,
+                                    label: '${widget.thread.inspiredCount}',
+                                    color: inspireColor,
+                                    onTap: () =>
+                                        _toggleInspire(widget.thread.id),
+                                  ),
+                                  _HeaderActionButton(
+                                    icon: Icons.comment_outlined,
+                                    label: '${widget.thread.commentCount}',
+                                    color: const Color(0xFF90F0C0),
+                                    onTap: _scrollToComments,
+                                  ),
+                                  _HeaderActionButton(
+                                    icon: Icons.share_outlined,
+                                    label: 'Share',
+                                    color: Colors.white,
+                                    onTap: _shareThread,
                                   ),
                                 ],
                               ),
-                              _buildTags(),
-                              const Spacer(),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceEvenly,
-                                  children: [
-                                    _HeaderActionButton(
-                                      icon: isInspired
-                                          ? Icons.lightbulb
-                                          : Icons.lightbulb_outline,
-                                      label: '${widget.thread.inspiredCount}',
-                                      color: inspireColor,
-                                      onTap: () =>
-                                          _toggleInspire(widget.thread.id),
-                                    ),
-                                    _HeaderActionButton(
-                                      icon: Icons.comment_outlined,
-                                      label: '${widget.thread.commentCount}',
-                                      color: const Color(0xFF90F0C0),
-                                      onTap: _scrollToComments,
-                                    ),
-                                    _HeaderActionButton(
-                                      icon: Icons.share_outlined,
-                                      label: 'Share',
-                                      color: Colors.white,
-                                      onTap: _shareThread,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -1499,6 +1503,13 @@ class _CommentCardState extends State<_CommentCard> {
 
   // Show image in full screen
   void _showImageFullScreen(BuildContext context, String imageUrl) {
+    final resolvedUrl = _resolveThreadImageUrl(imageUrl);
+    if (resolvedUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Image URL unavailable')),
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1513,8 +1524,7 @@ class _CommentCardState extends State<_CommentCard> {
               minScale: 0.5,
               maxScale: 4.0,
               child: CachedNetworkImage(
-                imageUrl:
-                    'https://server.awarcrown.com/threads/uploads/$imageUrl',
+                imageUrl: resolvedUrl,
                 fit: BoxFit.contain,
                 placeholder: (context, url) => const Center(
                   child: CircularProgressIndicator(color: Colors.white),
@@ -1666,17 +1676,24 @@ class _CommentCardState extends State<_CommentCard> {
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: GestureDetector(
-                        onTap: () => _showImageFullScreen(
-                          context,
-                          widget.comment.imageUrl!,
-                        ),
+                    onTap: () {
+                      final resolved =
+                          _resolveThreadImageUrl(widget.comment.imageUrl);
+                      if (resolved.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Image unavailable')),
+                        );
+                        return;
+                      }
+                      _showImageFullScreen(context, resolved);
+                    },
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: Stack(
                             children: [
                               CachedNetworkImage(
                                 imageUrl:
-                                    'https://server.awarcrown.com/threads/uploads/${widget.comment.imageUrl}',
+                                    _resolveThreadImageUrl(widget.comment.imageUrl),
                                 width: double.infinity,
                                 fit: BoxFit.cover,
                                 placeholder: (context, url) => Container(

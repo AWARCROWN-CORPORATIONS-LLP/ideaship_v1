@@ -33,7 +33,7 @@ android {
 
     defaultConfig {
         applicationId = "com.awarcrown.ideaship"
-        minSdk = 23
+        minSdkVersion flutter.minSdkVersion
         targetSdk = 35
         versionCode = 3
         versionName = "1.0.1"

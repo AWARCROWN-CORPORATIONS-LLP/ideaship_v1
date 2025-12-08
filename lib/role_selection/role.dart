@@ -11,13 +11,26 @@ import 'studentrole.dart';
 import 'startuprole.dart';
 // import other role files as needed
 
-Widget loadRolePage(String route) {
+Widget loadRolePage(
+  String route, {
+  String? username,
+  String? email,
+  String? id,
+}) {
   switch (route) {
     case 'studentrole.dart':
-      return const StudentRolePage();
+      return StudentRolePage(
+        initialUsername: username,
+        initialEmail: email,
+        initialId: id,
+      );
    
     case 'startuprole.dart':
-      return const StartupRolePage();
+      return StartupRolePage(
+        initialUsername: username,
+        initialEmail: email,
+        initialId: id,
+      );
     
     default:
       return Container(
@@ -180,7 +193,14 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
         if (route.isNotEmpty && mounted) {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => loadRolePage(route)),
+            MaterialPageRoute(
+              builder: (context) => loadRolePage(
+                route,
+                username: _username,
+                email: _email,
+                id: _id,
+              ),
+            ),
           );
         }
         return;
@@ -387,6 +407,9 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
                           iconPath: role['icon']!,
                           route: role['route']!,
                           heroTag: role['heroTag']!,
+                          username: _username,
+                          email: _email,
+                          id: _id,
                         );
                       },
                     );
@@ -407,6 +430,9 @@ class RoleCard extends StatefulWidget {
   final String iconPath;
   final String route;
   final String heroTag;
+  final String? username;
+  final String? email;
+  final String? id;
 
   const RoleCard({
     super.key,
@@ -415,6 +441,9 @@ class RoleCard extends StatefulWidget {
     required this.iconPath,
     required this.route,
     required this.heroTag,
+    this.username,
+    this.email,
+    this.id,
   });
 
   @override
@@ -439,7 +468,12 @@ class _RoleCardState extends State<RoleCard> {
             pageBuilder: (context, animation, secondaryAnimation) {
               return FadeTransition(
                 opacity: animation,
-                child: loadRolePage(widget.route),
+                child: loadRolePage(
+                  widget.route,
+                  username: widget.username,
+                  email: widget.email,
+                  id: widget.id,
+                ),
               );
             },
             transitionsBuilder:
