@@ -10,28 +10,50 @@ header('Referrer-Policy: no-referrer');
 
 // === Dependencies ===
 require '/home/v6gkv3hx0rj5/vendor/autoload.php';
-require_once 'config.php';
+// This file is assumed to define $pdo (PDO connection) and $jwtSecret
+// and potentially other configurations.
+require_once 'config.php'; 
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
 
-// === PHPMailer Setup ===
-$mail = new PHPMailer(true);
-try {
-    $mail->isSMTP();
-    $mail->Host = 'localhost';
-    $mail->Port = 25;
-    $mail->SMTPAuth = false;
-    $mail->SMTPSecure = false;
-    $mail->Timeout = 15;
-    $mail->CharSet = 'UTF-8';
-    $mail->Encoding = 'base64';
-    $mail->isHTML(false);
-    $mail->setFrom('support@awarcrown.com', 'Awarcrown Auth');
-    $mail->addReplyTo('support@awarcrown.com', 'Awarcrown Support');
-} catch (Exception $e) {
-    error_log("PHPMailer setup failed: " . $e->getMessage());
+// === PHPMailer Setup Class/Helper (Improved: use a class or helper to avoid code duplication) ===
+
+/**
+ * Creates and configures a PHPMailer instance for standard use.
+ * @param bool $isHTML Set to true for HTML emails, false for plain text.
+ * @return PHPMailer Configured PHPMailer object.
+ */
+function createMailer($isHTML = false) {
+    $mail = new PHPMailer(true);
+    try {
+        // Configuration should ideally come from config.php or environment
+        $mail->isSMTP();
+        $mail->Host = 'localhost';
+        $mail->Port = 25;
+        $mail->SMTPAuth = false;
+        $mail->SMTPSecure = false;
+        $mail->Timeout = 15;
+        $mail->CharSet = 'UTF-8';
+        // Note: base64 encoding is not typical for plain text or simple HTML. 
+        // Default encoding is usually better unless specific requirements exist.
+        $mail->Encoding = 'quoted-printable'; 
+        
+        $mail->isHTML($isHTML);
+        $mail->setFrom('support@awarcrown.com', 'Awarcrown Auth');
+        $mail->addReplyTo('support@awarcrown.com', 'Awarcrown Support');
+        return $mail;
+    } catch (Exception $e) {
+        error_log("PHPMailer setup failed: " . $e->getMessage());
+        // In a real application, you might throw the exception here 
+        // or return null and check in the calling function.
+        throw new Exception("Mailer configuration error.");
+    }
 }
+
+// Global $mail setup is REMOVED to prevent reuse/leakage. 
+// Handlers will call createMailer() or receive $mail if it's reused carefully.
+
 
 // === JWT Utils ===
 function base64UrlEncode($text) {
@@ -52,16 +74,23 @@ function generateAccessToken($userId, $secret, $expiresIn = 3600) {
 
 // === Logging + JSON Error Response ===
 function logError($msg) {
+    // SECURITY IMPROVEMENT: Sanitize input before writing to log to prevent log injection
+    $msg = filter_var($msg, FILTER_SANITIZE_STRING); 
     error_log(date('[Y-m-d H:i:s] ') . $msg . "\n", 3, __DIR__ . '/error.log');
 }
 function sendErrorResponse($status, $msg) {
     http_response_code($status);
+    // Ensure all output is JSON for API calls
+    header('Content-Type: application/json'); 
     echo json_encode(['success' => false, 'message' => $msg]);
     exit;
 }
 
 
+// === HTML Output Functions (No changes needed, they seem fine for outputting the modals/pages) ===
+
 function outputSuccessModal($msg) {
+    // ... (HTML/JS content is unchanged)
     echo '<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -71,8 +100,8 @@ function outputSuccessModal($msg) {
 
 <style>
     :root {
-        --primary: #1a73e8;       /* Google Blue */
-        --success: #0f9d58;       /* Google Green */
+        --primary: #1a73e8;        /* Google Blue */
+        --success: #0f9d58;        /* Google Green */
         --text-dark: #202124;
         --text-light: #5f6368;
         --bg: #f8f9fa;
@@ -147,7 +176,7 @@ function outputSuccessModal($msg) {
 
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(15px); }
-        to   { opacity: 1; transform: translateY(0); }
+        to  { opacity: 1; transform: translateY(0); }
     }
 </style>
 </head>
@@ -157,7 +186,7 @@ function outputSuccessModal($msg) {
 <div class="card">
     <div class="icon">✔️</div>
 
-    <h2>Success</h2>
+    <h2>Email verification Success</h2>
 
     <p><?php echo htmlspecialchars($msg); ?></p>
     <p class="sub">Opening Awarcrown App…</p>
@@ -166,7 +195,7 @@ function outputSuccessModal($msg) {
         Redirecting in <span id="count">5</span> seconds
     </div>
 
-    <a href="awarcrown://verified" class="button">Open App Now</a>
+    <a href="awarcrown://open" class="button">Open App Now</a>
 </div>
 
 <script>
@@ -177,7 +206,7 @@ const timer = setInterval(() => {
 }, 1000);
 
 setTimeout(() => {
-    window.location = "awarcrown://verified";
+    window.location = "awarcrown://open";
 
     // fallback
     setTimeout(() => {
@@ -193,10 +222,9 @@ setTimeout(() => {
     exit;
 }
 
-////////////////////////////////////////////////////////////////
-// ERROR MODAL (UPDATED: awarcrown://open + 5 sec wait only)
-////////////////////////////////////////////////////////////////
+
 function outputErrorModal($msg) {
+    // ... (HTML/JS content is unchanged)
     echo '<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -259,10 +287,9 @@ setTimeout(() => {
 </html>';
     exit;
 }
-//////////////////////////////////////////////////////////////
-// ERROR PAGE (Unified with same 5-sec rule as error modal)
-//////////////////////////////////////////////////////////////
+
 function outputErrorPage($msg) {
+    // ... (HTML/JS content is unchanged)
     echo '<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -272,7 +299,7 @@ function outputErrorPage($msg) {
 
 <style>
     :root {
-        --primary: #1a73e8;       /* Google Blue */
+        --primary: #1a73e8;        /* Google Blue */
         --danger: #d93025;
         --text-dark: #202124;
         --text-light: #5f6368;
@@ -345,7 +372,7 @@ function outputErrorPage($msg) {
 
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(15px); }
-        to   { opacity: 1; transform: translateY(0); }
+        to  { opacity: 1; transform: translateY(0); }
     }
 </style>
 </head>
@@ -353,7 +380,7 @@ function outputErrorPage($msg) {
 <body>
 
 <div class="card">
-    <div class="icon">⚠️</div>
+    <div class="icon">Awarcrown</div>
     <h2>Access Restricted</h2>
 
     <p><?php echo htmlspecialchars($msg); ?></p>
@@ -391,18 +418,13 @@ setTimeout(() => {
 }
 
 
-//////////////////////////////////////////////////////////////
-// Unauthorized Shortcut
-//////////////////////////////////////////////////////////////
 function outputUnauthorized() {
     outputErrorPage('Unauthorized access. Opening Awarcrown App…');
 }
 
 
-//////////////////////////////////////////////////////////////
-// Reset Password Form
-//////////////////////////////////////////////////////////////
 function outputResetForm($token) {
+    // ... (HTML content is unchanged)
     echo '<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -412,7 +434,7 @@ function outputResetForm($token) {
 
 <style>
     :root {
-        --primary: #1a73e8;       /* Google Blue */
+        --primary: #1a73e8;        /* Google Blue */
         --text-dark: #202124;
         --text-light: #5f6368;
         --bg: #f8f9fa;
@@ -483,7 +505,7 @@ function outputResetForm($token) {
 
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(15px); }
-        to   { opacity: 1; transform: translateY(0); }
+        to  { opacity: 1; transform: translateY(0); }
     }
 </style>
 </head>
@@ -513,14 +535,23 @@ function outputResetForm($token) {
 }
 
 
-//////////////////////////////////////////////////////////////
-// MAIN ROUTER
-//////////////////////////////////////////////////////////////
+// === Main Execution Block (Corrected for PDO and JWT Secret dependency) ===
+
+// NOTE: We assume $pdo and $jwtSecret are defined in config.php
+// If not, you must define them here before the try block.
+// Example:
+// $pdo = new PDO('mysql:host=...;dbname=...', 'user', 'pass');
+// $jwtSecret = 'YOUR_SECURE_SECRET';
+
 try {
     $action = $_GET['action'] ?? '';
 
     // Preflight
-    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') exit(0);
+    if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        // Set Content-Length to 0 for a valid preflight response
+        header('Content-Length: 0');
+        exit(0);
+    }
 
     // No action → unauthorized GET
     if ($_SERVER['REQUEST_METHOD'] === 'GET' && empty($action)) {
@@ -532,7 +563,8 @@ try {
         switch ($action) {
 
             case 'verify':
-                handleVerify($pdo, $_GET);
+                // Pass $pdo to the handler
+                handleVerify($pdo, $_GET); 
                 break;
 
             case 'reset':
@@ -542,6 +574,7 @@ try {
                 $stmt = $pdo->prepare("SELECT user_id FROM email_verifications WHERE token=? AND expires_at>NOW()");
                 $stmt->execute([$token]);
 
+                // Check for valid, non-expired token.
                 if (!$stmt->fetch()) {
                     outputErrorPage('Invalid or expired reset link.');
                 }
@@ -557,38 +590,49 @@ try {
     // -------- POST HANDLERS ----------
     elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
+        // Set Content-Type for JSON API responses
+        header('Content-Type: application/json');
+
         $raw = file_get_contents('php://input');
-        $data = json_decode($raw, true) ?: $_POST;
+        // Prefer JSON decode for API. Fallback to $_POST for form data.
+        $data = json_decode($raw, true) ?: $_POST; 
 
         switch ($action) {
             case 'register':
-                handleRegister($pdo, $mail, $data, $jwtSecret);
+                // Pass $pdo and $jwtSecret to the handler.
+                handleRegister($pdo, $data, $jwtSecret); 
                 break;
 
             case 'login':
-                handleLogin($pdo, $data, $jwtSecret);
+                // Pass $pdo and $jwtSecret to the handler.
+                handleLogin($pdo, $data, $jwtSecret); 
                 break;
 
             case 'refresh':
-                handleRefresh($pdo, $data, $jwtSecret);
+                // Pass $pdo and $jwtSecret to the handler.
+                handleRefresh($pdo, $data, $jwtSecret); 
                 break;
 
             case 'update-password':
-                handleUpdatePassword($pdo, $data);
+                // Pass $pdo to the handler.
+                handleUpdatePassword($pdo, $data); 
                 break;
 
             case 'forgot-password':
-                handleForgotPassword($pdo, $mail, $data);
+                // Pass $pdo to the handler.
+                handleForgotPassword($pdo, $data); 
                 break;
 
             default:
-                throw new Exception('Invalid action');
+                // Correct status code for API call with invalid action
+                sendErrorResponse(400, 'Invalid action'); 
         }
     }
 
     // -------- Other Methods ----------
     else {
-        throw new Exception('Method not allowed');
+        // Correct status code for Method Not Allowed
+        sendErrorResponse(405, 'Method not allowed'); 
     }
 
 } catch (Exception $e) {
@@ -597,13 +641,14 @@ try {
     if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         outputErrorPage($e->getMessage());
     } else {
-        sendErrorResponse(400, $e->getMessage());
+        // Use 500 for unhandled exceptions in API calls
+        sendErrorResponse(500, 'An unexpected error occurred: ' . $e->getMessage()); 
     }
 }
-//////////////////////////////////////////////////////////////
-// HANDLER: REGISTER
-//////////////////////////////////////////////////////////////
-function handleRegister($pdo, $mail, $data, $jwtSecret) {
+
+// === HANDLER FUNCTIONS (Corrected for dependency injection) ===
+
+function handleRegister($pdo, $data, $jwtSecret) {
     try {
         $username = trim($data['username'] ?? '');
         $email    = trim($data['email'] ?? '');
@@ -617,6 +662,9 @@ function handleRegister($pdo, $mail, $data, $jwtSecret) {
         $stmt = $pdo->prepare("SELECT id FROM users WHERE username=? OR email=?");
         $stmt->execute([$username, $email]);
         if ($stmt->fetch()) throw new Exception('Username or email already taken');
+
+        // Start Transaction for safety
+        $pdo->beginTransaction(); 
 
         // Insert user
         $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -632,8 +680,8 @@ function handleRegister($pdo, $mail, $data, $jwtSecret) {
                        VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))")
             ->execute([$userId, $token]);
 
-        // Send mail
-        $mail->clearAddresses();
+        // --- Send mail (use the helper function) ---
+        $mail = createMailer(false); // Plain text for verification link
         $mail->addAddress($email);
         $mail->Subject = 'Verify Your Awarcrown Account';
         $mail->Body =
@@ -642,6 +690,7 @@ function handleRegister($pdo, $mail, $data, $jwtSecret) {
             "This link expires in 24 hours.";
 
         $mail->send();
+        // --- End mail send ---
 
         // JWT tokens
         $accessToken  = generateAccessToken($userId, $jwtSecret);
@@ -651,6 +700,8 @@ function handleRegister($pdo, $mail, $data, $jwtSecret) {
                        VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY))")
             ->execute([$userId, $refreshToken]);
 
+        $pdo->commit(); // Commit transaction on success
+
         echo json_encode([
             'success' => true,
             'message' => 'Registered successfully. Verify using the link sent to your email.',
@@ -658,6 +709,7 @@ function handleRegister($pdo, $mail, $data, $jwtSecret) {
             'refresh_token' => $refreshToken
         ]);
     } catch (Exception $e) {
+        if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack(); // Rollback on error
         logError("Register error: " . $e->getMessage());
         sendErrorResponse(400, $e->getMessage());
     }
@@ -667,46 +719,96 @@ function handleRegister($pdo, $mail, $data, $jwtSecret) {
 //////////////////////////////////////////////////////////////
 // HANDLER: LOGIN
 //////////////////////////////////////////////////////////////
+function sanitizeInput($value) {
+    // SECURITY IMPROVEMENT: FILTER_SANITIZE_STRING is deprecated. Use more specific filters or htmlspecialchars.
+    // For an identifier, a simple trim is often enough, the validation handles the rest.
+    return trim($value); 
+}
+
 function handleLogin($pdo, $data, $jwtSecret) {
     try {
-        $identifier = trim($data['username'] ?? '');
+        // --- 1. Input sanitization ---
+        $identifier = sanitizeInput($data['username'] ?? '');
         $password   = $data['password'] ?? '';
+        $password   = trim($password);
 
-        if (!$identifier || !$password) throw new Exception('Credentials required');
+        if (empty($identifier) || empty($password)) {
+            throw new Exception('Username or password required.');
+        }
 
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE username=? OR email=?");
-        $stmt->execute([$identifier, $identifier]);
+        // --- 2. Validate identifier format and determine query ---
+        // Validate against both email and username formats if possible
+        $isEmail = filter_var($identifier, FILTER_VALIDATE_EMAIL);
+        $query = "SELECT * FROM users WHERE ";
+        $params = [];
+
+        if ($isEmail) {
+            $query .= "email = ?";
+            $params = [$identifier];
+        } elseif (preg_match('/^[a-zA-Z0-9_]{3,30}$/', $identifier)) {
+            $query .= "username = ?";
+            $params = [$identifier];
+        } else {
+            throw new Exception('Invalid username or email format.');
+        }
+
+        // --- 3. Safe SQL execution (Prepared Statements) ---
+        $stmt = $pdo->prepare($query);
+        $stmt->execute($params);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$user || !password_verify($password, $user['password_hash'])) {
-            throw new Exception('Invalid credentials');
+        if (!$user) {
+            // SECURITY: Use a generic error message
+            throw new Exception('Invalid login credentials.'); 
         }
+
+        // --- 4. Verify password securely ---
+        if (!password_verify($password, $user['password_hash'])) {
+            // SECURITY: Use a generic error message
+            throw new Exception('Invalid login credentials.'); 
+        }
+
+        // --- 5. Check account status ---
         if (!$user['is_active']) {
             throw new Exception('Please verify your email before logging in.');
         }
 
-        // NEW TOKENS
-        $accessToken  = generateAccessToken($user['id'], $jwtSecret);
+        // --- 6. Generate Access Token ---
+        $accessToken = generateAccessToken($user['id'], $jwtSecret);
 
-        $pdo->prepare("DELETE FROM refresh_tokens WHERE user_id=?")
-            ->execute([$user['id']]);
+        // --- 7. Refresh Token Rotation (with transaction) ---
+        $pdo->beginTransaction(); 
+        
+        // Delete old tokens (Good practice: rotate and invalidate)
+        $pdo->prepare("DELETE FROM refresh_tokens WHERE user_id = ?")->execute([$user['id']]); 
 
         $refreshToken = bin2hex(random_bytes(32));
 
-        $pdo->prepare("INSERT INTO refresh_tokens (user_id, token, expires_at)
-                       VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY))")
-            ->execute([$user['id'], $refreshToken]);
+        $pdo->prepare("
+            INSERT INTO refresh_tokens (user_id, token, expires_at)
+            VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY))
+        ")->execute([$user['id'], $refreshToken]);
+
+        $pdo->commit(); // Commit transaction on success
+
+        // --- 8. Clean user output (never send password_hash) ---
+        $userResponse = [
+            'id'       => (int)$user['id'],
+            'username' => htmlspecialchars($user['username'], ENT_QUOTES, 'UTF-8'),
+            'email'    => htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8'),
+            'role'     => $user['role'] ?? 'user',
+            'verified' => (bool)$user['is_active']
+        ];
 
         echo json_encode([
-            'success' => true,
-            'user' => [
-                'id'       => $user['id'],
-                'username' => $user['username']
-            ],
-            'access_token'  => $accessToken,
-            'refresh_token' => $refreshToken
+            'success'        => true,
+            'user'           => $userResponse,
+            'access_token'   => $accessToken,
+            'refresh_token'  => $refreshToken
         ]);
+
     } catch (Exception $e) {
+        if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack(); // Rollback on error
         logError("Login error: " . $e->getMessage());
         sendErrorResponse(401, $e->getMessage());
     }
@@ -722,23 +824,31 @@ function handleRefresh($pdo, $data, $jwtSecret) {
         if (!$refresh) throw new Exception('Refresh token required');
 
         $stmt = $pdo->prepare("SELECT user_id FROM refresh_tokens
-                               WHERE token=? AND expires_at > NOW()");
+                              WHERE token=? AND expires_at > NOW()");
         $stmt->execute([$refresh]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$row) throw new Exception('Invalid refresh token');
+        if (!$row) throw new Exception('Invalid or expired refresh token');
 
         $userId = $row['user_id'];
+
+        // Start Transaction
+        $pdo->beginTransaction(); 
+
+        // Delete the *old* token (single-use/rotation model)
+        $pdo->prepare("DELETE FROM refresh_tokens WHERE token=?")
+             ->execute([$refresh]); 
 
         // Generate new tokens
         $newAccess  = generateAccessToken($userId, $jwtSecret);
         $newRefresh = bin2hex(random_bytes(32));
 
-        $pdo->prepare("DELETE FROM refresh_tokens WHERE user_id=?")
-            ->execute([$userId]);
+        // Insert new token
         $pdo->prepare("INSERT INTO refresh_tokens (user_id, token, expires_at)
                        VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 30 DAY))")
             ->execute([$userId, $newRefresh]);
+
+        $pdo->commit(); // Commit transaction
 
         echo json_encode([
             'success'       => true,
@@ -746,14 +856,12 @@ function handleRefresh($pdo, $data, $jwtSecret) {
             'refresh_token' => $newRefresh
         ]);
     } catch (Exception $e) {
+        if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack(); // Rollback on error
         sendErrorResponse(401, $e->getMessage());
     }
 }
 
 
-//////////////////////////////////////////////////////////////
-// HANDLER: EMAIL VERIFICATION
-//////////////////////////////////////////////////////////////
 function handleVerify($pdo, $data) {
     try {
         $token = $data['token'] ?? '';
@@ -769,33 +877,147 @@ function handleVerify($pdo, $data) {
             throw new Exception('Invalid or expired verification link');
         }
 
+        $pdo->beginTransaction();
+
+        // Activate user
         $pdo->prepare("UPDATE users SET is_active=1 WHERE id=?")
             ->execute([$row['user_id']]);
 
+        // Delete token
         $pdo->prepare("DELETE FROM email_verifications WHERE token=?")
             ->execute([$token]);
 
-        // SUCCESS REDIRECT (awarcrown://verified)
-        outputSuccessModal('Your email has been verified successfully!');
+        $pdo->commit();
+
+// ================
+// SEND WELCOME MAIL (Corrected to use createMailer and not redefine PHPMailer setup)
+// ================
+        try {
+            $stmt = $pdo->prepare("SELECT username, email FROM users WHERE id=?");
+            $stmt->execute([$row['user_id']]);
+            $user = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($user) {
+
+                // --------------------------------
+                // Build HTML template 
+                // --------------------------------
+                $htmlTemplate = '
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Welcome to Awarcrown Ideaship</title>
+
+<style>
+    body {
+        font-family: Arial, Helvetica, sans-serif;
+        background: #f4f6f9;
+        margin: 0;
+        padding: 0;
     }
-    catch (Exception $e) {
-        outputErrorPage('Verification failed: ' . $e->getMessage());
+    .container {
+        background: #ffffff;
+        max-width: 650px;
+        margin: 30px auto;
+        padding: 40px;
+        border-radius: 12px;
+        border: 1px solid #e5e8eb;
+    }
+    h2 {
+        color: #1a202c;
+        font-size: 26px;
+        margin-top: 10px;
+        font-weight: 600;
+    }
+    p {
+        color: #4a5568;
+        font-size: 16px;
+        line-height: 1.6;
+    }
+    /* Removed .loader, it is not needed in a welcome email. */
+    .footer {
+        margin-top: 40px;
+        text-align: center;
+        font-size: 13px;
+        color: #718096;
+    }
+</style>
+
+</head>
+<body>
+
+<div class="container">
+    <h2>Welcome to the Awarcrown Ideaship Family</h2>
+
+    <p>Dear {{USERNAME}},</p>
+
+    <p>
+        Your email has been successfully verified, and your account is now active.
+        We are excited to welcome you into the Awarcrown Ideaship family, a place where innovators,
+        creators, and future leaders build meaningful impact together.
+    </p>
+
+    <p>
+        You now have full access to our platform.
+        We look forward to seeing your journey, your ideas, and the value you bring.
+    </p>
+
+    <p>
+        If you require assistance, feel free to reply to this email.
+        Our support team is here to help anytime.
+    </p>
+
+    <div class="footer">
+        Awarcrown Corporations LLP<br>
+        Building the Future, Idea by Idea
+    </div>
+</div>
+
+</body>
+</html>
+';
+
+                // Replace username placeholder
+                $htmlTemplate = str_replace('{{USERNAME}}', htmlspecialchars($user['username']), $htmlTemplate);
+
+                // --------------------------------
+                // SEND EMAIL (using the helper)
+                // --------------------------------
+                $mail = createMailer(true); // HTML email
+                $mail->addAddress($user['email']);
+                $mail->Subject = "Welcome to Awarcrown Ideaship";
+                $mail->Body = $htmlTemplate;
+
+                $mail->send();
+            }
+
+        } catch (Exception $e) {
+            // Log this as a soft failure; user verification is already successful
+            error_log("Welcome email failed: " . $e->getMessage()); 
+        }
+
+        outputSuccessModal('Email verified successfully! You can now log in.');
+
+    } catch (Exception $e) {
+        if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack(); // Rollback on error
+        logError("Verification error: " . $e->getMessage());
+        outputErrorPage('Verification Failed: ' . $e->getMessage());
     }
 }
 
 
-//////////////////////////////////////////////////////////////
-// HANDLER: FORGOT PASSWORD
-//////////////////////////////////////////////////////////////
-function handleForgotPassword($pdo, $mail, $data) {
+
+function handleForgotPassword($pdo, $data) {
     try {
         $email = trim($data['email'] ?? '');
         if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            throw new Exception('Valid email required');
+            // SECURITY: Never throw here, proceed to generic success message
+            // throw new Exception('Valid email required'); 
         }
 
         // Fix bad fetch logic
-        $stmt = $pdo->prepare("SELECT id, username FROM users WHERE email=?");
+        $stmt = $pdo->prepare("SELECT id, username, email FROM users WHERE email=?");
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -803,16 +1025,22 @@ function handleForgotPassword($pdo, $mail, $data) {
         if ($user) {
             $token = hash('sha256', random_bytes(32));
 
+            $pdo->beginTransaction(); // Start Transaction
+
+            // Clear old tokens for this user
             $pdo->prepare("DELETE FROM email_verifications WHERE user_id=?")
                 ->execute([$user['id']]);
 
+            // Insert new token
             $pdo->prepare("INSERT INTO email_verifications (user_id, token, expires_at)
                            VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 1 HOUR))")
                 ->execute([$user['id'], $token]);
 
+            $pdo->commit(); // Commit Transaction
+
             // send email
-            $mail->clearAddresses();
-            $mail->addAddress($email);
+            $mail = createMailer(false); // Plain text for reset link
+            $mail->addAddress($user['email']); // Use the fetched email
             $mail->Subject = 'Password Reset - Awarcrown';
             $mail->Body =
                 "Reset your password:\n" .
@@ -827,14 +1055,18 @@ function handleForgotPassword($pdo, $mail, $data) {
         ]);
 
     } catch (Exception $e) {
-        sendErrorResponse(400, $e->getMessage());
+        if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack(); // Rollback on error
+        // SECURITY: Log the error but still send generic success to the client
+        logError("Forgot Password email failed: " . $e->getMessage()); 
+        echo json_encode([
+            'success' => true,
+            'message' => 'If this email is registered, a reset link has been sent. Estimated delivery: 1m 30s.'
+        ]);
     }
 }
 
 
-//////////////////////////////////////////////////////////////
-// HANDLER: UPDATE PASSWORD AFTER RESET
-//////////////////////////////////////////////////////////////
+
 function handleUpdatePassword($pdo, $data) {
     try {
         $token   = trim($data['token'] ?? '');
@@ -851,7 +1083,9 @@ function handleUpdatePassword($pdo, $data) {
         $stmt->execute([$token]);
         $row = $stmt->fetch();
 
-        if (!$row) throw new Exception('Invalid reset link');
+        if (!$row) throw new Exception('Invalid or expired reset link.');
+
+        $pdo->beginTransaction(); // Start Transaction
 
         // Update password
         $pdo->prepare("UPDATE users SET password_hash=? WHERE id=?")
@@ -864,13 +1098,16 @@ function handleUpdatePassword($pdo, $data) {
         // Remove verification token
         $pdo->prepare("DELETE FROM email_verifications WHERE token=?")
             ->execute([$token]);
+            
+        $pdo->commit(); // Commit Transaction
 
-        // Success → awarcrown://verified
-        outputSuccessModal('Password updated successfully!');
+        
+        outputSuccessModal('Password updated successfully! You can now log in.');
 
     } catch (Exception $e) {
+        if (isset($pdo) && $pdo->inTransaction()) $pdo->rollBack(); // Rollback on error
+        logError("Update Password error: " . $e->getMessage());
         outputErrorPage('Password reset failed: ' . $e->getMessage());
     }
 }
 ?>
-

@@ -1104,13 +1104,12 @@ class _StartupsPageState extends State<StartupsPage>
     );
   }
 }
-
 class _AnimatedButton extends StatefulWidget {
   final VoidCallback onPressed;
   final IconData icon;
   final String? label;
-  final Color? color;
-  final Color? textColor;
+  final Color? color;        // Button background
+  final Color? textColor;    // Text + icon color
   final double size;
 
   const _AnimatedButton({
@@ -1135,13 +1134,12 @@ class _AnimatedButtonState extends State<_AnimatedButton>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 150),
       vsync: this,
     );
-    _scaleAnimation = Tween<double>(
-      begin: 1.0,
-      end: 0.95,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.94)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
   }
 
   @override
@@ -1150,9 +1148,14 @@ class _AnimatedButtonState extends State<_AnimatedButton>
     super.dispose();
   }
 
+  Color get _effectiveTextColor =>
+      widget.textColor ?? Colors.black87; // FIX: Always visible
+
+  Color get _effectiveBackground =>
+      widget.color ?? Colors.grey.shade200; // FIX: Default light grey
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return GestureDetector(
       onTapDown: (_) => _controller.forward(),
       onTapUp: (_) {
@@ -1163,30 +1166,37 @@ class _AnimatedButtonState extends State<_AnimatedButton>
       child: ScaleTransition(
         scale: _scaleAnimation,
         child: widget.label != null
-            ? ElevatedButton.icon(
-                onPressed: widget.onPressed,
-                icon: Icon(
-                  widget.icon,
-                  size: widget.size,
-                  color: widget.textColor,
+            ? Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: _effectiveBackground,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                label: Text(
-                  widget.label!,
-                  style: TextStyle(color: widget.textColor),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: widget.color ?? colorScheme.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(widget.icon, size: widget.size, color: _effectiveTextColor),
+                    const SizedBox(width: 6),
+
+                    // FIX: Label ALWAYS visible
+                    Text(
+                      widget.label!,
+                      style: TextStyle(
+                        color: _effectiveTextColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               )
             : IconButton(
-                icon: Icon(widget.icon, size: widget.size, color: widget.color),
+                icon: Icon(
+                  widget.icon,
+                  size: widget.size,
+                  color: _effectiveTextColor,
+                ),
                 onPressed: widget.onPressed,
               ),
       ),

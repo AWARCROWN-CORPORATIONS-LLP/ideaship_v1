@@ -421,7 +421,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Text(data['message'] ?? "Verification email sent!"),
+                content: Text(data['message'] ?? "Verification email sent! Estimated to reach inbox within minutes."),
                 backgroundColor: Colors.green,
               ),
             );

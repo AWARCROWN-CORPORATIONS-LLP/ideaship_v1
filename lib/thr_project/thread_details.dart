@@ -49,14 +49,14 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
   late Animation<double> _detailFadeAnimation;
   final ScrollController _commentsScrollController = ScrollController();
   Timer? _commentsRetryTimer;
-  Timer? _commentPollingTimer; 
+  Timer? _commentPollingTimer;
   int _commentsRetryCount = 0;
   static const int _commentsMaxRetries = 3;
   http.Client? _commentsHttpClient;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isOnline = false;
   final Set<int> _loadedCommentIds = <int>{};
-  int _lastCommentCount = 0; 
+  int _lastCommentCount = 0;
 
   File? _selectedImage;
   bool _isUploadingImage = false;
@@ -567,11 +567,14 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
 
   // Remove selected image
   Future<void> _removeImage() async {
-    final shouldRemove = await showDialog<bool>(
+    final shouldRemove =
+        await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Remove image?'),
-            content: const Text('This image will be removed from your comment.'),
+            content: const Text(
+              'This image will be removed from your comment.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
@@ -622,9 +625,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
       request.fields['body'] = body.trim();
       request.fields['parent_id'] = (parentId ?? 0).toString();
       request.fields['username'] = widget.username;
-      if (code != null) {
-        request.fields['code'] = code;
-      }
+      request.fields['code'] = code ?? "";
 
       if (image != null) {
         final fileSize = await image.length();
@@ -645,7 +646,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
           streamedResponse.statusCode == 201) {
         _commentController.clear();
         _commentFocusNode.unfocus();
-        await _clearDraft(); 
+        await _clearDraft();
         setState(() {
           _replyToCommentId = null;
           _replyToUsername = null;
@@ -653,7 +654,6 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
           _isUploadingImage = false;
         });
 
-        
         await _pollForNewComments();
         _showSuccess('Comment added successfully!');
       } else {
@@ -792,124 +792,128 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
             ),
           ),
         ListView.builder(
-          itemCount: comments.length,
+          itemCount: comments.length+1,
           controller: _commentsScrollController,
           padding: EdgeInsets.zero,
           physics: const NeverScrollableScrollPhysics(),
           shrinkWrap: true,
           itemBuilder: (context, index) {
             final comment = comments[index];
-            return _CommentCard(comment: comment, onReply: _onReplyTapped);
+            return _CommentCard(comment: comment, onReply: _onReplyTapped,);
           },
         ),
       ],
     );
   }
-Widget _buildCommentsSection() {
-  if (isLoading) {
-    return Column(
-      children: List.generate(
-        3,
-        (index) => Shimmer.fromColors(
-          baseColor: Colors.grey[300]!,
-          highlightColor: Colors.grey[100]!,
-          child: Card(
-            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
-            child: const SizedBox(height: 80),
+
+  Widget _buildCommentsSection() {
+    if (isLoading) {
+      return Column(
+        children: List.generate(
+          3,
+          (index) => Shimmer.fromColors(
+            baseColor: Colors.grey[300]!,
+            highlightColor: Colors.grey[100]!,
+            child: Card(
+              margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 12),
+              child: const SizedBox(height: 80),
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  if (hasError) {
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Center(
-        child: Column(
-          children: [
-            Icon(Icons.error_outline, size: 50, color: Colors.red[300]),
-            const SizedBox(height: 8),
-            Text(errorMessage ?? 'Failed to load comments'),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: _loadComments,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  if (comments.isEmpty) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 48.0),
-      child: Center(
-        child: Column(
-          children: [
-            const Icon(Icons.comment_outlined, size: 60, color: Color(0xFF6B7280)),
-            const SizedBox(height: 16),
-            Text(
-              'Be the first to comment',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: _primaryTextColor,
+    if (hasError) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(Icons.error_outline, size: 50, color: Colors.red[300]),
+              const SizedBox(height: 8),
+              Text(errorMessage ?? 'Failed to load comments'),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: _loadComments,
+                child: const Text('Retry'),
               ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Pull up a chair and share your thoughts!',
-              style: TextStyle(fontSize: 14, color: _secondaryTextColor),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () {
-                _focusCommentInput();
-                _scrollToLatest();
-              },
-              child: const Text('Write the first comment'),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
+      );
+    }
+
+    if (comments.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48.0),
+        child: Center(
+          child: Column(
+            children: [
+              const Icon(
+                Icons.comment_outlined,
+                size: 60,
+                color: Color(0xFF6B7280),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Be the first to comment',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: _primaryTextColor,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Pull up a chair and share your thoughts!',
+                style: TextStyle(fontSize: 14, color: _secondaryTextColor),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  _focusCommentInput();
+                  _scrollToLatest();
+                },
+                child: const Text('Write the first comment'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Scrollable comments with bounded height so the UI doesn't grow endlessly
+ final listView = ListView.separated(
+  controller: _commentsScrollController,
+  physics: const BouncingScrollPhysics(),
+  reverse: true,
+  shrinkWrap: true,
+  padding: const EdgeInsets.only(bottom: 120), // <-- BOTTOM padding visible!
+  itemCount: comments.length,
+  separatorBuilder: (_, __) => const SizedBox(height: 4),
+  itemBuilder: (context, index) {
+    final dataIndex = comments.length - 1 - index;
+    final c = comments[dataIndex];
+    return _CommentCard(comment: c, onReply: _onReplyTapped);
+  
+
+      },
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final maxHeight = MediaQuery.of(context).size.height * 0.55;
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            // Keep list scrollable without letting it grow indefinitely
+            maxHeight: maxHeight,
+            minHeight: 120,
+          ),
+          child: listView,
+        );
+      },
     );
   }
-
-  // Scrollable comments with bounded height so the UI doesn't grow endlessly
-  final listView = ListView.separated(
-    controller: _commentsScrollController,
-    physics: const BouncingScrollPhysics(),
-    reverse: true, // Chat-like: newest at bottom, scroll up for history
-    shrinkWrap: true,
-    itemCount: comments.length,
-    separatorBuilder: (_, __) => const SizedBox(height: 4),
-    itemBuilder: (context, index) {
-      // Because reverse=true, we need to map the visual index to the data index
-      final dataIndex = comments.length - 1 - index;
-      final c = comments[dataIndex];
-      return _CommentCard(
-        comment: c,
-        onReply: _onReplyTapped,
-      );
-    },
-  );
-
-  return LayoutBuilder(
-    builder: (context, constraints) {
-      final maxHeight = MediaQuery.of(context).size.height * 0.55;
-      return ConstrainedBox(
-        constraints: BoxConstraints(
-          // Keep list scrollable without letting it grow indefinitely
-          maxHeight: maxHeight,
-          minHeight: 120,
-        ),
-        child: listView,
-      );
-    },
-  );
-}
 
   void _scrollToLatest() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -933,10 +937,7 @@ Widget _buildCommentsSection() {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('New messages'),
-        action: SnackBarAction(
-          label: 'View',
-          onPressed: _scrollToLatest,
-        ),
+        action: SnackBarAction(label: 'View', onPressed: _scrollToLatest),
         duration: const Duration(seconds: 2),
         behavior: SnackBarBehavior.floating,
       ),
@@ -944,8 +945,8 @@ Widget _buildCommentsSection() {
   }
 
   Widget _buildCommentInputBar() {
-    final bool canSend = (_commentController.text.trim().isNotEmpty ||
-            _selectedImage != null) &&
+    final bool canSend =
+        (_commentController.text.trim().isNotEmpty || _selectedImage != null) &&
         !_isUploadingImage;
 
     return SafeArea(
@@ -974,7 +975,10 @@ Widget _buildCommentsSection() {
             if (_replyToCommentId != null && _replyToUsername != null)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
                   color: Colors.blue.withOpacity(0.06),
@@ -992,7 +996,10 @@ Widget _buildCommentsSection() {
                     const Spacer(),
                     IconButton(
                       iconSize: 20,
-                      constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+                      constraints: const BoxConstraints(
+                        minHeight: 44,
+                        minWidth: 44,
+                      ),
                       icon: const Icon(Icons.close),
                       onPressed: () {
                         setState(() {
@@ -1119,7 +1126,10 @@ Widget _buildCommentsSection() {
                 const SizedBox(width: 8),
                 IconButton(
                   iconSize: 26,
-                  constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+                  constraints: const BoxConstraints(
+                    minHeight: 44,
+                    minWidth: 44,
+                  ),
                   icon: Icon(
                     Icons.image_outlined,
                     color: _selectedImage != null
@@ -1131,7 +1141,10 @@ Widget _buildCommentsSection() {
                 ),
                 IconButton(
                   iconSize: 26,
-                  constraints: const BoxConstraints(minHeight: 44, minWidth: 44),
+                  constraints: const BoxConstraints(
+                    minHeight: 44,
+                    minWidth: 44,
+                  ),
                   icon: _isUploadingImage
                       ? const SizedBox(
                           width: 20,
@@ -1140,8 +1153,9 @@ Widget _buildCommentsSection() {
                         )
                       : Icon(
                           Icons.send_rounded,
-                          color:
-                              canSend ? const Color(0xFF4A90E2) : Colors.grey,
+                          color: canSend
+                              ? const Color(0xFF4A90E2)
+                              : Colors.grey,
                         ),
                   onPressed: canSend ? _submitComment : null,
                   tooltip: 'Send comment',
@@ -1312,7 +1326,7 @@ Widget _buildCommentsSection() {
         : const Color(0xFF90F0C0);
     final bool usingCache = widget.thread.isFromCache;
     return Scaffold(
-      resizeToAvoidBottomInset: true, 
+      resizeToAvoidBottomInset: true,
       backgroundColor: _pageColor,
       body: Column(
         children: [
@@ -1402,9 +1416,7 @@ Widget _buildCommentsSection() {
                             _buildTags(),
                             const Spacer(),
                             Container(
-                              padding: const EdgeInsets.symmetric(
-                                vertical: 8,
-                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
                                 color: Colors.black.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(12),
@@ -1468,7 +1480,12 @@ Widget _buildCommentsSection() {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Padding(
-                              padding: const EdgeInsets.fromLTRB(20, 20, 12, 12),
+                              padding: const EdgeInsets.fromLTRB(
+                                20,
+                                20,
+                                12,
+                                12,
+                              ),
                               child: InkWell(
                                 onTap: () {
                                   _scrollToLatest();
@@ -1512,7 +1529,6 @@ Widget _buildCommentsSection() {
     );
   }
 }
-
 
 final _urlRegex = RegExp(r'https?://[^\s]+|www\.[^\s]+', caseSensitive: false);
 
@@ -1709,9 +1725,9 @@ class _CommentCardState extends State<_CommentCard> {
   void _showImageFullScreen(BuildContext context, String imageUrl) {
     final resolvedUrl = _resolveThreadImageUrl(imageUrl);
     if (resolvedUrl.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image URL unavailable')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Image URL unavailable')));
       return;
     }
     Navigator.push(
@@ -1769,6 +1785,7 @@ class _CommentCardState extends State<_CommentCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ----------- HEADER (Avatar, name, time) ----------
             Row(
               children: [
                 GestureDetector(
@@ -1836,6 +1853,7 @@ class _CommentCardState extends State<_CommentCard> {
               ],
             ),
 
+            // ----------- BODY (Text + Image) ----------
             Padding(
               padding: const EdgeInsets.only(left: 42.0, top: 8, bottom: 4),
               child: Column(
@@ -1875,61 +1893,49 @@ class _CommentCardState extends State<_CommentCard> {
                       ),
                     ),
 
+                  // ----------- IMAGE FIXED SIZE (UPDATED) ----------
                   if (widget.comment.imageUrl != null &&
                       widget.comment.imageUrl!.isNotEmpty)
                     Padding(
                       padding: const EdgeInsets.only(top: 8.0),
                       child: GestureDetector(
-                    onTap: () {
-                      final resolved =
-                          _resolveThreadImageUrl(widget.comment.imageUrl);
-                      if (resolved.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Image unavailable')),
-                        );
-                        return;
-                      }
-                      _showImageFullScreen(context, resolved);
-                    },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Stack(
-                            children: [
-                              CachedNetworkImage(
-                                imageUrl:
-                                    _resolveThreadImageUrl(widget.comment.imageUrl),
-                                width: double.infinity,
-                                fit: BoxFit.cover,
-                                placeholder: (context, url) => Container(
-                                  height: 200,
-                                  color: Colors.grey[200],
-                                  child: const Center(
-                                    child: CircularProgressIndicator(),
-                                  ),
-                                ),
-                                errorWidget: (context, url, error) => Container(
-                                  height: 200,
-                                  color: Colors.grey[200],
-                                  child: const Icon(Icons.error_outline),
-                                ),
+                        onTap: () {
+                          final resolved = _resolveThreadImageUrl(
+                            widget.comment.imageUrl,
+                          );
+                          if (resolved.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Image unavailable'),
                               ),
-                              Positioned(
-                                top: 8,
-                                right: 8,
-                                child: Container(
-                                  padding: const EdgeInsets.all(6),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.5),
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: const Icon(
-                                    Icons.zoom_in,
-                                    color: Colors.white,
-                                    size: 18,
+                            );
+                            return;
+                          }
+                          _showImageFullScreen(context, resolved);
+                        },
+                        child: SizedBox(
+                          width: 250,
+                          height: 250,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: CachedNetworkImage(
+                              imageUrl: _resolveThreadImageUrl(
+                                widget.comment.imageUrl,
+                              ),
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Container(
+                                color: Colors.grey[200],
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
                                 ),
                               ),
-                            ],
+                              errorWidget: (context, url, error) => Container(
+                                color: Colors.grey[200],
+                                child: const Icon(Icons.error),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -1938,6 +1944,7 @@ class _CommentCardState extends State<_CommentCard> {
               ),
             ),
 
+            // ----------- REPLY BUTTON ----------
             Padding(
               padding: const EdgeInsets.only(left: 30.0),
               child: Semantics(
@@ -1960,6 +1967,7 @@ class _CommentCardState extends State<_CommentCard> {
               ),
             ),
 
+            // ----------- EXPAND / COLLAPSE REPLIES ----------
             if (widget.comment.replies.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(left: 30.0, top: 4.0),
@@ -1976,8 +1984,7 @@ class _CommentCardState extends State<_CommentCard> {
                   label: Text(
                     _isExpanded
                         ? 'Hide replies'
-                        : 'View ${widget.comment.replies.length} '
-                              '${widget.comment.replies.length > 1 ? 'replies' : 'reply'}',
+                        : 'View ${widget.comment.replies.length} ${widget.comment.replies.length > 1 ? 'replies' : 'reply'}',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       color: Color(0xFF4A90E2),
@@ -1987,6 +1994,7 @@ class _CommentCardState extends State<_CommentCard> {
                 ),
               ),
 
+            // ----------- REPLIES LIST ----------
             if (widget.comment.replies.isNotEmpty && _isExpanded)
               Padding(
                 padding: const EdgeInsets.only(left: 12.0, top: 8.0),
@@ -2010,6 +2018,7 @@ class _CommentCardState extends State<_CommentCard> {
                 ),
               ),
 
+           
             if (widget.comment.isFromCache)
               const Padding(
                 padding: EdgeInsets.only(left: 42.0, top: 4),
@@ -2018,7 +2027,7 @@ class _CommentCardState extends State<_CommentCard> {
                   style: TextStyle(fontSize: 10, color: Colors.grey),
                 ),
               ),
-          ], 
+          ],
         ),
       ),
     );

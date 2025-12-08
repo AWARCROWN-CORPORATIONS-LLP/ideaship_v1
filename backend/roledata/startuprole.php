@@ -36,6 +36,7 @@ try {
         'startup_name' => trim($_POST['startup_name'] ?? ''),
         'phone' => trim($_POST['phone'] ?? ''),
         'address' => trim($_POST['address'] ?? ''),
+        'description'=>trim($POST['description']?? ''),
         'industry' => trim($_POST['industry'] ?? ''),
         'linkedin' => trim($_POST['linkedin'] ?? ''),
         'instagram' => trim($_POST['instagram'] ?? ''),
@@ -163,7 +164,7 @@ try {
             throw new Exception('Profile picture size exceeds 5MB');
         }
 
-        $uploadDir = '../feed/uploads/';
+        $uploadDir = '../accessprofile/uploads/';
         if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
         $fileName = $userId . '_' . time() . '_' . basename($_FILES['logo']['name']);
@@ -172,19 +173,19 @@ try {
 
         // Update user profile picture
         $updateStmt = $pdo->prepare("UPDATE users SET profile_picture = :pic WHERE id = :uid");
-        $updateStmt->execute(['pic' => '../feed/uploads/' . $fileName, 'uid' => $userId]);
+        $updateStmt->execute(['pic' => '../accessprofile/uploads/' . $fileName, 'uid' => $userId]);
     }
 
     // ✅ Insert into startup_profiles
     $stmt = $pdo->prepare("
         INSERT INTO startup_profiles (
-            user_id, username, email, founders_names, startup_name, phone, address, industry,
+            user_id, username, email, founders_names, startup_name, phone, address,description, industry,
             linkedin, instagram, facebook, founding_date, stage, team_size, highlights,
             additional_docs, funding_goals, mentorship_needs, business_vision, business_reg_type,
             business_registration, founder_id, gov_id_type, reference, supporting_docs,
             email_verification, role_type
         ) VALUES (
-            :user_id, :username, :email, :founders_names, :startup_name, :phone, :address, :industry,
+            :user_id, :username, :email, :founders_names, :startup_name, :phone, :address, :description, :industry,
             :linkedin, :instagram, :facebook, :founding_date, :stage, :team_size, :highlights,
             :additional_docs, :funding_goals, :mentorship_needs, :business_vision, :business_reg_type,
             :business_registration, :founder_id, :gov_id_type, :reference, :supporting_docs,

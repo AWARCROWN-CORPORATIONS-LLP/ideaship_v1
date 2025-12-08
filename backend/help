@@ -1,0 +1,157 @@
+<?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+session_start();
+
+// Database configuration
+$db_server = "localhost";
+$db_user = "awarcrownadmins";
+$db_pass = "Awarcrown@0523";
+$db_name = "awarcrown";
+
+// Create connection
+$conn = new mysqli($db_server, $db_user, $db_pass, $db_name);
+
+// Check connection
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+
+// Sanitize input
+$name = isset($_POST['name']) ? htmlspecialchars(trim($_POST['name'])) : null;
+$email = isset($_POST['email']) ? htmlspecialchars(trim($_POST['email'])) : null;
+$feedbackType = isset($_POST['feedbackType']) ? htmlspecialchars(trim($_POST['feedbackType'])) : null;
+$message = isset($_POST['message']) ? htmlspecialchars(trim($_POST['message'])) : null;
+
+if ($name && $email && $feedbackType && $message) {
+    $ticketID = strtoupper(uniqid('AWC-'));
+
+    $stmt = $conn->prepare("INSERT INTO feedback (name, email, feedback_type, message, ticket_id) VALUES (?, ?, ?, ?, ?)");
+    $stmt->bind_param("sssss", $name, $email, $feedbackType, $message, $ticketID);
+
+    if ($stmt->execute()) {
+        // Email setup
+        $to = $email;
+        $subject = "Awarcrown Feedback Received - Ticket #$ticketID";
+        $headers = "From: support@awarcrown.com\r\n";
+        $headers .= "Reply-To: support@awarcrown.com\r\n";
+        $headers .= "Bcc: naveenjupalli1019@gmail.com, alapatijanardhan19254@gmail.com, adityach0523@gmail.com\r\n";
+        $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
+
+        $logoUrl = "https://www.awarcrown.com/images/black_logo.png";
+        $linkedinUrl = "https://www.linkedin.com/company/cybertron7";
+
+        $emailMessage = "
+            <html>
+            <body>
+                <h2>Thank you for your feedback, $name!</h2>
+                <p>We have received your feedback/bug report. Your ticket ID is <strong>$ticketID</strong>.</p>
+                <p><strong>Details:</strong></p>
+                <ul>
+                    <li><strong>Name:</strong> $name</li>
+                    <li><strong>Email:</strong> $email</li>
+                    <li><strong>Feedback Type:</strong> $feedbackType</li>
+                    <li><strong>Message:</strong> $message</li>
+                </ul>
+                <p>We will get back to you shortly. Meanwhile, feel free to connect with us on <a href='$linkedinUrl'>LinkedIn</a>.</p>
+                <p>Thank you,<br>The Awarcrown Team</p>
+                <img src='$logoUrl' alt='Awarcrown Logo' style='width:200px; margin-top:20px;'>
+            </body>
+            </html>
+        ";
+
+        if (mail($to, $subject, $emailMessage, $headers)) {
+            $status = "success";
+            $messageBox = "
+                <div class='box success'>
+                    <img src='$logoUrl' class='logo' alt='Logo'>
+                    <h2>✅ Feedback Submitted Successfully!</h2>
+                    <p>Your Ticket ID: <strong>$ticketID</strong></p>
+                    <p>A confirmation email has been sent to <strong>$email</strong>.</p>
+                    <p>Redirecting to homepage in <span id='countdown'>5</span> seconds...</p>
+                </div>
+            ";
+        } else {
+            $status = "error";
+            $messageBox = "
+                <div class='box error'>
+                    <img src='$logoUrl' class='logo' alt='Logo'>
+                    <h2>⚠️ Feedback Saved, Email Failed!</h2>
+                    <p>Your Ticket ID: <strong>$ticketID</strong></p>
+                    <p>We couldn't send the confirmation email. Please check later.</p>
+                </div>
+            ";
+        }
+
+        echo "
+            <html>
+            <head>
+                <style>
+                    body {
+                        font-family: 'Segoe UI', Arial, sans-serif;
+                        background: linear-gradient(135deg, #f9f9f9, #eef1f5);
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        height: 100vh;
+                        margin: 0;
+                    }
+                    .box {
+                        background: #fff;
+                        border-radius: 16px;
+                        padding: 30px;
+                        width: 450px;
+                        text-align: center;
+                        box-shadow: 0px 8px 20px rgba(0,0,0,0.1);
+                        animation: fadeIn 0.6s ease;
+                    }
+                    .box h2 {
+                        margin-top: 10px;
+                    }
+                    .box p {
+                        color: #555;
+                        font-size: 15px;
+                        line-height: 1.6;
+                    }
+                    .box.success { border-top: 6px solid #28a745; }
+                    .box.error { border-top: 6px solid #dc3545; }
+                    .logo {
+                        width: 100px;
+                        margin-bottom: 15px;
+                    }
+                    @keyframes fadeIn {
+                        from { opacity: 0; transform: translateY(-20px); }
+                        to { opacity: 1; transform: translateY(0); }
+                    }
+                </style>
+            </head>
+            <body>
+                $messageBox
+
+                <script>
+                    setTimeout(function() {
+                        window.location.href = 'https://www.awarcrown.com';
+                    }, 5000);
+
+                    let count = 5;
+                    setInterval(function() {
+                        count--;
+                        if (count >= 0) {
+                            document.getElementById('countdown').textContent = count;
+                        }
+                    }, 1000);
+                </script>
+            </body>
+            </html>
+        ";
+    } else {
+        echo "<p style='color: red; font-family: Arial;'>Error: " . $stmt->error . "</p>";
+    }
+    $stmt->close();
+} else {
+    echo "<p style='color: red; font-family: Arial;'>Please fill out all required fields.</p>";
+}
+
+$conn->close();
+?>

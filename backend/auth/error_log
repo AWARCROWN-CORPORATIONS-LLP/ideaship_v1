@@ -8,3 +8,18 @@ Stack trace:
 [06-Dec-2025 19:26:08 UTC] PHP Fatal error:  Cannot redeclare function outputSuccessModal() (previously declared in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php:85) in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php on line 127
 [06-Dec-2025 19:26:46 UTC] PHP Fatal error:  Cannot redeclare function outputSuccessModal() (previously declared in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php:85) in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php on line 127
 [06-Dec-2025 19:26:54 UTC] PHP Fatal error:  Cannot redeclare function outputSuccessModal() (previously declared in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php:85) in /home/v6gkv3hx0rj5/public_html/vanguard.awarcrown.com/auth/api.php on line 127
+[08-Dec-2025 10:03:32 UTC] PHP Warning:  Undefined variable $email in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 692
+[08-Dec-2025 10:03:32 UTC] PHP Warning:  Trying to access array offset on null in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 692
+[08-Dec-2025 19:41:29 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:48 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:48 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:48 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:48 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:49 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:49 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:49 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:49 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:50 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:50 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:50 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029
+[08-Dec-2025 19:42:51 UTC] PHP Parse error:  Unclosed '{' on line 782 in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/auth/api.php on line 1029

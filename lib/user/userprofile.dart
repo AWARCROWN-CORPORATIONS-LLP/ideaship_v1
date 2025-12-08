@@ -336,57 +336,81 @@ Future<void> _fetchMyPosts({int? cursorId}) async {
       await _fetchSavedPosts(cursorId: _savedNextCursorId);
     }
   }
+void _initializeControllers() {
+  _controllers.clear();
+  String getVal(String key) => _profileData?[key]?.toString() ?? '';
 
-  void _initializeControllers() {
-    _controllers.clear();
-    String getVal(String key) => _profileData?[key]?.toString() ?? '';
+  // Common fields
+  _controllers['role'] = TextEditingController(text: _role ?? '');
+ 
+_controllers['full_name'] = TextEditingController(
+  text: _role == "startup"
+      ? getVal('founders_names')                
+      : getVal('full_name'),                     
+);
 
-    _controllers['role'] = TextEditingController(text: _role ?? '');
-    _controllers['full_name'] = TextEditingController(text: getVal('full_name'));
-    _controllers['email'] = TextEditingController(text: getVal('email'));
-    _controllers['phone'] = TextEditingController(text: getVal('phone'));
-    _controllers['dob'] = TextEditingController(text: getVal('dob'));
-    _controllers['address'] = TextEditingController(text: getVal('address'));
-    _controllers['nationality'] = TextEditingController(text: getVal('nationality'));
-    _controllers['bio'] = TextEditingController(text: getVal('bio'));
-    _controllers['website'] = TextEditingController(text: getVal('website'));
+  _controllers['email'] = TextEditingController(text: getVal('email'));
+  _controllers['phone'] = TextEditingController(text: getVal('phone'));
+  _controllers['address'] = TextEditingController(text: getVal('address'));
+  _controllers['bio'] = TextEditingController(text: getVal('description'));
+  _controllers['website'] = TextEditingController(text: getVal('website'));
 
-    if (_role == 'student') {
-      _controllers['student_id'] = TextEditingController(text: getVal('student_id'));
-      _controllers['institution'] = TextEditingController(text: getVal('institution'));
-      _controllers['linkedin'] = TextEditingController(text: getVal('linkedin'));
-      _controllers['academic_level'] = TextEditingController(text: getVal('academic_level'));
-      _controllers['major'] = TextEditingController(text: getVal('major'));
-      _controllers['portfolio'] = TextEditingController(text: getVal('portfolio'));
-      _controllers['skills_dev'] = TextEditingController(text: getVal('skills_dev'));
-      _controllers['interests'] = TextEditingController(text: getVal('interests'));
-      _controllers['expected_passout_year'] = TextEditingController(text: getVal('expected_passout_year'));
-    } else if (_role == 'Company/HR') {
-      _controllers['company_name'] = TextEditingController(text: getVal('company_name'));
-      _controllers['contact_person_name'] = TextEditingController(text: getVal('contact_person_name'));
-      _controllers['contact_designation'] = TextEditingController(text: getVal('contact_designation'));
-      _controllers['contact_email'] = TextEditingController(text: getVal('contact_email'));
-      _controllers['contact_phone'] = TextEditingController(text: getVal('contact_phone'));
-      _controllers['company_address'] = TextEditingController(text: getVal('company_address'));
-      _controllers['industry'] = TextEditingController(text: getVal('industry'));
-      _controllers['company_size'] = TextEditingController(text: getVal('company_size'));
-      _controllers['website'] = TextEditingController(text: getVal('website'));
-      _controllers['linkedin_profile'] = TextEditingController(text: getVal('linkedin_profile'));
-      _controllers['budget'] = TextEditingController(text: getVal('budget'));
-      _controllers['company_culture'] = TextEditingController(text: getVal('company_culture'));
-      _controllers['preferred_talent_sources'] = TextEditingController(text: getVal('preferred_talent_sources'));
-      _controllers['training_programs'] = TextEditingController(text: getVal('training_programs'));
-      _controllers['candidate_preferences'] = TextEditingController(text: getVal('candidate_preferences'));
-      _controllers['diversity_goals'] = TextEditingController(text: getVal('diversity_goals'));
-      _controllers['location_preferences'] = TextEditingController(text: getVal('location_preferences'));
-      _controllers['business_registration'] = TextEditingController(text: getVal('business_registration'));
-      _controllers['authorized_signatory'] = TextEditingController(text: getVal('authorized_signatory'));
-      _controllers['ein'] = TextEditingController(text: getVal('ein'));
-      _controllers['reference_contact'] = TextEditingController(text: getVal('reference_contact'));
-      _controllers['website_domain_verification'] = TextEditingController(text: getVal('website_domain_verification'));
-      _controllers['email_verification'] = TextEditingController(text: getVal('email_verification'));
-    }
+  // STUDENT ROLE
+  if (_role == "student") {
+    _controllers['student_id'] = TextEditingController(text: getVal('student_id'));
+    _controllers['institution'] = TextEditingController(text: getVal('institution'));
+    _controllers['academic_level'] = TextEditingController(text: getVal('academic_level'));
+    _controllers['major'] = TextEditingController(text: getVal('major'));
+    _controllers['expected_passout_year'] = TextEditingController(text: getVal('expected_passout_year'));
+    _controllers['linkedin'] = TextEditingController(text: getVal('linkedin'));
+    _controllers['portfolio'] = TextEditingController(text: getVal('portfolio'));
+    _controllers['skills_dev'] = TextEditingController(text: getVal('skills_dev'));
+    _controllers['interests'] = TextEditingController(text: getVal('interests'));
   }
+
+  // STARTUP ROLE
+  else if (_role == "startup") {
+    _controllers['founders_names'] = TextEditingController(text: getVal('founders_names'));
+    _controllers['startup_name'] = TextEditingController(text: getVal('startup_name'));
+    _controllers['industry'] = TextEditingController(text: getVal('industry'));
+    _controllers['team_size'] = TextEditingController(text: getVal('team_size'));
+
+    // Social links
+    _controllers['linkedin'] = TextEditingController(text: getVal('linkedin'));
+    _controllers['instagram'] = TextEditingController(text: getVal('instagram'));
+    _controllers['facebook'] = TextEditingController(text: getVal('facebook'));
+
+    // Business fields
+    _controllers['founding_date'] = TextEditingController(text: getVal('founding_date'));
+    _controllers['stage'] = TextEditingController(text: getVal('stage'));
+    _controllers['business_reg_type'] = TextEditingController(text: getVal('business_reg_type'));
+    _controllers['business_registration'] = TextEditingController(text: getVal('business_registration'));
+
+    // Government info
+    _controllers['founder_id'] = TextEditingController(text: getVal('founder_id'));
+    _controllers['gov_id_type'] = TextEditingController(text: getVal('gov_id_type'));
+
+    // Additional info
+    _controllers['highlights'] = TextEditingController(text: getVal('highlights'));
+    _controllers['funding_goals'] = TextEditingController(text: getVal('funding_goals'));
+    _controllers['mentorship_needs'] = TextEditingController(text: getVal('mentorship_needs'));
+    _controllers['business_vision'] = TextEditingController(text: getVal('business_vision'));
+
+    // Contact Email
+    _controllers['reference'] = TextEditingController(text: getVal('reference'));
+
+    // Docs
+    _controllers['additional_docs'] = TextEditingController(text: getVal('additional_docs'));
+    _controllers['supporting_docs'] = TextEditingController(text: getVal('supporting_docs'));
+
+    // Verification
+    _controllers['email_verification'] = TextEditingController(text: getVal('email_verification'));
+  }
+}
+
+
+
+  
 
   Future<void> _updateProfile() async {
     if (!_formKey.currentState!.validate()) {
@@ -880,95 +904,172 @@ Future<void> _fetchMyPosts({int? cursorId}) async {
     }
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildInfoSection(
-              'Basic Information',
-              Icons.info_outline,
-              [
-                _buildInfoField('Full Name', 'full_name', isRequired: true),
-                if (_role == 'student')
-                  _buildInfoField('Student ID', 'student_id', isRequired: true),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _buildInfoSection(
-              'Personal Information',
-              Icons.person_outline,
-              [
-                _buildInfoField('Email', 'email', alwaysReadOnly: true),
-                _buildInfoField('Phone', 'phone'),
-                _buildInfoField('Date of Birth', 'dob'),
-                _buildInfoField('Address', 'address', isMultiline: true),
-                _buildInfoField('Nationality', 'nationality'),
-                _buildInfoField('Bio', 'bio', isMultiline: true),
-                _buildInfoField('Website', 'website'),
-              ],
-            ),
-            if (_role == 'student') ...[
-              const SizedBox(height: 16),
-              _buildInfoSection(
-                'Education',
-                Icons.school_outlined,
-                [
-                  _buildInfoField('Institution', 'institution', alwaysReadOnly: true),
-                  _buildInfoField('Academic Level', 'academic_level', alwaysReadOnly: true),
-                  _buildInfoField('Major', 'major', alwaysReadOnly: true),
-                  _buildInfoField('Expected Passout Year', 'expected_passout_year', isNumeric: true, alwaysReadOnly: true),
-                  _buildInfoField('LinkedIn', 'linkedin'),
-                  _buildInfoField('Portfolio', 'portfolio'),
-                ],
+  padding: const EdgeInsets.all(20),
+  child: Form(
+    key: _formKey,
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // BASIC INFORMATION SECTION
+_buildInfoSection(
+  'Basic Information',
+  Icons.info_outline,
+  [
+    if (_role == 'student')
+      _buildInfoField('Full Name', 'full_name', isRequired: true)
+    else if (_role == 'startup')
+      _buildInfoField('Founder Name', 'founders_names', isRequired: true),
+
+    if (_role == 'student')
+      _buildInfoField('Student ID', 'student_id', isRequired: true),
+
+    if (_role == 'startup')
+      _buildInfoField('Startup Name', 'startup_name', isRequired: true),
+  ],
+),
+
+
+        const SizedBox(height: 16),
+
+        _buildInfoSection(
+          'Personal Information',
+          Icons.person_outline,
+          [
+            _buildInfoField('Email', 'email', alwaysReadOnly: true),
+            _buildInfoField('Phone', 'phone'),
+            _buildInfoField('Address', 'address', isMultiline: true),
+            _buildInfoField('Bio', 'bio', isMultiline: true),
+            _buildInfoField('Website', 'website'),
+          ],
+        ),
+
+        // Student-specific fields
+        if (_role == 'student') ...[
+          const SizedBox(height: 16),
+          _buildInfoSection(
+            'Education',
+            Icons.school_outlined,
+            [
+              _buildInfoField('Institution', 'institution', alwaysReadOnly: true),
+              _buildInfoField('Academic Level', 'academic_level', alwaysReadOnly: true),
+              _buildInfoField('Major', 'major', alwaysReadOnly: true),
+              _buildInfoField('Expected Passout Year', 'expected_passout_year',
+                  isNumeric: true, alwaysReadOnly: true),
+              _buildInfoField('LinkedIn', 'linkedin'),
+              _buildInfoField('Portfolio', 'portfolio'),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildInfoSection(
+            'Preferences',
+            Icons.favorite_outline,
+            [
+              _buildInfoField('Skills Development', 'skills_dev', isMultiline: true),
+              _buildInfoField('Interests', 'interests', isMultiline: true),
+            ],
+          ),
+        ]
+
+        // STARTUP SECTION
+        else if (_role == 'startup') ...[
+          const SizedBox(height: 16),
+
+          _buildInfoSection(
+            'Startup Information',
+            Icons.business_outlined,
+            [
+              _buildInfoField('Founders Name', 'founders_names',alwaysReadOnly: true),
+              _buildInfoField('Startup Name', 'startup_name',alwaysReadOnly: true),
+              _buildInfoField('Phone', 'phone',alwaysReadOnly: true),
+              _buildInfoField('Contact Email', 'reference', alwaysReadOnly: true),
+              _buildInfoField('Company Address', 'address', isMultiline: true),
+              _buildInfoField('Industry', 'industry'),
+              _buildInfoField('Team Size', 'team_size', isNumeric: true),
+              _buildInfoField('Founding Date', 'founding_date', alwaysReadOnly: true),
+              _buildInfoField('Stage', 'stage'),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          _buildInfoSection(
+            'Social Profiles',
+            Icons.link,
+            [
+              _buildInfoField('LinkedIn', 'linkedin'),
+              _buildInfoField('Instagram', 'instagram'),
+              _buildInfoField('Facebook', 'facebook'),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          _buildInfoSection(
+            'Business Details',
+            Icons.domain,
+            [
+              _buildInfoField('Business Registration Type', 'business_reg_type'),
+              _buildInfoField('Registration Number', 'business_registration',alwaysReadOnly: true),
+              _buildInfoField('Government ID Type', 'gov_id_type',alwaysReadOnly: true),
+              _buildInfoField('Founder Govt ID Number', 'founder_id',alwaysReadOnly: true),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          _buildInfoSection(
+            'Vision & Goals',
+            Icons.flag_outlined,
+            [
+              _buildInfoField('Highlights / Achievements', 'highlights', isMultiline: true),
+              _buildInfoField('Funding Goals', 'funding_goals', isMultiline: true),
+              _buildInfoField('Mentorship Needs', 'mentorship_needs', isMultiline: true),
+              _buildInfoField('Business Vision', 'business_vision', isMultiline: true),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          _buildInfoSection(
+            'Documents & Verification',
+            Icons.verified_outlined,
+            [
+              _buildInfoField('Email Verification Status', 'email_verification',
+                  alwaysReadOnly: true),
+              _buildInfoField('Supporting Docs', 'supporting_docs', isMultiline: true),
+              _buildInfoField('Additional Docs', 'additional_docs', isMultiline: true),
+            ],
+          ),
+        ],
+
+        if (_isEditing) ...[
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _updateProfile,
+                  child: const Text('Save Changes'),
+                ),
               ),
-              const SizedBox(height: 16),
-              _buildInfoSection(
-                'Preferences',
-                Icons.favorite_outline,
-                [
-                  _buildInfoField('Skills Development', 'skills_dev', isMultiline: true),
-                  _buildInfoField('Interests', 'interests', isMultiline: true),
-                ],
-              ),
-            ] else if (_role == 'Company/HR') ...[
-              const SizedBox(height: 16),
-              _buildInfoSection(
-                'Company Details',
-                Icons.business_outlined,
-                [
-                  _buildInfoField('Company Name', 'company_name', isRequired: true),
-                  _buildInfoField('Contact Person Name', 'contact_person_name'),
-                  _buildInfoField('Contact Designation', 'contact_designation'),
-                  _buildInfoField('Contact Email', 'contact_email', alwaysReadOnly: true),
-                  _buildInfoField('Contact Phone', 'contact_phone', alwaysReadOnly: true),
-                  _buildInfoField('Company Address', 'company_address', isMultiline: true),
-                  _buildInfoField('Industry', 'industry'),
-                  _buildInfoField('Company Size', 'company_size', isNumeric: true),
-                  _buildInfoField('Website', 'website'),
-                  _buildInfoField('LinkedIn Profile', 'linkedin_profile'),
-                  _buildInfoField('Budget', 'budget', isNumeric: true),
-                  _buildInfoField('Company Culture', 'company_culture', isMultiline: true),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _buildInfoSection(
-                'Preferences & Compliance',
-                Icons.verified_user_outlined,
-                [
-                  _buildInfoField('Preferred Talent Sources', 'preferred_talent_sources', isMultiline: true),
-                  _buildInfoField('Training Programs', 'training_programs', isMultiline: true),
-                  _buildInfoField('Candidate Preferences', 'candidate_preferences', isMultiline: true),
-                  _buildInfoField('Diversity Goals', 'diversity_goals', isMultiline: true),
-                  _buildInfoField('Location Preferences', 'location_preferences'),
-                  _buildInfoField('Business Registration', 'business_registration'),
-                  _buildInfoField('Authorized Signatory', 'authorized_signatory'),
-                  _buildInfoField('EIN', 'ein'),
-                  _buildInfoField('Reference Contact', 'reference_contact'),
-                ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () {
+                    setState(() {
+                      _isEditing = false;
+                      _selectedImage = null;
+                    });
+                    _initializeControllers();
+                  },
+                  child: const Text('Cancel'),
+                ),
               ),
             ],
+          ),
+        ],/*
+       const SizedBox(height: 32),
+      
             if (_isEditing) ...[
               const SizedBox(height: 24),
               Row(
@@ -1002,7 +1103,7 @@ Future<void> _fetchMyPosts({int? cursorId}) async {
                   ),
                 ],
               ),
-            ],
+            ],*/
             const SizedBox(height: 32),
           ],
         ),

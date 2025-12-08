@@ -8,6 +8,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'encrypt.dart';
+
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -22,6 +24,8 @@ class _SettingsPageState extends State<SettingsPage> {
   String _appVersion = '';
   bool _notificationsEnabled = true;
   String _selectedLanguage = 'English';
+  late String encryptedName;
+  late String encryptedEmail;
 
   @override
   void initState() {
@@ -61,6 +65,7 @@ class _SettingsPageState extends State<SettingsPage> {
       _email = prefs.getString('email') ?? '';
       _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
       _selectedLanguage = prefs.getString('selected_language') ?? 'English';
+     
     });
   }
 
@@ -645,7 +650,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 iconColor: const Color(0xFF007AFF),
                 title: 'Contact Us',
                 subtitle: 'Feedback or support',
-                onTap: () => _openLink('https://server.awarcrown.com/feedback/'),
+                onTap: () {
+      final n = Uri.encodeComponent(CryptoHelper.encryptText(_username));
+      final e = Uri.encodeComponent(CryptoHelper.encryptText(_email));
+
+      _openLink("https://server.awarcrown.com/support/?n=$n&e=$e");
+    },
               ),
               _buildDivider(),
               _buildSettingTile(

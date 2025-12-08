@@ -16,3 +16,6 @@
 [2025-11-04 19:58:17] Profile picture updated successfully | Context: {"user_id":17,"file":"profile_17_1762286297.png"}
 [2025-11-19 09:10:34] Profile picture updated successfully | Context: {"user_id":16,"file":"profile_16_1763543434.jpg"}
 [2025-11-27 16:55:38] Profile picture updated successfully | Context: {"user_id":19,"file":"profile_19_1764262538.jpg"}
+[2025-12-08 11:14:38] Profile picture updated successfully | Context: {"user_id":16,"file":"profile_16_1765192478.jpg"}
+[2025-12-08 14:01:09] Profile picture updated successfully | Context: {"user_id":22,"file":"profile_22_1765202469.jpg"}
+[2025-12-08 19:28:07] Profile picture updated successfully | Context: {"user_id":23,"file":"profile_23_1765222087.jpg"}

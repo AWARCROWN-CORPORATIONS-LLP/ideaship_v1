@@ -45,14 +45,14 @@ if ($stmt->fetch()) {
     $stmt->execute([$post_id, $user_id]);
     $existing = $stmt->fetch(PDO::FETCH_ASSOC);
     if ($existing) {
-        $share_url = 'https://share.awarcrown.com/post_feature/' . $existing['token'];
+        $share_url = 'https://share.awarcrown.com/post_feature/idshare?token=' . $existing['token'];
         echo json_encode(['status' => 'success', 'message' => 'Post already shared', 'share_url' => $share_url]);
         exit;
     }
 }
 
-// Generate unique token (encrypted-like, using random bytes)
-$token = bin2hex(random_bytes(16)); // 32 char hex token
+
+$token = bin2hex(random_bytes(16));
 
 // Insert share
 try {

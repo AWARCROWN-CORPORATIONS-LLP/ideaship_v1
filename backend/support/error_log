@@ -1,0 +1,7 @@
+[08-Dec-2025 16:07:16 UTC] PHP Warning:  Undefined variable $GET in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/support/index.php on line 2
+[08-Dec-2025 16:07:16 UTC] PHP Warning:  Trying to access array offset on null in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/support/index.php on line 2
+[08-Dec-2025 17:03:15 UTC] PHP Warning:  require(phpmailer/PHPMailer.php): Failed to open stream: No such file or directory in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/support/feedbacksave.php on line 134
+[08-Dec-2025 17:03:15 UTC] PHP Fatal error:  Uncaught Error: Failed opening required 'phpmailer/PHPMailer.php' (include_path='.:/opt/alt/php84/usr/share/pear:/opt/alt/php84/usr/share/php:/usr/share/pear:/usr/share/php') in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/support/feedbacksave.php:134
+Stack trace:
+#0 {main}
+  thrown in /home/v6gkv3hx0rj5/public_html/server.awarcrown.com/support/feedbacksave.php on line 134

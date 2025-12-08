@@ -39,6 +39,7 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
   final _startupNameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _industryController = TextEditingController();
   final _linkedinController = TextEditingController();
   final _instagramController = TextEditingController();
@@ -55,6 +56,7 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
   final _founderIdController = TextEditingController();
   final _referenceController = TextEditingController();
   final _supportingDocsController = TextEditingController();
+
   final List<Map<String, dynamic>> _teamMembers = [];
   String? _logoPath;
   String? _govIdType;
@@ -164,6 +166,7 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
         _startupNameController.text = prefs.getString('startupName') ?? '';
         _phoneController.text = prefs.getString('phone') ?? '';
         _addressController.text = prefs.getString('address') ?? '';
+        _descriptionController.text = prefs.getString('description') ?? '';
         _industryController.text = prefs.getString('industry') ?? '';
         _linkedinController.text = prefs.getString('linkedin') ?? '';
         _instagramController.text = prefs.getString('instagram') ?? '';
@@ -204,6 +207,7 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
       await prefs.setString('startupName', _startupNameController.text);
       await prefs.setString('phone', _phoneController.text);
       await prefs.setString('address', _addressController.text);
+      await prefs.setString('description', _descriptionController.text);
       await prefs.setString('industry', _industryController.text);
       await prefs.setString('linkedin', _linkedinController.text);
       await prefs.setString('instagram', _instagramController.text);
@@ -247,6 +251,7 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
       await prefs.remove('startupName');
       await prefs.remove('phone');
       await prefs.remove('address');
+      await prefs.remove('description');
       await prefs.remove('industry');
       await prefs.remove('linkedin');
       await prefs.remove('instagram');
@@ -299,6 +304,7 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
     _startupNameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
+    _descriptionController.dispose();
     _industryController.dispose();
     _linkedinController.dispose();
     _instagramController.dispose();
@@ -542,6 +548,7 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
     request.fields['startup_name'] = _startupNameController.text;
     request.fields['phone'] = _phoneController.text;
     request.fields['address'] = _addressController.text;
+    request.fields['description'] = _descriptionController.text;
     request.fields['industry'] = _industryController.text;
     request.fields['linkedin'] = _linkedinController.text;
     request.fields['instagram'] = _instagramController.text;
@@ -828,6 +835,22 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
                         return null;
                       },
                       maxLines: 2,
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _descriptionController,
+                      decoration: InputDecoration(
+                        labelText: 'Description',
+                        hintText: 'Briefly describe your startup',
+                        prefixIcon: const Icon(Icons.description, color: Color(0xFF27AE60)),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) return 'Required';
+                        if (value.length < 20) return 'Description too short';
+                        return null;
+                      },
+                      maxLines: 3,
                     ),
                     const SizedBox(height: 16),
                     Autocomplete<String>(

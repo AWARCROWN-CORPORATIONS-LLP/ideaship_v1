@@ -1,52 +1,91 @@
 <?php
 /**
  * Secure Image Serving Script for Comment Images
- * 
- * This script serves comment images securely, preventing direct access
- * and ensuring proper file validation.
+ * ------------------------------------------------
+ * - Prevents directory traversal
+ * - Validates MIME types
+ * - Logs errors
+ * - Sends safe, professional responses
  */
 
 require_once 'config.php';
 
-// Get image filename from query parameter
+// ---------------------------------------
+// 🔐 Error Logging Setup
+// ---------------------------------------
+ini_set('log_errors', 1);
+ini_set('error_log', __DIR__ . '/error_log.txt');
+error_reporting(E_ALL & ~E_DEPRECATED);
+
+/**
+ * Safe JSON error output + log
+ */
+function send_error($message, $status = 400) {
+    http_response_code($status);
+    error_log("[IMAGE_SERVE_ERROR] {$message}");
+    echo json_encode(['error' => $message]);
+    exit;
+}
+
+// ---------------------------------------
+// 🔍 Validate & sanitize input
+// ---------------------------------------
 $filename = $_GET['file'] ?? '';
 
-if (empty($filename)) {
-    http_response_code(400);
-    die('Invalid request');
+if (!$filename) {
+    send_error("Missing 'file' parameter", 400);
 }
 
-// Sanitize filename to prevent directory traversal
+// Prevent directory traversal like ../../etc/passwd
 $filename = basename($filename);
-$filepath = __DIR__ . '/uploads/comments/' . $filename;
 
-// Validate file exists
-if (!file_exists($filepath)) {
-    http_response_code(404);
-    die('Image not found');
+// Must only allow safe characters (extra security)
+if (!preg_match('/^[A-Za-z0-9._-]+$/', $filename)) {
+    send_error("Invalid filename format", 400);
 }
 
-// Validate file is actually an image
+$filepath = __DIR__ . "/uploads/comments/" . $filename;
+
+// ---------------------------------------
+// 📁 Validate file existence
+// ---------------------------------------
+if (!file_exists($filepath)) {
+    send_error("Requested image not found: $filename", 404);
+}
+
+// ---------------------------------------
+// 🛡 Validate MIME type
+// ---------------------------------------
 $finfo = finfo_open(FILEINFO_MIME_TYPE);
 $mimeType = finfo_file($finfo, $filepath);
 finfo_close($finfo);
 
-$allowedMimes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+$allowedMimes = [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp'
+];
+
 if (!in_array($mimeType, $allowedMimes)) {
-    http_response_code(403);
-    die('Invalid file type');
+    send_error("Blocked attempt to access non-image file ($mimeType)", 403);
 }
 
-// Get file size
+// ---------------------------------------
+// 📦 Send headers
+// ---------------------------------------
 $filesize = filesize($filepath);
 
-// Set appropriate headers
-header('Content-Type: ' . $mimeType);
-header('Content-Length: ' . $filesize);
-header('Cache-Control: public, max-age=31536000'); // Cache for 1 year
-header('Expires: ' . gmdate('D, d M Y H:i:s', time() + 31536000) . ' GMT');
+header("Content-Type: {$mimeType}");
+header("Content-Length: {$filesize}");
+header("Cache-Control: public, max-age=31536000");
+header("Expires: " . gmdate("D, d M Y H:i:s", time() + 31536000) . " GMT");
 
-// Output file
-readfile($filepath);
+// ---------------------------------------
+// 📤 Output image
+// ---------------------------------------
+if (@readfile($filepath) === false) {
+    send_error("Failed to read image file", 500);
+}
+
 exit;
-

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.awarcrown.ideaship",
+      "sha256_cert_fingerprints": [
+        "A7:F4:31:CD:5C:8F:21:9B:6E:C8:BB:11:79:BC:94:FB:0D:01:C7:5D:77:07:F1:0D:1A:84:EA:B2:57:5E:B2:AC"
+      ]
+    }
+  }
+]
