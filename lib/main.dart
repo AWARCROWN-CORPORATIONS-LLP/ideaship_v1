@@ -266,11 +266,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       return;
     }
 
-    // Support multiple URL formats
-    // Format 1: https://server.awarcrown.com/threads/123
-    // Format 2: https://server.awarcrown.com/thread/123
-    // Format 3: https://server.awarcrown.com/post/123
-    // Format 4: https://server.awarcrown.com/posts/123
+    
 
     if (uri.host == "server.awarcrown.com" || uri.host.contains("awarcrown.com") || uri.host=="share.awarcrown.com") {
       final pathSegments = uri.pathSegments;

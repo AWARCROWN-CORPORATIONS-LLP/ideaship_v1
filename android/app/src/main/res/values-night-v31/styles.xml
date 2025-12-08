@@ -8,14 +8,13 @@
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
         <!-- Splash Screen Background -->
         <item name="android:windowSplashScreenBackground">#FFFFFF</item>
-        <!-- Splash Screen Icon - No rounding, perfect display with animation -->
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icon_no_round</item>
+       
+       
         <!-- Remove icon background (prevents rounding) -->
         <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
         <!-- Animation duration in milliseconds -->
         <item name="android:windowSplashScreenAnimationDuration">1000</item>
-        <!-- Branding image (optional, shown below icon) -->
-        <item name="android:windowSplashScreenBrandingImage">@drawable/splash</item>
+       
     </style>
     <!-- Theme applied to the Android Window as soon as the process has started.
          This theme determines the color of the Android Window while your
