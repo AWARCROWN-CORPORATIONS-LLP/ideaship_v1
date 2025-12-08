@@ -1021,8 +1021,9 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
       if (_regUserError != null ||
           _regEmailError != null ||
           _regPassError != null ||
-          _regConfirmPassError != null)
+          _regConfirmPassError != null) {
         hasError = true;
+      }
     });
 
     if (hasError) return;

@@ -227,26 +227,21 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Future<void> _deleteAccount() async {
-    try {
-      _showSnackBar("Processing account deletion...");
+ Future<void> _deleteAccount() async {
+  try {
+    _showSnackBar("Processing account deletion...");
 
-      final prefs = await SharedPreferences.getInstance();
-      final username = prefs.getString("username") ?? "";
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString("username") ?? "";
 
-      
-      final response = await http.post(
-        Uri.parse("https://server.awarcrown.com/accountclear/delete_account"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({"username": username}),
-      );
+    final response = await http.post(
+      Uri.parse("https://server.awarcrown.com/accountclear/delete_account"),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({"username": username}),
+    );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        _showSnackBar("Account deleted successfully.");
-      } else {
-        _showSnackBar("Account deleted locally (server offline).");
-      }
-
+    if (response.statusCode == 200) {
+      _showSnackBar("Your account has been permanently deleted.");
       await prefs.clear();
 
       if (!mounted) return;
@@ -255,10 +250,14 @@ class _SettingsPageState extends State<SettingsPage> {
         context,
         MaterialPageRoute(builder: (context) => const AuthLogReg()),
       );
-    } catch (e) {
-      _showSnackBar("Error deleting account: $e");
+    } else {
+      _showSnackBar("Unable to delete account. Please try again.");
     }
+  } catch (e) {
+    _showSnackBar("Network error: $e");
   }
+}
+
 
 
 
