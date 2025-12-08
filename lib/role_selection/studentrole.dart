@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import 'dart:convert';
 import 'dart:io';
-import '../dashboard.dart'; // Import Dashboard for navigation
+import '../dashboard.dart'; 
 
 class StudentRolePage extends StatefulWidget {
   final String? initialUsername;
@@ -67,10 +67,11 @@ class _StudentRolePageState extends State<StudentRolePage> {
       _usernameController.text = _username;
       _emailController.text = _email;
     }
+     _checkProfileStatus(); 
     _loadSessionData();
     _dobController.text = DateFormat('yyyy-MM-dd').format(DateTime.now().subtract(const Duration(days: 7300)));
-    _loadFormData(); // Load saved form data
-    _checkProfileStatus(); // Check if profile already completed
+    _loadFormData(); 
+   
   }
 
   Future<void> _loadSessionData() async {
@@ -90,7 +91,7 @@ class _StudentRolePageState extends State<StudentRolePage> {
     }
   }
 
-  // Check if profile is already completed to prevent duplicate submission
+  
   Future<void> _checkProfileStatus() async {
     if (_id == '0' || _id.isEmpty) return;
 

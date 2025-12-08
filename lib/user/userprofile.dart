@@ -1518,7 +1518,7 @@ Future<void> _fetchMyPosts({int? cursorId}) async {
       ),
       body: Column(
         children: [
-          if (!_isEditing) _buildProfileHeader(),
+          _buildProfileHeader(),
           Expanded(
             child: TabBarView(
               controller: _tabController,

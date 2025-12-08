@@ -1365,33 +1365,31 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
     }
     return url;
   }
-Future<void> _launchUrl(String url) async {
-  final normalized = _normalizeUrl(url);
-  final uri = Uri.parse(normalized);
 
-  try {
-    // Try open externally (Instagram / LinkedIn app)
-    bool openedExternal = await launchUrl(
-      uri,
-      mode: LaunchMode.externalApplication,
-    );
+  Future<void> _launchUrl(String url) async {
+    final normalized = _normalizeUrl(url);
+    final uri = Uri.parse(normalized);
 
-    if (openedExternal) return;
+    try {
+      // Try open externally (Instagram / LinkedIn app)
+      bool openedExternal = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
 
-    // Fallback: open in-app browser
-    bool openedWebView = await launchUrl(
-      uri,
-      mode: LaunchMode.inAppWebView,
-    );
+      if (openedExternal) return;
 
-    if (!openedWebView && mounted) {
-      _showError("Unable to open link");
+      // Fallback: open in-app browser
+      bool openedWebView = await launchUrl(uri, mode: LaunchMode.inAppWebView);
+
+      if (!openedWebView && mounted) {
+        _showError("Unable to open link");
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showError("Failed to open URL");
     }
-  } catch (e) {
-    if (!mounted) return;
-    _showError("Failed to open URL");
   }
-}
 
   Future<String?> _getShareLink(String startupId) async {
     if (userId == null || userId!.isEmpty) return null;

@@ -1342,44 +1342,63 @@ class _ThreadsScreenState extends State<ThreadsScreen>
       ),
     );
   }
+Future<void> _joinPrivateThread(String code) async {
+  final bool online = await _isDeviceOnline();
+  if (!online) {
+    _showError('Please connect to internet to join private thread.');
+    return;
+  }
 
-  Future<void> _joinPrivateThread(String code) async {
-    final bool online = await _isDeviceOnline();
-    if (!online) {
-      _showError('Please connect to internet to join private thread.');
+  try {
+    final uri = Uri.parse("https://server.awarcrown.com/threads/join-by-code");
+
+    final response = await http
+        .post(
+          uri,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: json.encode({"code": code}),
+        )
+        .timeout(const Duration(seconds: 10));
+
+    final data = json.decode(response.body);
+
+   
+    if (data is Map && data.containsKey('error')) {
+      _showError(data['error']);
       return;
     }
-    try {
-      final response = await http
-          .get(
-            Uri.parse(
-              'https://server.awarcrown.com/threads/join-by-code?code=${Uri.encodeComponent(code)}',
-            ),
-          )
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final thread = Thread.fromJson(data, isFromCache: false);
-        await _setThreadCode(thread.id, code);
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ThreadDetailScreen(
-                thread: thread,
-                username: username ?? '',
-                userId: userId ?? 0,
-              ),
-            ),
-          );
-        }
-      } else {
-        _showError('Invalid code or thread not found');
-      }
-    } catch (e) {
-      _showError('Failed to join: $_getErrorMessage(e)');
+
+    
+    if (!data.containsKey('thread_id')) {
+      _showError('Invalid invite code or roundtable not found.');
+      return;
     }
+
+    final thread = Thread.fromJson(data, isFromCache: false);
+
+    
+    await _setThreadCode(thread.id, code);
+
+    if (!mounted) return;
+
+    // Navigate to the thread screen
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ThreadDetailScreen(
+          thread: thread,
+          username: username ?? '',
+          userId: userId ?? 0,
+        ),
+      ),
+    );
+  } catch (e) {
+    _showError('Failed to join: ${_getErrorMessage(e)}');
   }
+}
+
 
   void _scheduleRetry(Future<void> Function() retryFunction) {
     if (_retryCount >= _maxRetries) return;

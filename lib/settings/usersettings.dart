@@ -7,6 +7,7 @@ import '../user/userprofile.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -18,7 +19,7 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   String _username = '';
   String _email = '';
-  String _appVersion = '1.0.0';
+  String _appVersion = '';
   bool _notificationsEnabled = true;
   String _selectedLanguage = 'English';
 
@@ -30,14 +31,25 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _loadAppVersion() async {
-    // App version - can be updated manually or via package_info_plus if available
-    // For now using default version
-    if (mounted) {
+    try {
+      final info = await PackageInfo.fromPlatform();
+
+      if (!mounted) return;
+
       setState(() {
-        _appVersion = '1.0.0';
+       _appVersion = "v${info.version} (Build ${info.buildNumber})";
+
+      });
+    } catch (e) {
+      // fallback version if error occurs
+      if (!mounted) return;
+      setState(() {
+        _appVersion = "1.0.0+1";
       });
     }
   }
+
+
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
@@ -57,7 +69,7 @@ class _SettingsPageState extends State<SettingsPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
+        backgroundColor: isError ? const Color.fromARGB(255, 26, 25, 25) : const Color.fromARGB(255, 0, 0, 0),
         behavior: SnackBarBehavior.floating,
         duration: Duration(seconds: isError ? 3 : 2),
       ),
@@ -71,7 +83,6 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  // ---------------- SWITCH ACCOUNT -----------------
 
   void _showSwitchAccountConfirmation() {
     showDialog(
@@ -80,7 +91,7 @@ class _SettingsPageState extends State<SettingsPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.swap_horiz, color: Color(0xFF007AFF), size: 28),
+            Icon(Icons.swap_horiz, color: Color.fromARGB(255, 34, 0, 112), size: 28),
             SizedBox(width: 12),
             Expanded(child: Text('Switch Account')),
           ],
@@ -99,7 +110,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Navigator.pop(context);
               _switchAccount();
             },
-            style: TextButton.styleFrom(foregroundColor: const Color(0xFF007AFF)),
+            style: TextButton.styleFrom(foregroundColor: const Color.fromARGB(255, 0, 0, 0)),
             child: const Text('Switch Account'),
           ),
         ],
@@ -131,7 +142,7 @@ class _SettingsPageState extends State<SettingsPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(
           children: [
-            Icon(Icons.logout, color: Colors.orange, size: 28),
+            Icon(Icons.logout, color: Color.fromARGB(255, 0, 0, 0), size: 28),
             SizedBox(width: 12),
             Expanded(child: Text('Logout')),
           ],
@@ -150,7 +161,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Navigator.pop(context);
               _logout();
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.orange),
+            style: TextButton.styleFrom(foregroundColor: const Color.fromARGB(255, 0, 0, 0)),
             child: const Text('Logout'),
           ),
         ],
@@ -188,9 +199,10 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
         content: const Text(
-          'Are you sure you want to delete your account?\n\n'
+          'Are you sure you want to delete your account?\n'
           'This action is permanent and cannot be undone. All your data will be permanently deleted.',
           style: TextStyle(height: 1.5),
+          
         ),
         actions: [
           TextButton(
@@ -219,7 +231,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
       
       final response = await http.post(
-        Uri.parse("https://server.awarcrown.com/api/delete_account"),
+        Uri.parse("https://server.awarcrown.com/accountclear/delete_account"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({"username": username}),
       );
@@ -243,7 +255,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  // ---------------- LINKS -----------------
+
 
   Future<void> _openLink(String url) async {
     final uri = Uri.parse(url);
@@ -252,7 +264,6 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  // ---------------- CLEAR CACHE -----------------
 
   Future<void> _clearCache() async {
     final confirmed = await showDialog<bool>(
@@ -279,7 +290,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (confirmed == true) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        // Clear cache-related keys (keep user data)
+      
         await prefs.remove('cached_posts');
         await prefs.remove('cache_timestamp');
         await prefs.remove('like_queue');
@@ -291,7 +302,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  // ---------------- EXPORT DATA -----------------
+  
 
   Future<void> _exportData() async {
     try {
@@ -317,74 +328,148 @@ class _SettingsPageState extends State<SettingsPage> {
 
   // ---------------- ABOUT DIALOG -----------------
 
-  void _showAbout() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('About'),
-        content: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF007AFF).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(Icons.lightbulb_outline, color: Color(0xFF007AFF), size: 32),
+ void _showAbout() {
+  showDialog(
+    context: context,
+    builder: (context) => Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+
+            /// HEADER
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF007AFF).withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Ideaship',
-                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  child: const Icon(Icons.psychology_alt_rounded,
+                      color: Color(0xFF007AFF), size: 34),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        "Ideaship",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.4,
+                          color: Color(0xFF1A1A1A),
                         ),
-                        Text('v$_appVersion', style: const TextStyle(color: Colors.grey)),
-                      ],
-                    ),
+                      ),
+                      Text(
+                        "Version $_appVersion",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+            Divider(color: Colors.grey.shade300, thickness: 1),
+            const SizedBox(height: 16),
+
+            /// TAGLINE
+            const Text(
+              "Developed by Awarcrown Elite Team",
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Developed by Awarcrown Elite Team',
-                style: TextStyle(fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 6),
+
+            Text(
+              "Building the next generation of innovation — "
+              "where ideas meet opportunity.",
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: Colors.grey.shade700,
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Connecting ideas with opportunities.',
-                style: TextStyle(color: Colors.grey),
+            ),
+
+            const SizedBox(height: 22),
+
+            /// LINKS SECTION
+            _buildAboutRow(
+              Icons.language_rounded,
+              "Website",
+              "https://awarcrown.com",
+              () => _openLink("https://awarcrown.com"),
+            ),
+
+            const SizedBox(height: 12),
+
+            _buildAboutRow(
+              Icons.email_outlined,
+              "Support Email",
+              "support@awarcrown.com",
+              () => _openLink("mailto:support@awarcrown.com"),
+            ),
+
+            const SizedBox(height: 12),
+
+           
+
+           
+
+            const SizedBox(height: 22),
+            Divider(color: Colors.grey.shade300, thickness: 1),
+            const SizedBox(height: 12),
+
+            /// COPYRIGHT
+            Center(
+              child: Text(
+                "© ${DateTime.now().year} Awarcrown Corporations LLP\nAll rights reserved.",
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  height: 1.4,
+                  color: Colors.grey.shade600,
+                ),
               ),
-              const SizedBox(height: 16),
-              const Divider(),
-              const SizedBox(height: 8),
-              _buildAboutRow(Icons.language, 'Website', 'https://awarcrown.com', () {
-                _openLink('https://awarcrown.com');
-              }),
-              const SizedBox(height: 8),
-              _buildAboutRow(Icons.email, 'Email', 'info@awarcrown.com', () {
-                _openLink('mailto:info@awarcrown.com');
-              }),
-            ],
-          ),
+            ),
+
+            const SizedBox(height: 16),
+
+            /// CLOSE BUTTON
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF007AFF),
+                ),
+                child: const Text(
+                  "Close",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
       ),
-    );
-  }
+    ),
+  );
+}
+
 
   Widget _buildAboutRow(IconData icon, String label, String value, VoidCallback onTap) {
     return InkWell(
@@ -559,8 +644,8 @@ class _SettingsPageState extends State<SettingsPage> {
                 icon: Icons.contact_support_outlined,
                 iconColor: const Color(0xFF007AFF),
                 title: 'Contact Us',
-                subtitle: 'support@ideaship.com',
-                onTap: () => _openLink('mailto:support@ideaship.com'),
+                subtitle: 'Feedback or support',
+                onTap: () => _openLink('https://server.awarcrown.com/feedback/'),
               ),
               _buildDivider(),
               _buildSettingTile(
@@ -579,7 +664,7 @@ class _SettingsPageState extends State<SettingsPage> {
               _buildDivider(),
               _buildSettingTile(
                 icon: Icons.info_outline,
-                iconColor: Colors.grey,
+                iconColor: const Color.fromARGB(255, 167, 89, 89),
                 title: 'About',
                 subtitle: 'Version $_appVersion',
                 onTap: _showAbout,
