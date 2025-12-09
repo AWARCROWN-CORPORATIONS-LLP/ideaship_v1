@@ -110,6 +110,8 @@ class _DashboardPageState extends State<DashboardPage>
     } catch (e) {
       if (mounted) {
         _showErrorBanner('Failed to load user data: ${e.toString()}');
+        //redirect to login
+        Navigator.pushReplacementNamed(context, 'auth/auth_log_reg');
       }
     }
   }

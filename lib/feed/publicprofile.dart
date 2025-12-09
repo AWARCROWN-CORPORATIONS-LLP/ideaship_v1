@@ -2236,8 +2236,10 @@ class _FollowersFollowingSheetState extends State<_FollowersFollowingSheet> {
                                   textAlign: TextAlign.center,
                                 ),
                               ),
+                              
+                             
                               const SizedBox(height: 12),
-                              // Follow Button
+                              
                               if (!isOwnProfile)
                                 Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 12),

@@ -334,6 +334,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     if (username == null || username!.isEmpty) {
       debugPrint("Cannot navigate to post: username is empty");
       showError("Please log in to view posts");
+      //redirect to login
+      
+
       return;
     }
 

@@ -1,3 +1,5 @@
+
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -155,7 +157,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
         return;
       }
     } catch (e) {
-      debugPrint("Auto-login check error: $e");
+     
       _showErrorDialog(
         "Auto-Login Error",
         "Failed to check stored session: ${e.toString()}. Please log in manually.",
@@ -412,8 +414,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
           )
           .timeout(const Duration(seconds: 30));
 
-      debugPrint("Resend Verification Response Status: ${response.statusCode}");
-      debugPrint("Resend Verification Response Body: ${response.body}");
+      
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -449,7 +450,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
         );
       }
     } catch (e) {
-      debugPrint("Resend Verification Error: $e");
+      
       final errorMsg = e.toString().contains('TimeoutException')
           ? "Request timed out. Check your connection."
           : "Failed to connect: ${e.toString()}. Check your internet.";
@@ -490,8 +491,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
           )
           .timeout(const Duration(seconds: 30));
 
-      debugPrint("Refresh Response Status: ${response.statusCode}");
-      debugPrint("Refresh Response Body: ${response.body}");
+     
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -504,7 +504,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
           if (newRefreshToken != null) {
             await prefs.setString('refresh_token', newRefreshToken);
           }
-          debugPrint("Tokens refreshed successfully.");
+          
           return true;
         } else {
           final message = data['message'] ?? "Unknown refresh error.";
@@ -524,7 +524,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
         return false;
       }
     } catch (e) {
-      debugPrint("Refresh Error: $e");
+     
       _showErrorDialog(
         "Connection Error",
         "Failed to refresh tokens: ${e.toString()}. Check your internet.",
@@ -672,12 +672,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
                                 )
                                 .timeout(const Duration(seconds: 30));
 
-                            debugPrint(
-                              "Forgot Password Response Status: ${response.statusCode}",
-                            );
-                            debugPrint(
-                              "Forgot Password Response Body: ${response.body}",
-                            );
+                            
 
                             if (response.statusCode == 200) {
                               final data = json.decode(response.body);
@@ -718,7 +713,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
                               );
                             }
                           } catch (e) {
-                            debugPrint("Forgot Password Error: $e");
+                           
                             setDialogState(
                               () => emailError =
                                   "Failed to connect to server: ${e.toString()}. Check your internet.",
@@ -801,8 +796,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
           )
           .timeout(const Duration(seconds: 30));
 
-      debugPrint("Login Response Status: ${response.statusCode}");
-      debugPrint("Login Response Body: ${response.body}");
+      
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -907,7 +901,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
         );
       }
     } catch (e) {
-      debugPrint("Login Error: $e");
+      
       final errorMsg = e.toString().contains('TimeoutException')
           ? "Request timed out. Check your connection."
           : "Failed to connect to server: ${e.toString()}. Check your internet.";
@@ -966,7 +960,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
         mode: LaunchMode.externalApplication,
       );
 
-      if (externalOpened) return; // Success → Stop execution
+      if (externalOpened) return; // Success Ã¢â€ â€™ Stop execution
     } catch (_) {
       // Ignore and continue to fallback
     }
@@ -1055,50 +1049,24 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
             headers: {'Content-Type': 'application/x-www-form-urlencoded'},
           )
           .timeout(const Duration(seconds: 30));
-      debugPrint("Register Response Status: ${response.statusCode}");
-      debugPrint("Register Response Body: ${response.body}");
+      
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['success'] == true) {
-          final userData = data['user'] as Map<String, dynamic>? ?? {};
-          final accessToken = data['access_token'] as String?;
-          final refreshToken = data['refresh_token'] as String?;
-
-          if (accessToken == null || accessToken.isEmpty) {
-            _showErrorDialog(
-              "Registration Failed",
-              "Access token missing from server response. Please try logging in.",
-            );
-            return;
-          }
-
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('id', userData['id']?.toString() ?? '');
-          await prefs.setString(
-            'username',
-            userData['username'] as String? ?? _regUserController.text.trim(),
-          );
-          await prefs.setString(
-            'email',
-            userData['email'] as String? ?? registeredEmail,
-          );
-          await prefs.setString(
-            'token',
-            accessToken,
-          ); // Store as 'token' for compatibility
-          if (refreshToken != null && refreshToken.isNotEmpty) {
-            await prefs.setString('refresh_token', refreshToken);
-          } else {
-            debugPrint("Warning: No refresh token received on register.");
-          }
-          // For register, always go to role selection (first time)
+          // Do not store tokens or user data on register; require explicit login
+          await prefs.remove('token');
+          await prefs.remove('refresh_token');
+          await prefs.remove('id');
+          await prefs.remove('username');
+          await prefs.remove('email');
           await prefs.setBool('profileCompleted', false);
 
           _showSuccessDialog(
             "Registration Successful",
             data['message'] ??
-                "Account created! Please verify your email to continue.",
+                "Account created! Please verify your email, then return to login and sign in manually the first time.",
             switchToLogin: true,
             goToRole: false,
             email: registeredEmail,
@@ -1157,7 +1125,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
         );
       }
     } catch (e) {
-      debugPrint("Register Error: $e");
+      
       final errorMsg = e.toString().contains('TimeoutException')
           ? "Request timed out. Check your connection."
           : "Failed to connect to server: ${e.toString()}. Check your internet.";
@@ -1560,7 +1528,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
                             textInputAction: TextInputAction.next,
                             autofillHints: const [AutofillHints.email],
                             helperText: _showInlineHints
-                                ? "We’ll send a confirmation email"
+                                ? "We will send a confirmation email"
                                 : null,
                             onChanged: (_) => setState(() {}),
                             semanticsLabel: 'Email field',

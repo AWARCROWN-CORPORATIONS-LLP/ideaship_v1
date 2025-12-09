@@ -275,7 +275,14 @@ class _AnimatedRoundTableIconState extends State<AnimatedRoundTableIcon>
 }
 
 class OnboardingTourScreen extends StatefulWidget {
-  const OnboardingTourScreen({super.key});
+  const OnboardingTourScreen({
+    super.key,
+    this.onFinished,
+    this.onBackToDashboard,
+  });
+
+  final VoidCallback? onFinished;
+  final VoidCallback? onBackToDashboard;
   @override
   State<OnboardingTourScreen> createState() => _OnboardingTourScreenState();
 }
@@ -319,112 +326,143 @@ class _OnboardingTourScreenState extends State<OnboardingTourScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final double iconSize =
-                (constraints.maxWidth * 0.4).clamp(100.0, 180.0);
-            final EdgeInsets contentPadding = EdgeInsets.symmetric(
-              horizontal: constraints.maxWidth * 0.08,
-              vertical: 24,
-            );
-            return Stack(
-              children: [
-                PageView(
-                  controller: _pageController,
-                  onPageChanged: (index) {
-                    if (mounted) {
-                      setState(() => currentPage = index);
-                    }
-                    _tableController.reset();
-                    _chairsController.reset();
-                    _tableController.forward().then(
-                      (_) => _chairsController.forward(),
-                    );
-                  },
-                  children: [
-                    _buildOnboardPage(
-                      context,
-                      iconSize,
-                      contentPadding,
-                      title: 'Gather \'Round!',
-                      subtitle: 'Join discussions like a virtual roundtable.',
-                    ),
-                    _buildOnboardPage(
-                      context,
-                      iconSize,
-                      contentPadding,
-                      title: 'Start Conversations',
-                      subtitle: 'Create threads and watch ideas circle the table.',
-                    ),
-                    _buildOnboardPage(
-                      context,
-                      iconSize,
-                      contentPadding,
-                      title: 'Pull Up a Chair',
-                      subtitle: 'Join discussions with a simple tap.',
-                    ),
-                  ],
-                ),
-
-                // Page Indicator
-                Positioned(
-                  bottom: 32,
-                  left: 0,
-                  right: 0,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      3,
-                      (index) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        height: 8,
-                        width: currentPage == index ? 24 : 8,
-                        decoration: BoxDecoration(
-                          color: currentPage == index ? Colors.blue : Colors.grey,
-                          borderRadius: BorderRadius.circular(4),
+    return WillPopScope(
+      onWillPop: () async {
+        widget.onBackToDashboard?.call();
+        return false;
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black54,
+        body: SafeArea(
+          child: Center(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final double cardWidth =
+                    (constraints.maxWidth * 0.92).clamp(320.0, 720.0);
+                final double cardHeight =
+                    (constraints.maxHeight * 0.9).clamp(480.0, 780.0);
+                final double iconSize =
+                    (cardWidth * 0.4).clamp(100.0, 180.0);
+                final EdgeInsets contentPadding = EdgeInsets.symmetric(
+                  horizontal: cardWidth * 0.08,
+                  vertical: 24,
+                );
+                return ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: cardWidth,
+                    maxHeight: cardHeight,
+                  ),
+                  child: Material(
+                    borderRadius: BorderRadius.circular(20),
+                    clipBehavior: Clip.antiAlias,
+                    elevation: 12,
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    child: Stack(
+                      children: [
+                        PageView(
+                          controller: _pageController,
+                          onPageChanged: (index) {
+                            if (mounted) {
+                              setState(() => currentPage = index);
+                            }
+                            _tableController.reset();
+                            _chairsController.reset();
+                            _tableController.forward().then(
+                              (_) => _chairsController.forward(),
+                            );
+                          },
+                          children: [
+                            _buildOnboardPage(
+                              context,
+                              iconSize,
+                              contentPadding,
+                              title: 'Gather \'Round!',
+                              subtitle:
+                                  'Join discussions like a virtual roundtable.',
+                            ),
+                            _buildOnboardPage(
+                              context,
+                              iconSize,
+                              contentPadding,
+                              title: 'Start Conversations',
+                              subtitle:
+                                  'Create threads and watch ideas circle the table.',
+                            ),
+                            _buildOnboardPage(
+                              context,
+                              iconSize,
+                              contentPadding,
+                              title: 'Pull Up a Chair',
+                              subtitle: 'Join discussions with a simple tap.',
+                            ),
+                          ],
                         ),
-                      ),
+
+                        // Page Indicator
+                        Positioned(
+                          bottom: 32,
+                          left: 0,
+                          right: 0,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: List.generate(
+                              3,
+                              (index) => AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                margin:
+                                    const EdgeInsets.symmetric(horizontal: 4),
+                                height: 8,
+                                width: currentPage == index ? 24 : 8,
+                                decoration: BoxDecoration(
+                                  color: currentPage == index
+                                      ? Colors.blue
+                                      : Colors.grey,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Next Button
+                        Positioned(
+                          bottom: 24,
+                          right: 24,
+                          child: FloatingActionButton(
+                            onPressed: () async {
+                              try {
+                                final prefs =
+                                    await SharedPreferences.getInstance();
+                                await prefs.setBool('hasSeenOnboarding', true);
+                                widget.onFinished?.call();
+                                if (context.mounted) {
+                                  Navigator.of(context).pop();
+                                }
+                              } catch (e) {
+                                debugPrint(
+                                  'Error saving onboarding preference: $e',
+                                );
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        'Error completing onboarding: $e',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                            child: const Icon(Icons.arrow_forward),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-
-                // Next Button
-                Positioned(
-                  bottom: 86,
-                  right: 20,
-                  child: FloatingActionButton(
-                    onPressed: () async {
-                      try {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setBool('hasSeenOnboarding', true);
-                        if (context.mounted) {
-                          Navigator.pushReplacement(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const ThreadsScreen(),
-                            ),
-                          );
-                        }
-                      } catch (e) {
-                        debugPrint('Error saving onboarding preference: $e');
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text('Error completing onboarding: $e'),
-                            ),
-                          );
-                        }
-                      }
-                    },
-                    child: const Icon(Icons.arrow_forward),
-                  ),
-                ),
-              ],
-            );
-          },
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
@@ -482,6 +520,7 @@ class ThreadsScreen extends StatefulWidget {
 class _ThreadsScreenState extends State<ThreadsScreen>
     with TickerProviderStateMixin {
   late TabController _tabController;
+  bool _onboardingShowing = false;
   bool isMyView = false;
   // Discover
   List<Thread> discoverThreads = [];
@@ -738,14 +777,26 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     try {
       final prefs = await SharedPreferences.getInstance();
       final hasSeen = prefs.getBool('hasSeenOnboarding') ?? false;
-      if (!hasSeen && mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const OnboardingTourScreen()),
+      if (!hasSeen && mounted && !_onboardingShowing) {
+        _onboardingShowing = true;
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) => OnboardingTourScreen(
+            onFinished: () {
+              _onboardingShowing = false;
+            },
+            onBackToDashboard: () {
+              _onboardingShowing = false;
+              Navigator.of(dialogContext).pop();
+            },
+          ),
         );
       }
     } catch (e) {
       debugPrint('Error checking onboarding: $e');
+    } finally {
+      _onboardingShowing = false;
     }
   }
 
@@ -1462,21 +1513,20 @@ Future<void> _joinPrivateThread(String code) async {
         final data = json.decode(response.body);
         debugPrint('Create response: ${response.body}');
 
-        // Check for 'success' key *and* 'thread_id' key
+       
         if (data is Map<String, dynamic> &&
             data['success'] == true &&
             data.containsKey('thread_id')) {
-          // --- THIS IS THE FIX ---
-          // Safely parse the thread_id, which might be a String ("72") or int (72)
+          
           final int? newId = int.tryParse(data['thread_id'].toString());
           if (newId == null) {
-            // If the ID is null or not a valid number, we can't proceed.
+          
             throw Exception('Invalid thread_id format from server.');
           }
-          // --- END OF FIX ---
+        
           final inviteCode = data['invite_code'] as String?;
           final newThread = Thread(
-            id: newId, // Use the new, safely parsed integer ID
+            id: newId,
             title: title,
             body: body,
             category: category,
