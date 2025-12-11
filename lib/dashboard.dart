@@ -20,6 +20,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:ideaship/feed/publicprofile.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:url_launcher/url_launcher.dart' show launchUrl, LaunchMode;
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -55,6 +56,7 @@ class _DashboardPageState extends State<DashboardPage>
     _setupLocalNotifications();
     _setupFCM();
     _loadUnreadCount();
+     _checkForUpdate();
   }
 
   @override
@@ -69,6 +71,116 @@ class _DashboardPageState extends State<DashboardPage>
       setState(() {});
     }
   }
+  Future<void> _checkForUpdate() async {
+  try {
+    final res = await http
+        .get(Uri.parse("https://server.awarcrown.com/update/update_check"))
+        .timeout(const Duration(seconds: 8));
+
+    if (res.statusCode == 200) {
+      final data = json.decode(res.body);
+
+      if (data['update_available'] == 1) {
+        _showUpdateDialog(
+          data['message'] ?? "A new version is available!",
+          data['update_url'] ?? "https://play.google.com/store/apps/details?id=com.awarcrown.ideaship",
+        );
+      }
+    }
+  } catch (e) {
+    debugPrint("Update check error: $e");
+  }
+}
+void _showUpdateDialog(String message, String updateUrl) {
+  if (!mounted) return;
+
+  showDialog(
+    context: context,
+    barrierDismissible: false, 
+    builder: (_) {
+      return Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 25),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.blue.withOpacity(0.12),
+                ),
+                child: const Icon(
+                  Icons.system_update_rounded,
+                  size: 42,
+                  color: Colors.blue,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              const Text(
+                "Update Required",
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 12),
+
+              Text(
+                message,
+                style: const TextStyle(
+                  fontSize: 15,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+
+              const SizedBox(height: 25),
+
+              // Only Update Now button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      vertical: 14,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    elevation: 3,
+                    backgroundColor: Colors.blue,
+                  ),
+                  onPressed: () {
+                    launchUrl(
+                      Uri.parse(updateUrl),
+                      mode: LaunchMode.externalApplication,
+                    );
+                  },
+                  child: const Text(
+                    "Update Now",
+                    style: TextStyle(
+                      fontSize: 17,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
 
   Future<void> _loadThemePreference() async {
     try {
@@ -110,7 +222,7 @@ class _DashboardPageState extends State<DashboardPage>
     } catch (e) {
       if (mounted) {
         _showErrorBanner('Failed to load user data: ${e.toString()}');
-        //redirect to login
+       
         Navigator.pushReplacementNamed(context, 'auth/auth_log_reg');
       }
     }

@@ -1,3 +1,4 @@
+
 // ignore_for_file: unused_local_variable
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -970,7 +971,7 @@ class PostsPage extends StatefulWidget {
   State<PostsPage> createState() => _PostsPageState();
 }
 //posts page state
-class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
+class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, WidgetsBindingObserver {
   List<dynamic> posts = [];
   bool isLoading = false;
   bool hasMore = true;
@@ -991,12 +992,64 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   final Map<int, bool> isSavingMap = {};
   final ValueNotifier<bool> _refreshNotifier = ValueNotifier(false);
   Set<int> _savedPosts = {};
-  final Map<int, bool> isReportingMap = {}; 
+  final Map<int, bool> isReportingMap = {};
+  bool _isInitialized = false;
+  DateTime? _lastRefreshTime;
+  
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeData();
     _scrollController.addListener(_onScroll);
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed && _isInitialized) {
+      // Refresh when app comes back to foreground
+      _refreshOnResume();
+    }
+  }
+  
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refresh when widget becomes visible again (e.g., navigating back from another screen)
+    if (_isInitialized && mounted) {
+      final now = DateTime.now();
+      // Only refresh if it's been more than 2 seconds since last refresh to avoid excessive calls
+      if (_lastRefreshTime == null || now.difference(_lastRefreshTime!).inSeconds > 2) {
+        _refreshOnResume();
+      }
+    }
+  }
+  
+  /// Public method to manually refresh posts (can be called from parent widget)
+  Future<void> refreshPosts() async {
+    await _refreshOnResume();
+  }
+  
+  Future<void> _refreshOnResume() async {
+    if (!mounted || isLoading) return;
+    _lastRefreshTime = DateTime.now();
+    // Process any queued like actions first
+    await _processLikeQueue();
+    // Do a full refresh: fetch fresh posts and update cache
+    await _fullRefresh();
+  }
+  
+  Future<void> _fullRefresh() async {
+    if (_username.isEmpty) return;
+    if (mounted) {
+      setState(() {
+      networkError = false;
+      nextCursorId = null;
+    });
+    }
+    // Fetch fresh posts from server (this will update cache via _fetchPosts)
+    await _fetchPosts();
   }
   Future<void> _initializeData() async {
     await _loadUsername();
@@ -1005,9 +1058,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
     await _loadPostsFromCache();
     await _updateFollowStatuses();
     await _fetchPosts();
+    _isInitialized = true;
   }
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     _scrollDebounceTimer?.cancel();
     for (final controller in likeAnimationControllers.values) {
@@ -1034,6 +1089,76 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       }
     } catch (e) {
       debugPrint('Error loading saved posts: $e');
+    }
+  }
+  // Save like state to SharedPreferences
+  Future<void> _saveLikeState(int postId, bool isLiked, int likeCount) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final likesMapStr = prefs.getString('post_likes_map') ?? '{}';
+      final likesCountMapStr = prefs.getString('post_like_counts_map') ?? '{}';
+      
+      final likesMap = Map<String, dynamic>.from(json.decode(likesMapStr));
+      final likesCountMap = Map<String, dynamic>.from(json.decode(likesCountMapStr));
+      
+      likesMap[postId.toString()] = isLiked;
+      likesCountMap[postId.toString()] = likeCount;
+      
+      await prefs.setString('post_likes_map', json.encode(likesMap));
+      await prefs.setString('post_like_counts_map', json.encode(likesCountMap));
+    } catch (e) {
+      debugPrint('Error saving like state: $e');
+    }
+  }
+  // Load like states from SharedPreferences
+  Future<Map<String, dynamic>> _loadLikeStates() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final likesMapStr = prefs.getString('post_likes_map') ?? '{}';
+      final likesCountMapStr = prefs.getString('post_like_counts_map') ?? '{}';
+      
+      final likesMap = Map<String, dynamic>.from(json.decode(likesMapStr));
+      final likesCountMap = Map<String, dynamic>.from(json.decode(likesCountMapStr));
+      
+      return {
+        'likes': likesMap,
+        'counts': likesCountMap,
+      };
+    } catch (e) {
+      debugPrint('Error loading like states: $e');
+      return {'likes': {}, 'counts': {}};
+    }
+  }
+  // Apply like states from SharedPreferences to posts
+  Future<void> _applyLikeStatesToPosts() async {
+    try {
+      final likeStates = await _loadLikeStates();
+      final likesMap = likeStates['likes'] as Map<String, dynamic>;
+      final countsMap = likeStates['counts'] as Map<String, dynamic>;
+      
+      if (mounted) {
+        setState(() {
+          for (var post in posts) {
+            final postId = _parseInt(post['post_id']);
+            if (postId != null) {
+              final postIdStr = postId.toString();
+              if (likesMap.containsKey(postIdStr)) {
+                post['is_liked'] = likesMap[postIdStr] == true;
+              }
+              if (countsMap.containsKey(postIdStr)) {
+                final savedCount = countsMap[postIdStr];
+                if (savedCount is int) {
+                  post['like_count'] = savedCount;
+                } else if (savedCount != null) {
+                  post['like_count'] = int.tryParse(savedCount.toString()) ?? post['like_count'] ?? 0;
+                }
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error applying like states: $e');
     }
   }
   Future<void> _saveSavedPosts() async {
@@ -1219,6 +1344,8 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                 }
               }
             });
+            // Apply like states from SharedPreferences after loading from cache
+            await _applyLikeStatesToPosts();
           }
         }
       }
@@ -1340,6 +1467,8 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
           nextCursorId = _parseInt(data['nextCursorId']);
           hasMore = nextCursorId != null;
         });
+        // Apply like states from SharedPreferences
+        await _applyLikeStatesToPosts();
         await _savePostsToCache();
         await _updateFollowStatuses();
         _refreshNotifier.value = !_refreshNotifier.value;
@@ -1389,6 +1518,8 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
             }
           }
         });
+        // Apply like states from SharedPreferences
+        await _applyLikeStatesToPosts();
         await _savePostsToCache();
         await _updateFollowStatuses();
         _showSuccess('${newOnes.length} new post${newOnes.length > 1 ? 's' : ''} loaded');
@@ -1422,6 +1553,8 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         posts[index]['is_liked'] = newLiked;
         posts[index]['like_count'] = optimisticCount;
       });
+      // Save to SharedPreferences immediately
+      await _saveLikeState(postId, newLiked, optimisticCount);
     }
     if (newLiked && !oldLiked) {
       final iconController = likeAnimationControllers.putIfAbsent(
@@ -1461,14 +1594,14 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
+          final serverLikeCount = data['like_count'] ?? optimisticCount;
+          final serverIsLiked = data['is_liked'] ?? newLiked;
           setState(() {
-            if (data['like_count'] != null) {
-              posts[index]['like_count'] = data['like_count'];
-            }
-            if (data['is_liked'] != null) {
-              posts[index]['is_liked'] = data['is_liked'];
-            }
+            posts[index]['like_count'] = serverLikeCount;
+            posts[index]['is_liked'] = serverIsLiked;
           });
+          // Save server response to SharedPreferences
+          await _saveLikeState(postId, serverIsLiked, serverLikeCount);
         }
       } else {
         throw http.ClientException('Server error: ${response.statusCode}');
@@ -1480,9 +1613,31 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
         _showSuccess('Like action queued offline');
       } else {
         if (mounted) {
+          // Reload like state from SharedPreferences to ensure consistency
+          final likeStates = await _loadLikeStates();
+          final likesMap = likeStates['likes'] as Map<String, dynamic>;
+          final countsMap = likeStates['counts'] as Map<String, dynamic>;
+          final postIdStr = postId.toString();
+          
           setState(() {
-            posts[index]['is_liked'] = oldLiked;
-            posts[index]['like_count'] = oldCount;
+            // Use SharedPreferences value if available, otherwise revert to old
+            if (likesMap.containsKey(postIdStr)) {
+              posts[index]['is_liked'] = likesMap[postIdStr] == true;
+            } else {
+              posts[index]['is_liked'] = oldLiked;
+            }
+            if (countsMap.containsKey(postIdStr)) {
+              final savedCount = countsMap[postIdStr];
+              if (savedCount is int) {
+                posts[index]['like_count'] = savedCount;
+              } else if (savedCount != null) {
+                posts[index]['like_count'] = int.tryParse(savedCount.toString()) ?? oldCount;
+              } else {
+                posts[index]['like_count'] = oldCount;
+              }
+            } else {
+              posts[index]['like_count'] = oldCount;
+            }
           });
         }
         _showError('Failed to ${newLiked ? 'like' : 'unlike'} post: ${_getErrorMessage(e)}');
@@ -2508,8 +2663,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                 ),
               ),
               const SizedBox(height: 16),
-              DropdownButtonFormField<String>(
-                value: selectedReason,
+              InputDecorator(
                 decoration: InputDecoration(
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -2517,20 +2671,25 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
                   filled: true,
                   fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                 ),
-                items: reasons.map((reason) {
-                  return DropdownMenuItem<String>(
-                    value: reason,
-                    child: Text(
-                      reason,
-                      style: const TextStyle(fontSize: 14),
-                    ),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setDialogState(() {
-                    selectedReason = value;
-                  });
-                },
+                child: DropdownButton<String>(
+                  value: selectedReason,
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  items: reasons.map((reason) {
+                    return DropdownMenuItem<String>(
+                      value: reason,
+                      child: Text(
+                        reason,
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setDialogState(() {
+                      selectedReason = value;
+                    });
+                  },
+                ),
               ),
             ],
           ),

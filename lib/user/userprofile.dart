@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -8,7 +9,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
-import 'dart:math' as math;
 import '../feed/publicprofile.dart';
 import '../feed/posts.dart';
 
@@ -41,17 +41,17 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
   bool _hasMorePosts = true;
   bool _hasMoreSaved = true;
   final ScrollController _scrollController = ScrollController();
+  bool _isNavigatingToDetail = false;
   
   final _formKey = GlobalKey<FormState>();
   XFile? _selectedImage;
   final Map<String, TextEditingController> _controllers = {};
   late TabController _tabController;
   
-  // Initialize all sections as expanded
+  // Initialize all sections as expanded (kept for legacy keys)
   final Map<String, bool> _expandedSections = {
     'basic': true,
     'personal': true,
-    'education': true,
     'preferences': true,
     'company': true,
   };
@@ -192,7 +192,7 @@ Future<void> _fetchMyPosts({int? cursorId}) async {
 
     final url = 'https://server.awarcrown.com/accessprofile/fetch_user_posts?action=my_posts&$queryString';
 
-    debugPrint("➡️ FETCH POSTS URL: $url");
+    debugPrint("âž¡ï¸ FETCH POSTS URL: $url");
 
     final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 20));
 
@@ -224,7 +224,7 @@ Future<void> _fetchMyPosts({int? cursorId}) async {
       });
     }
   } catch (e) {
-    debugPrint('❌ Error fetching my posts: $e');
+    debugPrint('âŒ Error fetching my posts: $e');
     if (mounted) {
       setState(() {
         _postsError = _getErrorMessage(e);
@@ -342,29 +342,15 @@ void _initializeControllers() {
 
   // Common fields
   _controllers['role'] = TextEditingController(text: _role ?? '');
- 
-_controllers['full_name'] = TextEditingController(
-  text: _role == "startup"
-      ? getVal('founders_names')                
-      : getVal('full_name'),                     
-);
-
+  _controllers['full_name'] = TextEditingController(
+    text: _role == "startup" ? getVal('founders_names') : getVal('full_name'),
+  );
   _controllers['email'] = TextEditingController(text: getVal('email'));
   _controllers['phone'] = TextEditingController(text: getVal('phone'));
-  _controllers['address'] = TextEditingController(text: getVal('address'));
   _controllers['bio'] = TextEditingController(text: getVal('description'));
-  _controllers['website'] = TextEditingController(text: getVal('website'));
 
   // STUDENT ROLE
   if (_role == "student") {
-    _controllers['student_id'] = TextEditingController(text: getVal('student_id'));
-    _controllers['institution'] = TextEditingController(text: getVal('institution'));
-    _controllers['academic_level'] = TextEditingController(text: getVal('academic_level'));
-    _controllers['major'] = TextEditingController(text: getVal('major'));
-    _controllers['expected_passout_year'] = TextEditingController(text: getVal('expected_passout_year'));
-    _controllers['linkedin'] = TextEditingController(text: getVal('linkedin'));
-    _controllers['portfolio'] = TextEditingController(text: getVal('portfolio'));
-    _controllers['skills_dev'] = TextEditingController(text: getVal('skills_dev'));
     _controllers['interests'] = TextEditingController(text: getVal('interests'));
   }
 
@@ -376,7 +362,6 @@ _controllers['full_name'] = TextEditingController(
     _controllers['team_size'] = TextEditingController(text: getVal('team_size'));
 
     // Social links
-    _controllers['linkedin'] = TextEditingController(text: getVal('linkedin'));
     _controllers['instagram'] = TextEditingController(text: getVal('instagram'));
     _controllers['facebook'] = TextEditingController(text: getVal('facebook'));
 
@@ -733,12 +718,12 @@ _controllers['full_name'] = TextEditingController(
                           color: Colors.blue.shade50,
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
-                          '${_profileData?['major'] ?? 'Student'} at ${_profileData?['institution'] ?? 'Not specified'}',
+                        child: const Text(
+                          'User',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.blue.shade700,
-                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF1B5E20),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       )
@@ -920,9 +905,6 @@ _buildInfoSection(
     else if (_role == 'startup')
       _buildInfoField('Founder Name', 'founders_names', isRequired: true),
 
-    if (_role == 'student')
-      _buildInfoField('Student ID', 'student_id', isRequired: true),
-
     if (_role == 'startup')
       _buildInfoField('Startup Name', 'startup_name', isRequired: true),
   ],
@@ -937,9 +919,7 @@ _buildInfoSection(
           [
             _buildInfoField('Email', 'email', alwaysReadOnly: true),
             _buildInfoField('Phone', 'phone'),
-            _buildInfoField('Address', 'address', isMultiline: true),
             _buildInfoField('Bio', 'bio', isMultiline: true),
-            _buildInfoField('Website', 'website'),
           ],
         ),
 
@@ -950,21 +930,6 @@ _buildInfoSection(
             'Education',
             Icons.school_outlined,
             [
-              _buildInfoField('Institution', 'institution', alwaysReadOnly: true),
-              _buildInfoField('Academic Level', 'academic_level', alwaysReadOnly: true),
-              _buildInfoField('Major', 'major', alwaysReadOnly: true),
-              _buildInfoField('Expected Passout Year', 'expected_passout_year',
-                  isNumeric: true, alwaysReadOnly: true),
-              _buildInfoField('LinkedIn', 'linkedin'),
-              _buildInfoField('Portfolio', 'portfolio'),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildInfoSection(
-            'Preferences',
-            Icons.favorite_outline,
-            [
-              _buildInfoField('Skills Development', 'skills_dev', isMultiline: true),
               _buildInfoField('Interests', 'interests', isMultiline: true),
             ],
           ),
@@ -982,7 +947,6 @@ _buildInfoSection(
               _buildInfoField('Startup Name', 'startup_name',alwaysReadOnly: true),
               _buildInfoField('Phone', 'phone',alwaysReadOnly: true),
               _buildInfoField('Contact Email', 'reference', alwaysReadOnly: true),
-              _buildInfoField('Company Address', 'address', isMultiline: true),
               _buildInfoField('Industry', 'industry'),
               _buildInfoField('Team Size', 'team_size', isNumeric: true),
               _buildInfoField('Founding Date', 'founding_date', alwaysReadOnly: true),
@@ -996,7 +960,6 @@ _buildInfoSection(
             'Social Profiles',
             Icons.link,
             [
-              _buildInfoField('LinkedIn', 'linkedin'),
               _buildInfoField('Instagram', 'instagram'),
               _buildInfoField('Facebook', 'facebook'),
             ],
@@ -1067,43 +1030,7 @@ _buildInfoSection(
               ),
             ],
           ),
-        ],/*
-       const SizedBox(height: 32),
-      
-            if (_isEditing) ...[
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _updateProfile,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Save Changes'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setState(() {
-                          _isEditing = false;
-                          _selectedImage = null;
-                        });
-                        _initializeControllers();
-                      },
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Cancel'),
-                    ),
-                  ),
-                ],
-              ),
-            ],*/
+        ],
             const SizedBox(height: 32),
           ],
         ),
@@ -1374,19 +1301,22 @@ _buildInfoSection(
 
     return GestureDetector(
       onTap: () async {
-        // Navigate to comments page
+        if (_isNavigatingToDetail) return;
+        _isNavigatingToDetail = true;
         try {
-          final response = await http.get(
-            Uri.parse('https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username ?? '')}'),
-          ).timeout(const Duration(seconds: 10));
-          
+          final response = await http
+              .get(
+                Uri.parse('https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username ?? '')}'),
+              )
+              .timeout(const Duration(seconds: 10));
+
           if (response.statusCode == 200 && mounted) {
             final data = json.decode(response.body);
             final comments = data['comments'] ?? [];
             final prefs = await SharedPreferences.getInstance();
             final userId = prefs.getInt('user_id');
-            
-            Navigator.push(
+
+            await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => CommentsPage(
@@ -1400,6 +1330,8 @@ _buildInfoSection(
           }
         } catch (e) {
           debugPrint('Error fetching comments: $e');
+        } finally {
+          _isNavigatingToDetail = false;
         }
       },
       child: Container(

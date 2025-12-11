@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:ideaship/auth/auth_log_reg.dart';
@@ -51,8 +52,8 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
   final TextEditingController _searchController = TextEditingController();
   List<Map<String, String>> roles = [
     {
-      'title': 'Student',
-      'subtitle': 'Seeking opportunities',
+      'title': 'User',
+      'subtitle': 'Explorers',
       'icon': 'assets/student.svg',
       'route': 'studentrole.dart',
       'heroTag': 'student-icon'
@@ -61,7 +62,7 @@ class _RoleSelectionPageState extends State<RoleSelectionPage> {
     {
       'title': 'Startup/Entrepreneur',
       'subtitle': 'Building solutions',
-      'icon': 'assets/startup.svg',
+      'icon': 'assets/company.png',
       'route': 'startuprole.dart',
       'heroTag': 'startup-icon'
     },
@@ -532,6 +533,24 @@ class _RoleCardState extends State<RoleCard> {
                     fontWeight: FontWeight.bold,
                     fontSize: screenWidth * 0.045,
                     color: const Color(0xFF2C3E50),
+                  ),
+                ),
+              if (widget.title.toLowerCase().contains('user'))
+                Container(
+                  margin: const EdgeInsets.only(top: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFF27AE60)),
+                  ),
+                  child: const Text(
+                    'Highly recommended',
+                    style: TextStyle(
+                      color: Color(0xFF1B5E20),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 6),

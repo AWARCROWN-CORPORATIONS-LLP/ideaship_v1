@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:ideaship/feed/posts.dart';
@@ -211,6 +212,12 @@ class _PublicProfilePageState extends State<PublicProfilePage>
           throw FormatException('Invalid JSON structure');
         }
         final processedData = Map<String, dynamic>.from(data);
+        // Parse user_id if present
+        final rawUserId = processedData['user_id'];
+        if (rawUserId != null) {
+          processedData['user_id'] =
+              rawUserId is int ? rawUserId : int.tryParse(rawUserId.toString()) ?? 0;
+        }
         processedData['followers_count'] =
             int.tryParse(processedData['followers_count']?.toString() ?? '0') ??
             0;
@@ -298,6 +305,8 @@ class _PublicProfilePageState extends State<PublicProfilePage>
             hasMore = nextCursorId != null;
             postsError = null;
           });
+          // Apply like states from SharedPreferences
+          await _applyLikeStatesToPosts();
         }
       });
     } on Exception catch (e) {
@@ -331,73 +340,104 @@ class _PublicProfilePageState extends State<PublicProfilePage>
   }
 
   Future<void> _toggleFollow() async {
+    if (!mounted) return;
     if (_userId == null || _userId == 0) {
       await _fetchUserId();
-      if (_userId == null || _userId == 0) return;
+      if (!mounted || _userId == null || _userId == 0) {
+        _showError('User not authenticated. Please log in again.');
+        return;
+      }
     }
-    try {
-      await _retryRequest(() async {
-        final response = await http
-            .post(
-              Uri.parse('https://server.awarcrown.com/feed/follow_action'),
-              headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-              body:
-                  'target_username=${Uri.encodeComponent(widget.targetUsername)}&username=${Uri.encodeComponent(currentUsername)}',
-            )
-            .timeout(const Duration(seconds: 10));
-
-        if (response.statusCode != 200) {
-          String specificError;
-          switch (response.statusCode) {
-            case 400:
-              specificError = 'Invalid request. Please try again.';
-              break;
-            case 401:
-              specificError = 'Please log in again.';
-              break;
-            case 403:
-              specificError = 'You can\'t follow this user.';
-              break;
-            case 404:
-              specificError = 'User not found.';
-              break;
-            case 500:
-              specificError =
-                  'The server is having issues. Please try again later.';
-              break;
-            default:
-              specificError =
-                  'There was a server issue (code ${response.statusCode}). Please try again.';
-          }
-          throw Exception(specificError);
-        }
-
-        final data = json.decode(response.body);
-        if (data is! Map<String, dynamic>) {
-          throw FormatException('Invalid JSON structure');
-        }
-        if (data['success'] != true) {
-          throw Exception(
-            'Follow action failed: ${data['message'] ?? 'Please try again.'}',
-          );
-        }
-        if (mounted) {
-          setState(() {
-            isFollowing = !isFollowing;
-            userInfo!['followers_count'] =
-                (userInfo!['followers_count'] ?? 0) + (isFollowing ? 1 : -1);
-          });
-        }
+    
+    final followedUserId = await _getTargetUserId();
+    if (followedUserId == null || followedUserId == 0) {
+      _showError('User information not available. Please try again.');
+      return;
+    }
+    
+    // Prevent duplicate requests
+    if (isProcessingFollow[followedUserId] ?? false) return;
+    
+    setState(() => isProcessingFollow[followedUserId] = true);
+    final oldFollowing = isFollowing;
+    final newFollowing = !oldFollowing;
+    
+    // Optimistic update
+    final oldFollowersCount = userInfo!['followers_count'] ?? 0;
+    final newFollowersCount = oldFollowersCount + (newFollowing ? 1 : -1);
+    
+    if (mounted) {
+      setState(() {
+        isFollowing = newFollowing;
+        userInfo!['followers_count'] = newFollowersCount < 0 ? 0 : newFollowersCount;
       });
-    } on Exception catch (e) {
-      debugPrint('Error in _toggleFollow: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_getErrorMessage(e)),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
+    
+    try {
+      final response = await http.post(
+        Uri.parse('https://server.awarcrown.com/feed/handle_followers'),
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'follower_id=$_userId&followed_id=$followedUserId&action=${newFollowing ? 'follow' : 'unfollow'}',
+      ).timeout(const Duration(seconds: 10));
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data is Map<String, dynamic>) {
+          if (data['status'] == 'success') {
+            _showSuccess(newFollowing ? 'Followed user' : 'Unfollowed user');
+          } else {
+            throw Exception(data['message'] ?? 'Failed to process follow action');
+          }
+        }
+      } else {
+        throw http.ClientException('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Revert on error
+      if (mounted) {
+        setState(() {
+          isFollowing = oldFollowing;
+          userInfo!['followers_count'] = oldFollowersCount;
+        });
+      }
+      _showError('Failed to ${newFollowing ? 'follow' : 'unfollow'} user: ${_getErrorMessage(e)}');
+      debugPrint('Error in _toggleFollow: $e');
+    } finally {
+      if (mounted) {
+        setState(() => isProcessingFollow[followedUserId] = false);
+      }
+    }
+  }
+
+  Future<int?> _getTargetUserId() async {
+    // Try cached userInfo
+    if (userInfo != null) {
+      final uid = userInfo!['user_id'];
+      if (uid is int && uid > 0) return uid;
+      if (uid != null) {
+        final parsed = int.tryParse(uid.toString());
+        if (parsed != null && parsed > 0) return parsed;
+      }
+    }
+    // Fallback: fetch by username
+    try {
+      final resp = await http
+          .get(
+            Uri.parse(
+              'https://server.awarcrown.com/feed/get_user?username=${Uri.encodeComponent(widget.targetUsername)}',
+            ),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (resp.statusCode == 200) {
+        final data = json.decode(resp.body);
+        final raw = data is Map<String, dynamic> ? data['user_id'] : null;
+        if (raw is int && raw > 0) return raw;
+        if (raw != null) return int.tryParse(raw.toString());
+      }
+    } catch (e) {
+      debugPrint('Fallback get user id error: $e');
+    }
+    return null;
   }
 
   Future<bool> _getIsFollowing(int followedId) async {
@@ -475,6 +515,8 @@ class _PublicProfilePageState extends State<PublicProfilePage>
         posts[index]['is_liked'] = newLiked;
         posts[index]['like_count'] = optimisticCount;
       });
+      // Save to SharedPreferences immediately
+      await _saveLikeState(postId, newLiked, optimisticCount);
     }
     if (newLiked && !oldLiked) {
       final iconController = likeAnimationControllers.putIfAbsent(
@@ -523,14 +565,14 @@ class _PublicProfilePageState extends State<PublicProfilePage>
           throw FormatException('Invalid JSON structure');
         }
         if (mounted) {
+          final serverLikeCount = data['like_count'] ?? optimisticCount;
+          final serverIsLiked = data['is_liked'] ?? newLiked;
           setState(() {
-            if (data['like_count'] != null) {
-              posts[index]['like_count'] = data['like_count'];
-            }
-            if (data['is_liked'] != null) {
-              posts[index]['is_liked'] = data['is_liked'];
-            }
+            posts[index]['like_count'] = serverLikeCount;
+            posts[index]['is_liked'] = serverIsLiked;
           });
+          // Save server response to SharedPreferences
+          await _saveLikeState(postId, serverIsLiked, serverLikeCount);
         }
       });
     } on Exception catch (e) {
@@ -540,9 +582,31 @@ class _PublicProfilePageState extends State<PublicProfilePage>
         _showSuccess('Like action queued offline');
       } else {
         if (mounted) {
+          // Reload like state from SharedPreferences to ensure consistency
+          final likeStates = await _loadLikeStates();
+          final likesMap = likeStates['likes'] as Map<String, dynamic>;
+          final countsMap = likeStates['counts'] as Map<String, dynamic>;
+          final postIdStr = postId.toString();
+          
           setState(() {
-            posts[index]['is_liked'] = oldLiked;
-            posts[index]['like_count'] = oldCount;
+            // Use SharedPreferences value if available, otherwise revert to old
+            if (likesMap.containsKey(postIdStr)) {
+              posts[index]['is_liked'] = likesMap[postIdStr] == true;
+            } else {
+              posts[index]['is_liked'] = oldLiked;
+            }
+            if (countsMap.containsKey(postIdStr)) {
+              final savedCount = countsMap[postIdStr];
+              if (savedCount is int) {
+                posts[index]['like_count'] = savedCount;
+              } else if (savedCount != null) {
+                posts[index]['like_count'] = int.tryParse(savedCount.toString()) ?? oldCount;
+              } else {
+                posts[index]['like_count'] = oldCount;
+              }
+            } else {
+              posts[index]['like_count'] = oldCount;
+            }
           });
           _showError(
             'Failed to ${newLiked ? 'like' : 'unlike'} post: ${_getErrorMessage(e)}',
@@ -569,6 +633,76 @@ class _PublicProfilePageState extends State<PublicProfilePage>
       await prefs.setString('like_queue', json.encode(queue));
     } catch (e) {
       debugPrint('Error queuing like action: $e');
+    }
+  }
+  // Save like state to SharedPreferences
+  Future<void> _saveLikeState(int postId, bool isLiked, int likeCount) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final likesMapStr = prefs.getString('post_likes_map') ?? '{}';
+      final likesCountMapStr = prefs.getString('post_like_counts_map') ?? '{}';
+      
+      final likesMap = Map<String, dynamic>.from(json.decode(likesMapStr));
+      final likesCountMap = Map<String, dynamic>.from(json.decode(likesCountMapStr));
+      
+      likesMap[postId.toString()] = isLiked;
+      likesCountMap[postId.toString()] = likeCount;
+      
+      await prefs.setString('post_likes_map', json.encode(likesMap));
+      await prefs.setString('post_like_counts_map', json.encode(likesCountMap));
+    } catch (e) {
+      debugPrint('Error saving like state: $e');
+    }
+  }
+  // Load like states from SharedPreferences
+  Future<Map<String, dynamic>> _loadLikeStates() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final likesMapStr = prefs.getString('post_likes_map') ?? '{}';
+      final likesCountMapStr = prefs.getString('post_like_counts_map') ?? '{}';
+      
+      final likesMap = Map<String, dynamic>.from(json.decode(likesMapStr));
+      final likesCountMap = Map<String, dynamic>.from(json.decode(likesCountMapStr));
+      
+      return {
+        'likes': likesMap,
+        'counts': likesCountMap,
+      };
+    } catch (e) {
+      debugPrint('Error loading like states: $e');
+      return {'likes': {}, 'counts': {}};
+    }
+  }
+  // Apply like states from SharedPreferences to posts
+  Future<void> _applyLikeStatesToPosts() async {
+    try {
+      final likeStates = await _loadLikeStates();
+      final likesMap = likeStates['likes'] as Map<String, dynamic>;
+      final countsMap = likeStates['counts'] as Map<String, dynamic>;
+      
+      if (mounted) {
+        setState(() {
+          for (var post in posts) {
+            final postId = post['post_id'];
+            if (postId != null) {
+              final postIdStr = postId.toString();
+              if (likesMap.containsKey(postIdStr)) {
+                post['is_liked'] = likesMap[postIdStr] == true;
+              }
+              if (countsMap.containsKey(postIdStr)) {
+                final savedCount = countsMap[postIdStr];
+                if (savedCount is int) {
+                  post['like_count'] = savedCount;
+                } else if (savedCount != null) {
+                  post['like_count'] = int.tryParse(savedCount.toString()) ?? post['like_count'] ?? 0;
+                }
+              }
+            }
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error applying like states: $e');
     }
   }
 
@@ -1265,6 +1399,22 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                                 ),
                               ),
 
+              if (userInfo!['bio'] != null &&
+                  userInfo!['bio'].toString().isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  userInfo!['bio'],
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
+                    height: 1.35,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+
                               const SizedBox(height: 8),
                               if (userInfo!['role'] == 'student')
                                 Container(
@@ -1362,6 +1512,9 @@ class _PublicProfilePageState extends State<PublicProfilePage>
                         if (currentUsername != widget.targetUsername)
                           _FollowButton(
                             isFollowing: isFollowing,
+                            isProcessing: userInfo != null && userInfo!['user_id'] != null
+                                ? (isProcessingFollow[userInfo!['user_id']] ?? false)
+                                : false,
                             onTap: _toggleFollow,
                           ),
                       ],
@@ -2574,13 +2727,18 @@ class _StatButton extends StatelessWidget {
 
 class _FollowButton extends StatelessWidget {
   final bool isFollowing;
+  final bool isProcessing;
   final VoidCallback onTap;
-  const _FollowButton({required this.isFollowing, required this.onTap});
+  const _FollowButton({
+    required this.isFollowing,
+    this.isProcessing = false,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: isProcessing ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -2589,14 +2747,23 @@ class _FollowButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           border: isFollowing ? Border.all(color: Colors.grey.shade300) : null,
         ),
-        child: Text(
-          isFollowing ? 'Following' : 'Follow',
-          style: TextStyle(
-            color: isFollowing ? Colors.grey.shade800 : Colors.white,
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-        ),
+        child: isProcessing
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            : Text(
+                isFollowing ? 'Following' : 'Follow',
+                style: TextStyle(
+                  color: isFollowing ? Colors.grey.shade800 : Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+              ),
       ),
     );
   }

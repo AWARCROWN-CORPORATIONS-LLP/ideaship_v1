@@ -832,7 +832,8 @@ class _ThreadsScreenState extends State<ThreadsScreen>
     } catch (e) {
       debugPrint('Error loading username and user ID: $e');
       if (mounted) {
-        _showError('Failed to load user info: $e');
+       // Even if loading fails, we proceed without crashing
+        setState(() {});
       }
     }
   }
