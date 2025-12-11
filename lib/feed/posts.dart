@@ -22,6 +22,9 @@ class ExpandedText extends StatefulWidget {
   @override
   State<ExpandedText> createState() => _ExpandedTextState();
 }
+
+//read more or less code 
+
 class _ExpandedTextState extends State<ExpandedText> {
   bool _isExpanded = false;
   @override
@@ -70,6 +73,7 @@ class _ExpandedTextState extends State<ExpandedText> {
     );
   }
 }
+//class for skeleton loading effect
 class Skeleton extends StatefulWidget {
   final double height;
   final double width;
@@ -83,6 +87,7 @@ class Skeleton extends StatefulWidget {
   @override
   State<Skeleton> createState() => _SkeletonState();
 }
+//skeleton loading effect state
 class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> gradientPosition;
@@ -126,6 +131,7 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
     );
   }
 }
+  //post skeleton widget
 class PostSkeleton extends StatelessWidget {
   const PostSkeleton({super.key});
   @override
@@ -199,6 +205,7 @@ class PostSkeleton extends StatelessWidget {
     );
   }
 }
+//class for comment skeleton loading effect
 class CommentSkeleton extends StatelessWidget {
   const CommentSkeleton({super.key});
   @override
@@ -240,6 +247,7 @@ class CommentSkeleton extends StatelessWidget {
     );
   }
 }
+//comment item widget
 class CommentItem extends StatelessWidget {
   final dynamic comment;
   final int depth;
@@ -389,6 +397,8 @@ class CommentItem extends StatelessWidget {
     }
   }
 }
+
+//comments page widget
 class CommentsPage extends StatefulWidget {
   final dynamic post;
   final List<dynamic> comments;
@@ -404,6 +414,7 @@ class CommentsPage extends StatefulWidget {
   @override
   State<CommentsPage> createState() => _CommentsPageState();
 }
+//comments page state
 class _CommentsPageState extends State<CommentsPage> {
   late dynamic post;
   late String _username;
@@ -422,7 +433,7 @@ class _CommentsPageState extends State<CommentsPage> {
     post = widget.post;
     _username = widget.username;
     _userId = widget.userId;
-    comments = List.from(widget.comments); // Copy to avoid mutation
+    comments = List.from(widget.comments); 
     _initializeUserId();
     _processLikeQueue();
     if (comments.isEmpty) {
@@ -952,11 +963,13 @@ class _CommentsPageState extends State<CommentsPage> {
     );
   }
 }
+//posts page widget
 class PostsPage extends StatefulWidget {
   const PostsPage({super.key});
   @override
   State<PostsPage> createState() => _PostsPageState();
 }
+//posts page state
 class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   List<dynamic> posts = [];
   bool isLoading = false;
@@ -978,7 +991,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin {
   final Map<int, bool> isSavingMap = {};
   final ValueNotifier<bool> _refreshNotifier = ValueNotifier(false);
   Set<int> _savedPosts = {};
-  final Map<int, bool> isReportingMap = {}; // Track reporting state to prevent spam
+  final Map<int, bool> isReportingMap = {}; 
   @override
   void initState() {
     super.initState();

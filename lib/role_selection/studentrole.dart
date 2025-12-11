@@ -612,8 +612,9 @@ class _StudentRolePageState extends State<StudentRolePage> {
                     if (value == null || value.isEmpty) return 'Required';
                     if (!RegExp(
                       r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                    ).hasMatch(value))
+                    ).hasMatch(value)) {
                       return 'Enter a valid email';
+                    }
                     return null;
                   },
                 ),
@@ -636,8 +637,9 @@ class _StudentRolePageState extends State<StudentRolePage> {
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
                     if (value.length < 2) return 'Name too short';
-                    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(value))
+                    if (!RegExp(r'^[a-zA-Z\s]+$').hasMatch(value)) {
                       return 'Only letters and spaces allowed';
+                    }
                     return null;
                   },
                 ),
@@ -665,8 +667,9 @@ class _StudentRolePageState extends State<StudentRolePage> {
                     if (value == null || value.isEmpty) return 'Required';
                     final dob = DateTime.parse(value);
                     final age = DateTime.now().difference(dob).inDays ~/ 365;
-                    if (age < 16 || age > 100)
+                    if (age < 16 || age > 100) {
                       return 'Age must be between 16 and 100';
+                    }
                     return null;
                   },
                   onTap: () => _selectDate(context),
@@ -688,8 +691,9 @@ class _StudentRolePageState extends State<StudentRolePage> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
-                    if (!RegExp(r'^\+?[\d\s\-\(\)]{10,}$').hasMatch(value))
+                    if (!RegExp(r'^\+?[\d\s\-\(\)]{10,}$').hasMatch(value)) {
                       return 'Enter valid phone (10+ digits)';
+                    }
                     return null;
                   },
                   keyboardType: TextInputType.phone,
@@ -749,8 +753,9 @@ class _StudentRolePageState extends State<StudentRolePage> {
                             helperText: 'Select or type your nationality',
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty)
+                            if (value == null || value.isEmpty) {
                               return 'Required';
+                            }
                             return null;
                           },
                           onFieldSubmitted: (String value) =>
@@ -796,8 +801,9 @@ class _StudentRolePageState extends State<StudentRolePage> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) return 'Required';
-                    if (!RegExp(r'^[A-Za-z0-9]+$').hasMatch(value))
+                    if (!RegExp(r'^[A-Za-z0-9]+$').hasMatch(value)) {
                       return 'Alphanumeric only';
+                    }
                     return null;
                   },
                 ),
@@ -854,8 +860,9 @@ class _StudentRolePageState extends State<StudentRolePage> {
                   ),
                   validator: (value) {
                     if (value == null || value.isEmpty) return null;
-                    if (!value.startsWith('https://www.linkedin.com/'))
+                    if (!value.startsWith('https://www.linkedin.com/')) {
                       return 'Must start with https://www.linkedin.com/';
+                    }
                     return null;
                   },
                 ),
@@ -926,8 +933,9 @@ class _StudentRolePageState extends State<StudentRolePage> {
                                 'Required - Your area of study or expertise',
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty)
+                            if (value == null || value.isEmpty) {
                               return 'Required';
+                            }
                             return null;
                           },
                           onFieldSubmitted: (String value) =>
@@ -956,8 +964,9 @@ class _StudentRolePageState extends State<StudentRolePage> {
                     final year = int.tryParse(value);
                     if (year == null) return 'Enter a valid year';
                     final currentYear = DateTime.now().year;
-                    if (year < currentYear || year > currentYear + 10)
+                    if (year < currentYear || year > currentYear + 10) {
                       return 'Year must be between $currentYear and ${currentYear + 10}';
+                    }
                     return null;
                   },
                 ),
@@ -1060,8 +1069,9 @@ class _StudentRolePageState extends State<StudentRolePage> {
                             helperText: 'Areas you want to improve in',
                           ),
                           validator: (value) {
-                            if (value == null || value.isEmpty)
+                            if (value == null || value.isEmpty) {
                               return 'Required';
+                            }
                             return null;
                           },
                           onFieldSubmitted: (String value) =>
