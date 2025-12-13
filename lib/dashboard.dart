@@ -7,7 +7,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:ideaship/feed/createpost.dart';
 import 'package:ideaship/feed/posts.dart';
 import 'package:ideaship/feed/startups.dart';
-
 import 'package:ideaship/settings/usersettings.dart';
 import 'package:ideaship/thr_project/thread_details.dart';
 import 'package:ideaship/user/userprofile.dart';
@@ -111,6 +110,7 @@ void _showUpdateDialog(String message, String updateUrl) {
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
+                 // ignore: deprecated_member_use
                   color: Colors.blue.withOpacity(0.12),
                 ),
                 child: const Icon(
@@ -144,7 +144,7 @@ void _showUpdateDialog(String message, String updateUrl) {
 
               const SizedBox(height: 25),
 
-              // Only Update Now button
+              
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -215,7 +215,7 @@ void _showUpdateDialog(String message, String updateUrl) {
           _username = prefs.getString('username') ?? '';
           _email = prefs.getString('email') ?? '';
           _role = prefs.getString('role') ?? '';
-          _major = prefs.getString('major');
+         
           _isLoading = false;
         });
       }
@@ -223,7 +223,7 @@ void _showUpdateDialog(String message, String updateUrl) {
       if (mounted) {
         _showErrorBanner('Failed to load user data: ${e.toString()}');
        
-        Navigator.pushReplacementNamed(context, 'auth/auth_log_reg');
+       
       }
     }
   }
@@ -251,11 +251,11 @@ void _showUpdateDialog(String message, String updateUrl) {
         final data = response.payload != null
             ? json.decode(response.payload!) as Map<String, dynamic>
             : <String, dynamic>{};
-        _handleNotificationTap(data); // Use local handler
+        _handleNotificationTap(data); 
       },
     );
 
-    // Android channel
+    
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       'high_importance_channel',
       'High Importance Notifications',
@@ -1210,6 +1210,7 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
+              // ignore: deprecated_member_use
               color: Colors.black.withOpacity(0.06),
               blurRadius: 8,
               offset: const Offset(0, 2),

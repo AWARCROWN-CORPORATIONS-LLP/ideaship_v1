@@ -403,7 +403,7 @@ class _NotificationsPageState extends State<NotificationsPage>
       ),
       body: Column(
         children: [
-          // Search Bar
+         
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
             child: TextField(

@@ -172,7 +172,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
     }
   }
 
-  // Scroll to comments section smoothly
+  
   void _scrollToComments() {
     if (_commentsScrollController.hasClients) {
       _commentsScrollController.animateTo(
@@ -437,7 +437,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
             .get(uri)
             .timeout(const Duration(seconds: 15));
 
-        debugPrint('Comments response: ${response.body}');
+        //debugPrint('Comments response: ${response.body}');
         if (response.statusCode == 200 || response.statusCode == 201) {
           final data = json.decode(response.body);
           final commentList = data['comments'] as List<dynamic>? ?? [];

@@ -1328,6 +1328,7 @@ class _ThreadsScreenState extends State<ThreadsScreen>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
+                // ignore: deprecated_member_use
                 color: const Color(0xFF4A90E2).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -1595,6 +1596,7 @@ Future<void> _joinPrivateThread(String code) async {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
+                // ignore: deprecated_member_use
                 color: const Color(0xFF10B981).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -1655,9 +1657,11 @@ Future<void> _joinPrivateThread(String code) async {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
+                // ignore: deprecated_member_use
                 color: const Color(0xFF4A90E2).withOpacity(0.05),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
+                  // ignore: deprecated_member_use
                   color: const Color(0xFF4A90E2).withOpacity(0.2),
                 ),
               ),
@@ -2159,6 +2163,7 @@ Future<void> _joinPrivateThread(String code) async {
                 autofocus: true,
                 decoration: InputDecoration(
                   hintText: 'Search discussions...',
+                  // ignore: deprecated_member_use
                   hintStyle: TextStyle(color: Colors.white.withOpacity(0.7)),
                   border: InputBorder.none,
                   suffixIcon: IconButton(
@@ -2173,6 +2178,7 @@ Future<void> _joinPrivateThread(String code) async {
             : TabBar(
                 controller: _tabController,
                 labelColor: Colors.white,
+                // ignore: deprecated_member_use
                 unselectedLabelColor: Colors.white.withOpacity(0.7),
                 indicatorColor: Colors.white,
                 indicatorWeight: 3,
@@ -2265,6 +2271,7 @@ Future<void> _joinPrivateThread(String code) async {
                 icon: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
+                    // ignore: deprecated_member_use
                     color: accentColor.withOpacity(0.25),
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -2364,6 +2371,7 @@ Future<void> _joinPrivateThread(String code) async {
                 ),
                 boxShadow: [
                   BoxShadow(
+                    // ignore: deprecated_member_use
                     color: accentColor.withOpacity(0.4),
                     blurRadius: 20,
                     offset: const Offset(0, 8),
@@ -2439,6 +2447,7 @@ Future<void> _joinPrivateThread(String code) async {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
+                        // ignore: deprecated_member_use
                         color: Colors.black.withOpacity(0.04),
                         blurRadius: 10,
                         offset: const Offset(0, 2),
@@ -2663,7 +2672,9 @@ Future<void> _joinPrivateThread(String code) async {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
+        // ignore: deprecated_member_use
         splashColor: const Color(0xFF4A90E2).withOpacity(0.08),
+        // ignore: deprecated_member_use
         highlightColor: const Color(0xFF4A90E2).withOpacity(0.04),
         onTap: isDeleting
             ? null
@@ -2685,6 +2696,7 @@ Future<void> _joinPrivateThread(String code) async {
             border: Border.all(color: const Color(0xFFE5E9F0), width: 1),
             boxShadow: [
               BoxShadow(
+                // ignore: deprecated_member_use
                 color: Colors.black.withOpacity(0.04),
                 blurRadius: 12,
                 offset: const Offset(0, 4),
@@ -2705,6 +2717,7 @@ Future<void> _joinPrivateThread(String code) async {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
+                            // ignore: deprecated_member_use
                             color: const Color(0xFF4A90E2).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -2796,6 +2809,7 @@ Future<void> _joinPrivateThread(String code) async {
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
+                            // ignore: deprecated_member_use
                             color: const Color(0xFF4A90E2).withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -2819,6 +2833,7 @@ Future<void> _joinPrivateThread(String code) async {
                                 decoration: BoxDecoration(
                                   color: const Color(
                                     0xFF10B981,
+                                    // ignore: deprecated_member_use
                                   ).withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -3039,6 +3054,7 @@ Future<void> _joinPrivateThread(String code) async {
                 Positioned.fill(
                   child: Container(
                     decoration: BoxDecoration(
+                      // ignore: deprecated_member_use
                       color: Colors.white.withOpacity(0.8),
                       borderRadius: BorderRadius.circular(20),
                     ),
@@ -3108,6 +3124,7 @@ Future<void> _joinPrivateThread(String code) async {
         child: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
+            // ignore: deprecated_member_use
             color: color.withOpacity(0.1),
             borderRadius: BorderRadius.circular(10),
           ),

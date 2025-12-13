@@ -1034,9 +1034,9 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
   Future<void> _refreshOnResume() async {
     if (!mounted || isLoading) return;
     _lastRefreshTime = DateTime.now();
-    // Process any queued like actions first
+   
     await _processLikeQueue();
-    // Do a full refresh: fetch fresh posts and update cache
+    
     await _fullRefresh();
   }
   
@@ -1048,18 +1048,22 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
       nextCursorId = null;
     });
     }
-    // Fetch fresh posts from server (this will update cache via _fetchPosts)
+   
     await _fetchPosts();
   }
-  Future<void> _initializeData() async {
-    await _loadUsername();
-    await _loadSavedPosts();
-    await _processLikeQueue();
-    await _loadPostsFromCache();
-    await _updateFollowStatuses();
-    await _fetchPosts();
-    _isInitialized = true;
-  }
+ Future<void> _initializeData() async {
+
+  await _loadUsername();
+  await _loadSavedPosts();
+  await _loadLikeStates();
+  await _processLikeQueue();
+  await _loadPostsFromCache();
+  _isInitialized = true;
+  await _fetchPosts();
+  await _updateFollowStatuses();
+  await _applyLikeStatesToPosts();
+}
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -1332,7 +1336,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
       final int? timestamp = prefs.getInt('cache_timestamp');
       if (cachedPostsJson != null && timestamp != null) {
         final cacheAge = DateTime.now().millisecondsSinceEpoch - timestamp;
-        if (cacheAge < 3600000) { // 1 hour
+        if (cacheAge < 3600000) { 
           final parsedPosts = json.decode(cachedPostsJson);
           if (parsedPosts is List && mounted) {
             setState(() {
@@ -1344,13 +1348,13 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
                 }
               }
             });
-            // Apply like states from SharedPreferences after loading from cache
+            
             await _applyLikeStatesToPosts();
           }
         }
       }
     } catch (e) {
-      debugPrint('Error loading posts from cache: $e');
+      // Ignore cache loading errors
     }
   }
   Future<void> _loadUsername() async {
@@ -1467,10 +1471,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
           nextCursorId = _parseInt(data['nextCursorId']);
           hasMore = nextCursorId != null;
         });
-        // Apply like states from SharedPreferences
+         await _updateFollowStatuses();
+      
         await _applyLikeStatesToPosts();
         await _savePostsToCache();
-        await _updateFollowStatuses();
+       
         _refreshNotifier.value = !_refreshNotifier.value;
       }
     } catch (e) {
@@ -1518,7 +1523,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
             }
           }
         });
-        // Apply like states from SharedPreferences
+        
         await _applyLikeStatesToPosts();
         await _savePostsToCache();
         await _updateFollowStatuses();
@@ -1532,12 +1537,17 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
       }
     }
   }
+
   Future<void> _toggleLike(int postId, int index) async {
+    
     if (!mounted) return;
     if (_userId == null || _userId == 0) {
       await _fetchUserId();
       if (!mounted || _userId == null || _userId == 0) {
         _showError('User not authenticated. Please log in again.');
+        //go to login page
+       
+
         return;
       }
     }
@@ -1547,13 +1557,13 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
     final oldCount = posts[index]['like_count'] ?? 0;
     final newLiked = !oldLiked;
     final optimisticCount = oldCount + (newLiked ? 1 : -1);
-    // Optimistic update
+    
     if (mounted) {
       setState(() {
         posts[index]['is_liked'] = newLiked;
         posts[index]['like_count'] = optimisticCount;
       });
-      // Save to SharedPreferences immediately
+      
       await _saveLikeState(postId, newLiked, optimisticCount);
     }
     if (newLiked && !oldLiked) {
@@ -2106,29 +2116,48 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
               ),
               child: Icon(
                 Icons.feed_outlined,
-                size: 64,
+                size: 44,
                 color: const Color(0xFF4A90E2),
               ),
             ),
             const SizedBox(height: 24),
-            Text(
-              'No posts yet',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Follow users to see their posts here',
-              style: TextStyle(
-                fontSize: 15,
-                color: colorScheme.onSurfaceVariant,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
+          RichText(
+  textAlign: TextAlign.center,
+  text: TextSpan(
+    children: [
+      TextSpan(
+        text: 'Built with ',
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: colorScheme.onSurfaceVariant, // grey
+          letterSpacing: -0.2,
+        ),
+      ),
+      TextSpan(
+        text: '“❤️ for Startups”',
+        style: TextStyle(
+          
+          fontSize: 18,
+          fontWeight: FontWeight.w500,
+          color: colorScheme.onSurface, 
+          letterSpacing: -0.2,
+        ),
+      ),
+    ],
+  ),
+),
+const SizedBox(height: 12),
+Text(
+  'Discover ideas from innovative founders.',
+  style: TextStyle(
+    fontSize: 14,
+    color: colorScheme.onSurfaceVariant,
+    height: 1.5,
+  ),
+  textAlign: TextAlign.center,
+),
+
           ],
         ),
       ),

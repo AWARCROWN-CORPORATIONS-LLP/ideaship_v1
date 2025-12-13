@@ -576,6 +576,7 @@ void _initializeControllers() {
     if (_profilePicture == null) return;
     showDialog(
       context: context,
+      // ignore: deprecated_member_use
       barrierColor: Colors.black.withOpacity(0.95),
       barrierDismissible: true,
       builder: (context) {
@@ -646,6 +647,7 @@ void _initializeControllers() {
                       border: Border.all(color: Colors.grey.shade200, width: 2),
                       boxShadow: [
                         BoxShadow(
+                          // ignore: deprecated_member_use
                           color: Colors.black.withOpacity(0.05),
                           blurRadius: 10,
                           offset: const Offset(0, 2),
@@ -719,7 +721,7 @@ void _initializeControllers() {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(
-                          'User',
+                          'Explorer',
                           style: TextStyle(
                             fontSize: 12,
                             color: Color(0xFF1B5E20),
@@ -735,7 +737,8 @@ void _initializeControllers() {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          '${_profileData?['contact_designation'] ?? 'HR'} at ${_profileData?['company_name'] ?? 'Not specified'}',
+                          'Builder at Ideaship',
+
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.purple.shade700,
@@ -1045,6 +1048,7 @@ _buildInfoSection(
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
+            // ignore: deprecated_member_use
             color: Colors.black.withOpacity(0.03),
             blurRadius: 10,
             offset: const Offset(0, 2),
@@ -1061,6 +1065,7 @@ _buildInfoSection(
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
+                    // ignore: deprecated_member_use
                     color: const Color(0xFF007AFF).withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1341,6 +1346,7 @@ _buildInfoSection(
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
+              // ignore: deprecated_member_use
               color: Colors.black.withOpacity(0.04),
               blurRadius: 10,
               offset: const Offset(0, 2),

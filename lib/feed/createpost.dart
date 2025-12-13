@@ -456,6 +456,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
             await Future.delayed(const Duration(milliseconds: 500));
             // ISSUE 5 FIX: Ensure state reset before popping if successful
             _resetStateOnCompletion(); 
+            
             Navigator.pop(context, true);
           }
         } else {
@@ -534,6 +535,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
           // ISSUE 7 FIX: Add the same subtle shadow as the info card for consistency
           boxShadow: [
              BoxShadow(
+              // ignore: deprecated_member_use
               color: Colors.black.withOpacity(0.03),
               blurRadius: 8,
               offset: const Offset(0, 2),
@@ -575,6 +577,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                     right: 8,
                     child: Container(
                       decoration: BoxDecoration(
+                        // ignore: deprecated_member_use
                         color: Colors.black.withOpacity(0.5),
                         shape: BoxShape.circle,
                       ),
@@ -755,6 +758,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                           border: Border.all(color: Colors.grey.shade200),
                           boxShadow: [
                             BoxShadow(
+                              // ignore: deprecated_member_use
                               color: Colors.black.withOpacity(0.03),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
@@ -766,6 +770,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
+                                // ignore: deprecated_member_use
                                 color: const Color(0xFF007AFF).withOpacity(0.1),
                                 shape: BoxShape.circle,
                               ),

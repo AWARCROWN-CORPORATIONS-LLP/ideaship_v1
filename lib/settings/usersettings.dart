@@ -473,6 +473,49 @@ class _SettingsPageState extends State<SettingsPage> {
     ),
   );
 }
+Widget _buildFooter() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 16),
+    child: Center(
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(fontSize: 23),
+         children: [
+  TextSpan(
+    text: 'Built with ',
+    style: TextStyle(
+       fontFamily: 'DMSans',
+      color: Colors.grey.shade500,
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+      
+    ),
+  ),
+  const TextSpan(
+    text: '❤️\n',
+    style: TextStyle(
+      fontSize: 16,
+      fontWeight: FontWeight.bold,
+    ),
+  ),
+  const TextSpan(
+    text: 'For Startups',
+    style: TextStyle(
+        fontFamily: 'PlayfairDisplay',
+      color: Colors.black,
+      fontSize: 26,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.4,
+    ),
+  ),
+],
+
+        ),
+      ),
+    ),
+  );
+}
+
 
 
   Widget _buildAboutRow(IconData icon, String label, String value, VoidCallback onTap) {
@@ -681,7 +724,11 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
 
-          const SizedBox(height: 24),
+         
+          const SizedBox(height: 5),
+_buildFooter(),
+const SizedBox(height: 10),
+
         ],
       ),
     );
