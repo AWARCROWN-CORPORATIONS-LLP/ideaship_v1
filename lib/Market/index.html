@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Ideaship – Launch Product</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    :root {
+      --primary: #111827;
+      --primary-light: #1f2937;
+      --accent: #6366f1;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Inter, system-ui, sans-serif;
+      background: var(--bg);
+      margin: 0;
+      padding: 16px;
+      color: var(--primary);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: auto;
+      display: grid;
+      gap: 24px;
+    }
+
+    @media (min-width: 1024px) {
+      .container {
+        grid-template-columns: 1.2fr 0.8fr;
+      }
+    }
+
+    .form-box,
+    .preview-box {
+      background: var(--card);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+      overflow: hidden;
+    }
+
+    .form-box {
+      padding: 32px;
+    }
+
+    /* -------- FORM -------- */
+    .section {
+      margin-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 24px;
+    }
+
+    .section:last-child {
+      border: none;
+    }
+
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+
+    .section-sub {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    label {
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: block;
+      margin: 16px 0 6px;
+    }
+
+    .required::after {
+      content: " *";
+      color: var(--danger);
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.95rem;
+    }
+
+    input[readonly] {
+      background: #f9fafb;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 90px;
+    }
+
+    /* Tag input */
+    .tag-input-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px;
+    }
+
+    .tag-chip {
+      background: #e0e7ff;
+      color: #3730a3;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      display: flex;
+      gap: 6px;
+    }
+
+    .tag-chip button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .tag-input {
+      border: none;
+      outline: none;
+      flex: 1;
+    }
+
+    /* Image upload */
+    .image-preview-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+
+    .image-preview {
+      height: 100px;
+      border: 2px dashed var(--border);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      background-size: cover;
+      background-position: center;
+      color: var(--muted);
+      font-size: 0.75rem;
+      position: relative;
+    }
+
+    .image-preview.has-image span {
+      display: none;
+    }
+
+    .remove-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: rgba(0, 0, 0, 0.6);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      cursor: pointer;
+      display: none;
+    }
+
+    .image-preview.has-image .remove-btn {
+      display: block;
+    }
+
+    /* -------- PREVIEW -------- */
+    .preview-box {
+      position: sticky;
+      top: 16px;
+    }
+
+    .preview-heading {
+      padding: 14px;
+      background: #f1f5f9;
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--muted);
+    }
+
+    .preview-header {
+      padding: 20px;
+      display: flex;
+      gap: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo-view {
+      width: 64px;
+      height: 64px;
+      border-radius: 12px;
+      background: #e5e7eb;
+      object-fit: cover;
+    }
+
+    .status {
+      font-size: 0.7rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+
+    .premarket {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .live {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .slideshow-container {
+      height: 220px;
+      background: #f3f4f6;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: 0.4s;
+      background-size: cover;
+      background-position: center;
+    }
+
+    .slide.active {
+      opacity: 1;
+    }
+
+    .preview-body {
+      padding: 20px;
+    }
+
+    .mass-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #ef4444;
+      margin-bottom: 12px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .tag-v {
+      background: #f1f5f9;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .comments-box {
+      margin-top: 16px;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+
+    .comment {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .comment-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #e5e7eb;
+    }
+
+    .comment-user {
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .comment-text {
+      font-size: 0.8rem;
+      color: var(--primary-light);
+    }
+
+    .cta-area {
+      padding: 20px;
+      border-top: 1px solid var(--border);
+    }
+
+    .btn-main {
+      width: 100%;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      background: var(--primary);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <!-- ================= FORM ================= -->
+    <form class="form-box" onsubmit="event.preventDefault()">
+      <h2>Launch Product</h2>
+
+      <div class="section">
+        <div class="section-title">Founder</div>
+        <label>Username</label>
+        <input readonly value="aditya">
+      </div>
+
+      <div class="section">
+        <div class="section-title">Product Basics</div>
+
+        <label class="required">Company Name</label>
+        <input id="in_company">
+
+        <label class="required">Product Name</label>
+        <input id="in_product">
+
+        <label>Headline</label>
+        <input id="in_tagline">
+
+        <label>Status</label>
+        <select id="in_status">
+          <option value="premarket">Pre-Market</option>
+          <option value="live">Live</option>
+        </select>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Media</div>
+
+        <label>Logo</label>
+        <div class="image-preview" id="logo_area">
+          <span>Upload</span>
+          <button type="button" class="remove-btn" onclick="clearImg('logo')">×</button>
+        </div>
+        <input type="file" id="file_logo" hidden accept="image/*">
+
+        <label>Gallery (3 images)</label>
+        <div class="image-preview-grid">
+          <div class="image-preview" id="img1_area"><span>Img 1</span><button type="button" class="remove-btn"
+              onclick="clearImg(1)">×</button></div>
+          <div class="image-preview" id="img2_area"><span>Img 2</span><button type="button" class="remove-btn"
+              onclick="clearImg(2)">×</button></div>
+          <div class="image-preview" id="img3_area"><span>Img 3</span><button type="button" class="remove-btn"
+              onclick="clearImg(3)">×</button></div>
+        </div>
+
+        <input type="file" id="file_1" hidden accept="image/*">
+        <input type="file" id="file_2" hidden accept="image/*">
+        <input type="file" id="file_3" hidden accept="image/*">
+      </div>
+
+      <div class="section">
+        <div class="section-title">Description</div>
+        <textarea id="in_desc"></textarea>
+
+        <label>Tags</label>
+        <div class="tag-input-container">
+          <div id="tags_container"></div>
+          <input id="in_tags" class="tag-input" placeholder="Add tag + Enter">
+        </div>
+      </div>
+
+      <button class="btn-main">Publish</button>
+    </form>
+
+    
+    <div class="preview-box">
+      <div class="preview-heading">IDEASHIP PREVIEW</div>
+
+      <div class="preview-header">
+        <img id="view_logo" class="logo-view">
+        <div>
+          <div>
+            <strong id="view_product">Your Product</strong>
+            <span id="view_status" class="status premarket">PRE-MARKET</span>
+          </div>
+          <div style="font-size:0.85rem;color:var(--muted)">
+            by <span id="view_company">Company</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="slideshow-container">
+        <div class="slide active" id="s1"></div>
+        <div class="slide" id="s2"></div>
+        <div class="slide" id="s3"></div>
+      </div>
+
+      <div class="preview-body">
+
+        <p id="view_tagline" style="font-weight:700;color:var(--accent)"></p>
+        <p id="view_desc">Description will appear here</p>
+
+        
+        <div class="mass-row">
+          🔥 <span id="view_mass">128</span> mass
+        </div>
+
+        
+        <div class="tag-row" id="view_tags"></div>
+
+        
+        <div class="comments-box">
+          <div class="comment">
+            <div class="comment-avatar"></div>
+            <div>
+              <div class="comment-user">Explorer</div>
+              <div class="comment-text">This looks promising 🔥</div>
+            </div>
+          </div>
+          <div class="comment">
+            <div class="comment-avatar"></div>
+            <div>
+              <div class="comment-user">Builder</div>
+              <div class="comment-text">Curious how you’ll scale this.</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="cta-area">
+        <button class="btn-main" id="view_cta">Get Early Access</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+  // ============================
+// Helper
+// ============================
+const $ = id => document.getElementById(id);
+
+// ============================
+// State
+// ============================
+let tags = [];
+const MAX_TAGS = 6;
+
+// ============================
+// Text bindings
+// ============================
+$('in_company').addEventListener('input', e => {
+  $('view_company').textContent = e.target.value || 'Company';
+});
+
+$('in_product').addEventListener('input', e => {
+  $('view_product').textContent = e.target.value || 'Product';
+});
+
+$('in_tagline').addEventListener('input', e => {
+  $('view_tagline').textContent = e.target.value;
+});
+
+$('in_desc').addEventListener('input', e => {
+  $('view_desc').textContent = e.target.value || 'Description will appear here';
+});
+
+// ============================
+// Status
+// ============================
+$('in_status').addEventListener('change', e => {
+  const isLive = e.target.value === 'live';
+
+  $('view_status').textContent = isLive ? 'LIVE' : 'PRE-MARKET';
+  $('view_status').className = `status ${isLive ? 'live' : 'premarket'}`;
+  $('view_cta').textContent = isLive ? 'Visit Product' : 'Get Early Access';
+});
+
+// ============================
+// Tags
+// ============================
+$('in_tags').addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    addTag(e.target.value);
+    e.target.value = '';
+  }
+});
+
+$('in_tags').addEventListener('paste', e => {
+  e.preventDefault();
+  e.clipboardData.getData('text')
+    .split(',')
+    .forEach(t => addTag(t));
+});
+
+function addTag(value) {
+  const tag = value.trim().replace(',', '');
+  if (!tag) return;
+
+  const exists = tags.some(t => t.toLowerCase() === tag.toLowerCase());
+  if (exists || tags.length >= MAX_TAGS) return;
+
+  tags.push(tag);
+  renderTags();
+}
+
+function renderTags() {
+  $('tags_container').innerHTML = tags
+    .map((t, i) =>
+      `<div class="tag-chip">
+        ${t}
+        <button type="button" data-i="${i}">×</button>
+      </div>`
+    ).join('');
+
+  $('view_tags').innerHTML = tags
+    .map(t => `<span class="tag-v">#${t}</span>`)
+    .join('');
+
+  document.querySelectorAll('.tag-chip button').forEach(btn => {
+    btn.onclick = () => {
+      tags.splice(btn.dataset.i, 1);
+      renderTags();
+    };
+  });
+}
+
+// ============================
+// Images
+// ============================
+function handleFile(inputId, areaId, previewId) {
+  const input = $(inputId);
+  const area = $(areaId);
+
+  area.onclick = () => input.click();
+
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const url = URL.createObjectURL(file);
+    area.style.backgroundImage = `url(${url})`;
+    area.classList.add('has-image');
+
+    if (previewId) $(previewId).src = url;
+
+    if (areaId.startsWith('img')) {
+      const index = areaId[3];
+      $(`s${index}`).style.backgroundImage = `url(${url})`;
+      updateSlides();
+    }
+  };
+}
+
+handleFile('file_logo', 'logo_area', 'view_logo');
+handleFile('file_1', 'img1_area');
+handleFile('file_2', 'img2_area');
+handleFile('file_3', 'img3_area');
+
+// ============================
+// Clear Image (FIXED)
+// ============================
+window.clearImg = key => {
+  if (key === 'logo') {
+    $('view_logo').src = '';
+    $('logo_area').style.backgroundImage = '';
+    $('logo_area').classList.remove('has-image');
+  } else {
+    $(`img${key}_area`).style.backgroundImage = '';
+    $(`img${key}_area`).classList.remove('has-image');
+    $(`s${key}`).style.backgroundImage = '';
+    $(`s${key}`).classList.remove('active');
+    updateSlides();
+  }
+};
+
+// ============================
+// Auto Slideshow (WORKING)
+// ============================
+const slideIds = ['s1', 's2', 's3'];
+let currentSlide = 0;
+
+function updateSlides() {
+  const activeSlides = slideIds.filter(
+    id => $(id).style.backgroundImage
+  );
+
+  slideIds.forEach(id => $(id).classList.remove('active'));
+
+  if (activeSlides.length) {
+    $(activeSlides[0]).classList.add('active');
+    currentSlide = 0;
+  }
+}
+
+setInterval(() => {
+  const activeSlides = slideIds.filter(
+    id => $(id).style.backgroundImage
+  );
+
+  if (activeSlides.length <= 1) return;
+
+  activeSlides.forEach(id => $(id).classList.remove('active'));
+
+  currentSlide = (currentSlide + 1) % activeSlides.length;
+  $(activeSlides[currentSlide]).classList.add('active');
+}, 3000);
+
+// ============================
+// Traction Counter
+// ============================
+let traction = 128;
+
+setInterval(() => {
+  traction += Math.floor(Math.random() * 5);
+  $('view_mass').textContent = traction;
+}, 4000);
+
+
+  </script>
+
+</body>
+
+</html>

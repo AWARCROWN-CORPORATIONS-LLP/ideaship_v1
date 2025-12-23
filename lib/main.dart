@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:app_links/app_links.dart';
+// Removed unused app_links import
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -15,6 +15,7 @@ import 'role_selection/role.dart';
 import 'dashboard.dart';
 import 'feed/posts.dart';
 import 'thr_project/threads.dart';
+import 'Market/marketplace.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -27,7 +28,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Message data: ${message.data}');
   await _showLocalNotification(message);
 }
-
 
 Future<void> _initializeLocalNotifications() async {
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -64,7 +64,8 @@ Future<void> _initializeLocalNotifications() async {
   if (Platform.isAndroid) {
     await flutterLocalNotificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(channel);
   }
 }
@@ -85,8 +86,10 @@ Future<void> _showLocalNotification(RemoteMessage message) async {
     presentSound: true,
   );
 
-  const platformDetails =
-      NotificationDetails(android: androidDetails, iOS: iosDetails);
+  const platformDetails = NotificationDetails(
+    android: androidDetails,
+    iOS: iosDetails,
+  );
 
   final title =
       message.notification?.title ?? message.data['title'] ?? 'Notification';
@@ -105,22 +108,15 @@ void safeNavigate(Widget page) {
   final ctx = navigatorKey.currentContext;
   if (ctx == null) return;
 
-  Navigator.push(
-    ctx,
-    MaterialPageRoute(builder: (_) => page),
-  );
+  Navigator.push(ctx, MaterialPageRoute(builder: (_) => page));
 }
 
 void safeReplace(Widget page) {
   final ctx = navigatorKey.currentContext;
   if (ctx == null) return;
 
-  Navigator.pushReplacement(
-    ctx,
-    MaterialPageRoute(builder: (_) => page),
-  );
+  Navigator.pushReplacement(ctx, MaterialPageRoute(builder: (_) => page));
 }
-
 
 Future<bool> hasInternet() async {
   try {
@@ -142,7 +138,6 @@ Future<http.Response?> retryRequest(Uri url, {int retries = 3}) async {
   return null;
 }
 
-
 void _handleNotificationTap(Map<String, dynamic> data) {
   WidgetsBinding.instance.addPostFrameCallback((_) {
     final threadId = int.tryParse("${data['thread_id']}");
@@ -156,7 +151,6 @@ void _handleNotificationTap(Map<String, dynamic> data) {
   });
 }
 
-
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -164,16 +158,20 @@ Future<void> main() async {
     debugPrint("Flutter Error: ${details.exception}");
   };
 
-  runZonedGuarded(() async {
-    await Firebase.initializeApp();
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-    await _initializeLocalNotifications();
-    runApp(const MyApp());
-  }, (error, stack) {
-    debugPrint("Uncaught Error: $error\n$stack");
-  });
+  runZonedGuarded(
+    () async {
+      await Firebase.initializeApp();
+      FirebaseMessaging.onBackgroundMessage(
+        _firebaseMessagingBackgroundHandler,
+      );
+      await _initializeLocalNotifications();
+      runApp(const MyApp());
+    },
+    (error, stack) {
+      debugPrint("Uncaught Error: $error\n$stack");
+    },
+  );
 }
-
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -181,14 +179,13 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
-
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   static _MyAppState? globalInstance;
 
-  final _appLinks = AppLinks();
+  // Removed AppLinks variable
   String? username;
-  Uri? _pendingDeepLink; // Store deep link until user is logged in
   bool _isUserLoggedIn = false;
+  // Removed _pendingDeepLink
 
   @override
   void initState() {
@@ -196,7 +193,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     globalInstance = this;
     WidgetsBinding.instance.addObserver(this);
     _checkLoginStatus();
-    initDeepLinks();
+    // Removed initDeepLinks() call
   }
 
   @override
@@ -212,12 +209,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     final profileCompleted = prefs.getBool('profileCompleted') ?? false;
     username = prefs.getString('username') ?? "";
     _isUserLoggedIn = token != null && profileCompleted && username!.isNotEmpty;
-    
-    // Process pending deep link if user is now logged in
-    if (_isUserLoggedIn && _pendingDeepLink != null) {
-      handleDeepLink(_pendingDeepLink!);
-      _pendingDeepLink = null;
-    }
   }
 
   // Reload username (called when user logs in)
@@ -225,118 +216,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     final prefs = await SharedPreferences.getInstance();
     username = prefs.getString('username') ?? "";
     _isUserLoggedIn = username!.isNotEmpty;
-    
-    // Process pending deep link if user is now logged in
-    if (_isUserLoggedIn && _pendingDeepLink != null) {
-      handleDeepLink(_pendingDeepLink!);
-      _pendingDeepLink = null;
-    }
   }
 
-  // Initialize deep links
-  Future<void> initDeepLinks() async {
-    try {
-      final initial = await _appLinks.getInitialLink();
-      if (initial != null) {
-        debugPrint("Initial deep link: $initial");
-        handleDeepLink(initial);
-      }
-    } catch (e) {
-      debugPrint("Initial deep link error: $e");
-    }
+  // Removed initDeepLinks() and handleDeepLink() methods
 
-    _appLinks.uriLinkStream.listen((uri) {
-      try {
-        debugPrint("Deep link stream: $uri");
-        handleDeepLink(uri);
-      } catch (e) {
-        debugPrint("Deep link stream error: $e");
-      }
-    });
-  }
-
-  // Handle deep link with improved parsing
-  void handleDeepLink(Uri uri) {
-    debugPrint("Deep link received → $uri");
-
-    // Check if user is logged in
-    if (!_isUserLoggedIn || username == null || username!.isEmpty) {
-      debugPrint("User not logged in, storing deep link for later");
-      _pendingDeepLink = uri;
-      return;
-    }
-
-    
-
-    if (uri.host == "server.awarcrown.com" || uri.host.contains("awarcrown.com") || uri.host=="share.awarcrown.com") {
-      final pathSegments = uri.pathSegments;
-      
-      if (pathSegments.isEmpty) {
-        debugPrint("Empty path segments");
-        return;
-      }
-
-      final firstSegment = pathSegments[0].toLowerCase();
-      
-      // Handle thread links
-      if (firstSegment == "thread" || firstSegment == "threads") {
-        if (pathSegments.length >= 2) {
-          final threadId = int.tryParse(pathSegments[1]);
-          if (threadId != null && threadId > 0) {
-            navigateToThread(threadId);
-          } else {
-            debugPrint("Invalid thread ID: ${pathSegments[1]}");
-            showError("Invalid thread link");
-          }
-        } else {
-          debugPrint("Missing thread ID in path");
-          showError("Invalid thread link format");
-        }
-      }
-      // Handle post links
-      else if (firstSegment == "post" || firstSegment == "posts") {
-        if (pathSegments.length >= 2) {
-          final postId = int.tryParse(pathSegments[1]);
-          if (postId != null && postId > 0) {
-            navigateToPost(postId);
-          } else {
-            debugPrint("Invalid post ID: ${pathSegments[1]}");
-            showError("Invalid post link");
-          }
-        } else {
-          debugPrint("Missing post ID in path");
-          showError("Invalid post link format");
-        }
-      }
-      // Handle query parameters (alternative format)
-      else if (uri.queryParameters.containsKey('thread_id')) {
-        final threadId = int.tryParse(uri.queryParameters['thread_id'] ?? '');
-        if (threadId != null && threadId > 0) {
-          navigateToThread(threadId);
-        }
-      } else if (uri.queryParameters.containsKey('post_id')) {
-        final postId = int.tryParse(uri.queryParameters['post_id'] ?? '');
-        if (postId != null && postId > 0) {
-          navigateToPost(postId);
-        }
-      }
-      else {
-        debugPrint("Unhandled deep link path: ${uri.path}");
-        showError("Unsupported link format");
-      }
-    } else {
-      debugPrint("Unhandled deep link host: ${uri.host}");
-    }
-  }
-
-  
+  // Kept navigateToPost and navigateToThread as they are used by Notifications
   Future<void> navigateToPost(int postId) async {
     if (username == null || username!.isEmpty) {
       debugPrint("Cannot navigate to post: username is empty");
       showError("Please log in to view posts");
-      //redirect to login
-      
-
       return;
     }
 
@@ -346,7 +234,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
 
     try {
-      // Show loading indicator
       final ctx = navigatorKey.currentContext;
       if (ctx != null) {
         ScaffoldMessenger.of(ctx).showSnackBar(
@@ -356,7 +243,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 ),
                 SizedBox(width: 12),
                 Text('Loading post...'),
@@ -393,7 +283,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         return;
       }
 
-      // Fetch comments
       final commentsUrl = Uri.parse(
         "https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(username!)}",
       );
@@ -409,7 +298,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id') ?? 0;
 
-      // Navigate to post
       safeNavigate(
         CommentsPage(
           post: post,
@@ -424,7 +312,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
   }
 
-  
   Future<void> navigateToThread(int threadId) async {
     if (username == null || username!.isEmpty) {
       debugPrint("Cannot navigate to thread: username is empty");
@@ -438,7 +325,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
 
     try {
-      // Show loading indicator
       final ctx = navigatorKey.currentContext;
       if (ctx != null) {
         ScaffoldMessenger.of(ctx).showSnackBar(
@@ -448,7 +334,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 SizedBox(
                   width: 20,
                   height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
                 ),
                 SizedBox(width: 12),
                 Text('Loading thread...'),
@@ -459,7 +348,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         );
       }
 
-      // Use the same endpoint format as the app uses
       final url = Uri.parse("https://server.awarcrown.com/threads/$threadId");
       final response = await retryRequest(url);
 
@@ -479,25 +367,25 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       }
 
       final data = jsonDecode(response.body);
-      
-      // Check for error in response
+
       if (data['error'] != null) {
         showError(data['error']);
         return;
       }
 
-      // Parse thread data - view.php returns thread object directly
-      // But we need to ensure it has all required fields
-      final threadData = data is Map<String, dynamic> ? data : <String, dynamic>{};
-      
-      // Ensure required fields exist
+      final threadData = data is Map<String, dynamic>
+          ? data
+          : <String, dynamic>{};
+
       if (threadData['thread_id'] == null && threadData['id'] != null) {
         threadData['thread_id'] = threadData['id'];
       }
-      if (threadData['category_name'] == null && threadData['category'] != null) {
+      if (threadData['category_name'] == null &&
+          threadData['category'] != null) {
         threadData['category_name'] = threadData['category'];
       }
-      if (threadData['creator_username'] == null && threadData['creator'] != null) {
+      if (threadData['creator_username'] == null &&
+          threadData['creator'] != null) {
         threadData['creator_username'] = threadData['creator'];
       }
       if (threadData['creator_role'] == null && threadData['role'] != null) {
@@ -507,8 +395,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         threadData['inspired_count'] = 0;
       }
       if (threadData['comment_count'] == null) {
-        threadData['comment_count'] = threadData['comments'] != null 
-            ? (threadData['comments'] as List).length 
+        threadData['comment_count'] = threadData['comments'] != null
+            ? (threadData['comments'] as List).length
             : 0;
       }
       if (threadData['tags'] == null) {
@@ -531,13 +419,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getInt('user_id') ?? 0;
 
-      // Navigate to thread
       safeNavigate(
-        ThreadDetailScreen(
-          thread: thread,
-          username: username!,
-          userId: userId,
-        ),
+        ThreadDetailScreen(thread: thread, username: username!, userId: userId),
       );
     } catch (e) {
       debugPrint("Error navigating to thread: $e");
@@ -565,13 +448,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       );
     }
   }
-  
-  // Public method to reload username (called after login)
+
   Future<void> reloadUsername() async {
     await loadUsername();
   }
 
-  
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -585,7 +466,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     );
   }
 }
-
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -611,11 +491,15 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(seconds: 2),
     );
 
-    scaleAnimation = Tween<double>(begin: 0.5, end: 1.0)
-        .animate(CurvedAnimation(parent: controller, curve: Curves.easeOutBack));
+    scaleAnimation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: controller, curve: Curves.easeOutBack));
 
-    fadeAnimation = Tween<double>(begin: 0.0, end: 1.0)
-        .animate(CurvedAnimation(parent: controller, curve: Curves.easeIn));
+    fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: controller, curve: Curves.easeIn));
 
     controller.forward();
 
@@ -639,7 +523,6 @@ class _SplashScreenState extends State<SplashScreen>
 
       if (!mounted) return;
 
-      // Reload username in MyApp to process any pending deep links
       if (token != null && profileCompleted) {
         _MyAppState.globalInstance?.reloadUsername();
         safeReplace(const DashboardPage());
@@ -691,8 +574,10 @@ class _SplashScreenState extends State<SplashScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: const [
-                    Text("Powered by",
-                        style: TextStyle(color: Colors.black54, fontSize: 14)),
+                    Text(
+                      "Powered by",
+                      style: TextStyle(color: Colors.black54, fontSize: 14),
+                    ),
                     Text(
                       "Awarcrown",
                       style: TextStyle(

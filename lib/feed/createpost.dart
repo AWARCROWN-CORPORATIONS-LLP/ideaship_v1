@@ -1,17 +1,59 @@
+// Created/updated: 2025-12-23
+// Replace your original CreatePostPage implementation with this file.
+
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:async';
+import 'package:in_app_review/in_app_review.dart';
 
 class CreatePostPage extends StatefulWidget {
   const CreatePostPage({super.key});
 
   @override
   State<CreatePostPage> createState() => _CreatePostPageState();
+}
+
+class ProgressMultipartRequest extends http.MultipartRequest {
+  ProgressMultipartRequest(
+    super.method,
+    super.url, {
+    required this.onProgress,
+  });
+
+  final void Function(int sentBytes, int totalBytes) onProgress;
+
+  @override
+  http.ByteStream finalize() {
+    // super.finalize() sets up the byte stream and the contentLength
+    final byteStream = super.finalize();
+    final totalBytes = contentLength ?? 0;
+
+    int sentBytes = 0;
+
+    // Use List<int> generics to match the ByteStream internal list type
+    final stream = byteStream.transform(
+      StreamTransformer<List<int>, List<int>>.fromHandlers(
+        handleData: (data, sink) {
+          sentBytes += data.length;
+          if (totalBytes > 0) {
+            try {
+              onProgress(sentBytes, totalBytes);
+            } catch (_) {}
+          }
+          sink.add(data);
+        },
+      ),
+    );
+
+    return http.ByteStream(stream);
+  }
 }
 
 class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStateMixin {
@@ -27,9 +69,9 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
   int _uploadedBytes = 0;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
-  
-  StreamSubscription<List<int>>? _uploadSubscription;
-  http.MultipartRequest? _currentRequest;
+
+  // HTTP client used for the upload. Closing this client cancels the request.
+  http.Client? _uploadClient;
 
   @override
   void initState() {
@@ -48,8 +90,8 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
 
   @override
   void dispose() {
-    // ISSUE 3 FIX: Ensure the subscription is cancelled if it exists before disposing.
-    _uploadSubscription?.cancel();
+    // Ensure the upload client is closed (cancels ongoing upload)
+    _uploadClient?.close();
     _animationController.dispose();
     _contentController.dispose();
     super.dispose();
@@ -58,6 +100,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
   // Load username from SharedPreferences
   Future<void> _loadUsername() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _username = prefs.getString('username') ?? '';
     });
@@ -65,7 +108,6 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
 
   void _showSnackBar(String message, {bool isError = false}) {
     if (!mounted) return;
-    // Dismiss any existing snackbars before showing a new one
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -84,7 +126,24 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
     );
   }
 
-  // ISSUE 1 FIX: Updated logic to correctly cancel the upload stream before popping.
+  Future<void> _askForReviewIfEligible({required bool hasImage}) async {
+    if (!hasImage) return;
+
+    final prefs = await SharedPreferences.getInstance();
+
+    final alreadyAsked = prefs.getBool('asked_for_review') ?? false;
+    if (alreadyAsked) return;
+
+    final InAppReview inAppReview = InAppReview.instance;
+
+    if (await inAppReview.isAvailable()) {
+      await Future.delayed(const Duration(seconds: 1));
+      inAppReview.requestReview();
+      await prefs.setBool('asked_for_review', true);
+    }
+  }
+
+  // Cancel upload when leaving screen during upload
   Future<bool> _onWillPop() async {
     if (_isUploading) {
       final shouldLeave = await showDialog<bool>(
@@ -110,9 +169,17 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
             ),
             TextButton(
               onPressed: () {
-                // Cancel the upload stream/request here
-                _uploadSubscription?.cancel();
-                _currentRequest = null; // Mark request as cancelled/disposed
+                // Close the HTTP client to cancel the upload
+                _uploadClient?.close();
+                _uploadClient = null;
+                if (mounted) {
+                  setState(() {
+                    _isUploading = false;
+                    _isLoading = false;
+                    _uploadProgress = 0.0;
+                    _uploadError = 'Upload cancelled by user';
+                  });
+                }
                 Navigator.pop(context, true);
               },
               style: TextButton.styleFrom(foregroundColor: Colors.red),
@@ -121,8 +188,6 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
           ],
         ),
       );
-      // If the user chooses 'Leave Anyway', the `_isUploading` state should be reset after navigation.
-      // This is handled implicitly as we pop the screen.
       return shouldLeave ?? false;
     }
     if (_contentController.text.trim().isNotEmpty || _image != null) {
@@ -152,7 +217,6 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
     return true;
   }
 
-  // Show dialog to guide user to settings
   Future<void> _showPermissionSettingsDialog(String permissionName) async {
     if (!mounted) return;
     await showDialog(
@@ -163,7 +227,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Access to **$permissionName** was denied. Please enable it in app settings to use this feature.'),
+            Text('Access to "$permissionName" was denied. Please enable it in app settings to use this feature.'),
             if (Platform.isAndroid && permissionName == 'photos')
               const Padding(
                 padding: EdgeInsets.only(top: 8.0),
@@ -187,12 +251,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
   // Image picking without compression for HD upload
   Future<void> _pickImage(ImageSource source) async {
     try {
-      final XFile? pickedImage = await _picker.pickImage(
-        source: source,
-        // Recommended to set image quality to max or remove it for full quality HD upload
-        // Setting it to null or 100 ensures max quality, but max quality is the default.
-        // If you truly want NO compression, remove the quality argument.
-      );
+      final XFile? pickedImage = await _picker.pickImage(source: source);
 
       if (pickedImage != null) {
         setState(() {
@@ -214,9 +273,8 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
     }
   }
 
-  // Show source selection dialog with better UI
   void _showImageSourceDialog() {
-    if (_isLoading) return; // Prevent interaction during upload/loading
+    if (_isLoading) return;
     showDialog(
       context: context,
       builder: (context) => Dialog(
@@ -255,42 +313,39 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
   String _getUserFriendlyError(dynamic error) {
     final errorString = error.toString().toLowerCase();
 
-    if (errorString.contains('socketexception') || errorString.contains('failed host lookup') || errorString.contains('network is unreachable')) {
+    if (errorString.contains('socketexception') ||
+        errorString.contains('failed host lookup') ||
+        errorString.contains('network is unreachable')) {
       return 'No internet connection. Please check your network and try again.';
-    } else if (errorString.contains('timeout') || errorString.contains('timed out')) {
+    } else if (errorString.contains('timeout')) {
       return 'Upload took too long. Please check your connection and try again.';
     } else if (errorString.contains('401') || errorString.contains('unauthorized')) {
       return 'Your session has expired. Please log in again.';
-    } else if (errorString.contains('403') || errorString.contains('forbidden')) {
+    } else if (errorString.contains('403')) {
       return 'You don\'t have permission to create posts.';
-    } else if (errorString.contains('413') || errorString.contains('too large')) {
+    } else if (errorString.contains('413') || errorString.contains('too large') || errorString.contains('image file is too large')) {
       return 'Image file is too large. Please choose a smaller image.';
     } else if (errorString.contains('500') || errorString.contains('internal server error')) {
-      return 'Server error occurred. Please try again in a moment.';
+      return 'Server error occurred. Please try again.';
     } else if (errorString.contains('format') || errorString.contains('invalid')) {
       return 'Invalid file format. Please choose a valid image.';
-    } else if (errorString.contains('not logged in') || errorString.contains('authentication') || errorString.contains('session has expired')) {
-      return 'Please log in to create posts.';
     } else {
-      // General error fallback, now also checking for file size error thrown locally
-      if (errorString.contains('image file is too large')) {
-        return 'Image file is too large (max 10MB). Please choose a smaller image.';
-      }
-      return 'Failed to upload post. Please try again. ($errorString)';
+      return 'Failed to upload post. Please try again.';
     }
   }
 
   Future<void> _showErrorDialog(String title, String message) async {
     if (!mounted) return;
+
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 28),
-            const SizedBox(width: 12),
-            Expanded(child: Text(title)),
+          children: const [
+            Icon(Icons.error_outline, color: Colors.red, size: 28),
+            SizedBox(width: 12),
+            Expanded(child: Text('Upload Failed')),
           ],
         ),
         content: Text(message),
@@ -307,22 +362,15 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
   Future<void> _submitPost() async {
     final content = _contentController.text.trim();
 
-    // Validation
     if (content.isEmpty && _image == null) {
       _showSnackBar('Please add content or an image before posting', isError: true);
       return;
     }
-    if (content.length > 1000) {
-      _showSnackBar('Content is too long. Maximum 1000 characters allowed.', isError: true);
-      return;
-    }
+
+    await _loadUsername();
     if (_username.isEmpty) {
-      // Re-attempt loading or show login prompt
-      await _loadUsername();
-      if (_username.isEmpty) {
-        _showSnackBar('Username not found. Please log in again.', isError: true);
-        return;
-      }
+      _showSnackBar('Username not found. Please log in again.', isError: true);
+      return;
     }
 
     setState(() {
@@ -331,11 +379,10 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
       _uploadProgress = 0.0;
       _uploadError = null;
     });
-    // ISSUE 2 FIX: Reverse animation should only be called if we successfully start the process.
+
     if (_animationController.status == AnimationStatus.completed) {
       _animationController.reverse();
     }
-
 
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -343,183 +390,116 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
       final email = prefs.getString('email') ?? '';
 
       if (username.isEmpty || email.isEmpty) {
-        throw Exception('User not logged in. Credentials missing.');
+        throw Exception('User not logged in');
       }
 
-      var request = http.MultipartRequest(
+      final request = ProgressMultipartRequest(
         'POST',
         Uri.parse('https://server.awarcrown.com/feed/upload_post'),
+        onProgress: (sent, total) {
+          if (mounted && total > 0) {
+            setState(() {
+              _uploadProgress = sent / total;
+              _uploadedBytes = sent;
+            });
+          }
+        },
       );
-      _currentRequest = request; // Keep track of the request for cancellation
 
-      request.fields['content'] = content;
-      request.fields['visibility'] = _visibility;
-      request.fields['username'] = username;
-      request.fields['email'] = email;
+      request.fields.addAll({
+        'content': content,
+        'visibility': _visibility,
+        'username': username,
+        'email': email,
+      });
 
       if (_image != null) {
         final fileSize = await _image!.length();
-        const maxFileSize = 10 * 1024 * 1024; // 10MB limit
-        if (fileSize > maxFileSize) {
-          throw Exception('Image file is too large (max 10MB)');
+        // limit to 10 MB as original code
+        if (fileSize > 10 * 1024 * 1024) {
+          throw Exception('Image file is too large');
         }
-        // ISSUE 4 FIX: The original code's try-catch around fromPath was confusing.
-        // It's better to perform the file size check first, and let the normal
-        // try-catch handle exceptions from `fromPath`.
-        request.files.add(await http.MultipartFile.fromPath(
-          'image',
-          _image!.path,
-          // You might want to infer the content type here for better server handling
-          // contentType: MediaType('image', 'jpeg'), 
-        ));
-      }
 
-      // Send the request
-      final streamedResponse = await request.send();
-
-      // Track upload progress logic
-      // Only track if we are uploading an image or the server sends a valid content length for the upload stream
-      if (streamedResponse.contentLength != null && _image != null) {
-        _uploadedBytes = 0;
-        
-        // This is where we listen to the *response* stream to read the response body,
-        // but since we are using MultipartRequest, the progress should ideally be tracked
-        // before the request is sent, or by listening to the request's byte count.
-        // For simplicity and common practice with http.MultipartRequest, we usually
-        // track the progress of the *request payload* being sent.
-
-        // Note: The original implementation tracked the upload progress from the
-        // *response* stream which is incorrect. A correct multipart upload progress
-        // requires a custom implementation (e.g., using `http.Client` and `Stream.transform`
-        // or a dedicated upload library) as `http.MultipartRequest` doesn't
-        // expose the sent bytes easily.
-
-        // The following part is kept from the original code but serves to read the *response* stream.
-        // Since the actual progress is not easily exposed by `http.MultipartRequest.send()`,
-        // let's adjust to only track the status change after a successful request.
-        
-        // --- Correct way for Response Tracking (not upload tracking, but necessary for response) ---
-        final completer = Completer<String>();
-        final responseBodyBuffer = StringBuffer();
-        
-        // ISSUE 1 FIX: Store the subscription for potential cancellation
-        _uploadSubscription = streamedResponse.stream.listen(
-          (chunk) {
-            // This is the response body coming back, not the upload progress
-            // We use this part to track the response receipt.
-            responseBodyBuffer.write(utf8.decode(chunk));
-
-            // Optional: You could update a final progress to 1.0 once the stream starts being received
-            if (streamedResponse.contentLength != null) {
-                _uploadedBytes += chunk.length;
-                if (_uploadedBytes > 0) {
-                   setState(() {
-                       _uploadProgress = 0.99; // Indicate near-completion after headers and server processing starts
-                   });
-                }
-            }
-          },
-          onDone: () {
-            completer.complete(responseBodyBuffer.toString());
-          },
-          onError: (error) {
-            // Cancel response body reading if an error occurs mid-stream
-            completer.completeError(error);
-          },
-          cancelOnError: true,
+        request.files.add(
+          await http.MultipartFile.fromPath('image', _image!.path),
         );
-
-        // Wait for the entire response to be read
-        final responseBody = await completer.future.timeout(const Duration(seconds: 30)); 
-        // -----------------------------------------------------------------------------------------
-        
-        _uploadSubscription = null; // Clear the subscription now that it's done
-
-        final statusCode = streamedResponse.statusCode;
-
-        if (statusCode != 200) {
-          String errorMessage = 'Server error occurred';
-          try {
-            final errorData = json.decode(responseBody);
-            errorMessage = errorData['message'] ?? errorMessage;
-          } catch (_) {
-            errorMessage = 'Server returned error code: $statusCode';
-          }
-          throw Exception(errorMessage);
-        }
-
-        final responseData = json.decode(responseBody);
-
-        if (responseData['status'] == 'success') {
-          if (mounted) {
-            _showSnackBar(responseData['message'] ?? 'Post created successfully!');
-            await Future.delayed(const Duration(milliseconds: 500));
-            // ISSUE 5 FIX: Ensure state reset before popping if successful
-            _resetStateOnCompletion(); 
-            
-            Navigator.pop(context, true);
-          }
-        } else {
-          final errorMsg = responseData['message'] ?? 'Failed to upload post';
-          throw Exception(errorMsg);
-        }
-      } else {
-        // Handle case where we couldn't track stream progress, usually for smaller uploads or when no image.
-        final response = await http.Response.fromStream(streamedResponse).timeout(const Duration(seconds: 30));
-        
-        if (response.statusCode != 200) {
-          String errorMessage = 'Server error occurred';
-          try {
-            final errorData = json.decode(response.body);
-            errorMessage = errorData['message'] ?? errorMessage;
-          } catch (_) {
-            errorMessage = 'Server returned error code: ${response.statusCode}';
-          }
-          throw Exception(errorMessage);
-        }
-
-        final responseData = json.decode(response.body);
-
-        if (responseData['status'] == 'success') {
-          if (mounted) {
-            _showSnackBar(responseData['message'] ?? 'Post created successfully!');
-            await Future.delayed(const Duration(milliseconds: 500));
-            // ISSUE 5 FIX: Ensure state reset before popping if successful
-            _resetStateOnCompletion(); 
-            Navigator.pop(context, true);
-          }
-        } else {
-          final errorMsg = responseData['message'] ?? 'Failed to upload post';
-          throw Exception(errorMsg);
-        }
       }
+
+      // Use a dedicated client so we can cancel by closing it
+      final client = http.Client();
+      _uploadClient = client;
+
+      // Use client.send(request) to tie the request to our client
+      final streamedResponse = await client.send(request);
+
+      // Convert streamed response to a full Response with a longer timeout for large uploads
+      final response = await http.Response.fromStream(streamedResponse).timeout(const Duration(seconds: 120));
+
+      // Close the client now that the response is read
+      client.close();
+      _uploadClient = null;
+
+      if (response.statusCode != 200) {
+        // Attempt to parse error message if JSON
+        String body = response.body;
+        String message = body;
+        try {
+          final parsed = json.decode(body);
+          if (parsed is Map && parsed['message'] != null) {
+            message = parsed['message'].toString();
+          }
+        } catch (_) {}
+        throw Exception('HTTP ${response.statusCode}: $message');
+      }
+
+      final data = json.decode(response.body);
+
+      if (data is Map && data['status'] != 'success') {
+        throw Exception(data['message'] ?? 'Upload failed');
+      }
+
+      if (!mounted) return;
+
+      setState(() => _uploadProgress = 1.0);
+
+      _showSnackBar(data['message'] ?? 'Post created successfully!');
+
+      await _askForReviewIfEligible(hasImage: _image != null);
+
+      await Future.delayed(const Duration(milliseconds: 300));
+      _resetStateOnCompletion();
+      Navigator.pop(context, true);
     } on TimeoutException {
-        // Catch specific timeout errors
-        throw Exception('Timed out waiting for server response.');
+      final msg = _getUserFriendlyError('timeout');
+      await _showErrorDialog('Upload Failed', msg);
+      _resetStateOnCompletion();
+    } on Exception catch (e) {
+      final msg = _getUserFriendlyError(e);
+      await _showErrorDialog('Upload Failed', msg);
+      _resetStateOnCompletion();
     } catch (e) {
-      // ISSUE 6 FIX: The catch block had nested `if (mounted)` checks and redundant `_animationController.forward()` calls.
-      final friendlyError = _getUserFriendlyError(e);
-      _uploadError = friendlyError;
-
-      if (mounted) {
-        _showErrorDialog('Upload Failed', friendlyError);
-        _resetStateOnCompletion();
-      }
+      final msg = _getUserFriendlyError(e);
+      await _showErrorDialog('Upload Failed', msg);
+      _resetStateOnCompletion();
     }
   }
-  
-  // Helper to centralize state reset logic
+
   void _resetStateOnCompletion() {
-      setState(() {
-        _isLoading = false;
-        _isUploading = false;
-        _uploadProgress = 0.0;
-        _uploadedBytes = 0;
-        _currentRequest = null;
-        _uploadSubscription?.cancel();
-        _uploadSubscription = null;
-      });
-      _animationController.forward();
+    if (!mounted) return;
+    setState(() {
+      _isLoading = false;
+      _isUploading = false;
+      _uploadProgress = 0.0;
+      _uploadedBytes = 0;
+      _currentRequestCleanup();
+      _uploadError = null;
+    });
+    _animationController.forward();
+  }
+
+  void _currentRequestCleanup() {
+    _uploadClient?.close();
+    _uploadClient = null;
   }
 
   Widget _buildImagePreview() {
@@ -532,9 +512,8 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: Colors.grey.shade200),
-          // ISSUE 7 FIX: Add the same subtle shadow as the info card for consistency
           boxShadow: [
-             BoxShadow(
+            BoxShadow(
               // ignore: deprecated_member_use
               color: Colors.black.withOpacity(0.03),
               blurRadius: 8,
@@ -577,15 +556,12 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                     right: 8,
                     child: Container(
                       decoration: BoxDecoration(
-                        // ignore: deprecated_member_use
                         color: Colors.black.withOpacity(0.5),
                         shape: BoxShape.circle,
                       ),
                       child: IconButton(
                         icon: const Icon(Icons.close, color: Colors.white, size: 20),
-                        onPressed: _isLoading
-                            ? null
-                            : () => setState(() => _image = null),
+                        onPressed: _isLoading ? null : () => setState(() => _image = null),
                       ),
                     ),
                   ),
@@ -600,7 +576,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Photo added: ${(_image?.lengthSync() ?? 0) > 0 ? '${((_image!.lengthSync() / 1024) / 1024).toStringAsFixed(2)} MB' : 'Processing...'}', // ISSUE 8 FIX: Show file size
+                      'Photo added: ${(_image?.lengthSync() ?? 0) > 0 ? '${((_image!.lengthSync() / 1024) / 1024).toStringAsFixed(2)} MB' : 'Processing...'}',
                       style: TextStyle(
                         color: Colors.grey.shade600,
                         fontSize: 14,
@@ -608,9 +584,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                     ),
                   ),
                   TextButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () => setState(() => _image = null),
+                    onPressed: _isLoading ? null : () => setState(() => _image = null),
                     child: const Text(
                       'Remove',
                       style: TextStyle(color: Colors.red),
@@ -627,8 +601,6 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
 
   @override
   Widget build(BuildContext context) {
-    // final colorScheme = Theme.of(context).colorScheme; // colorScheme not used
-    
     return WillPopScope(
       onWillPop: _onWillPop,
       child: Scaffold(
@@ -664,7 +636,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        value: null, // ISSUE 9 FIX: Circular indicator should be indeterminate if progress tracking is unreliable
+                        value: null,
                         valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF007AFF)),
                       ),
                     ),
@@ -682,7 +654,6 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
               )
             else
               TextButton(
-                // Disable if content is empty and no image
                 onPressed: _isLoading || (_contentController.text.trim().isEmpty && _image == null) ? null : _submitPost,
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFF007AFF),
@@ -702,21 +673,17 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
           opacity: _fadeAnimation,
           child: Column(
             children: [
-              // Upload progress bar
               if (_isUploading)
                 Container(
                   width: double.infinity,
                   height: 3,
                   color: Colors.grey.shade200,
                   child: LinearProgressIndicator(
-                    // ISSUE 10 FIX: Show progress only if progress is > 0, otherwise indeterminate/null 
-                    // (though true MultipartRequest progress is tricky)
-                    value: _uploadProgress > 0.0 && _uploadProgress < 1.0 ? _uploadProgress : null,
-                    backgroundColor: Colors.transparent,
+                    value: _uploadProgress == 0.0 ? null : _uploadProgress,
+                    backgroundColor: Colors.grey.shade200,
                     valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF007AFF)),
                   ),
                 ),
-              // Error banner
               if (_uploadError != null && !_isUploading)
                 Container(
                   width: double.infinity,
@@ -749,7 +716,6 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // User info card
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -758,7 +724,6 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                           border: Border.all(color: Colors.grey.shade200),
                           boxShadow: [
                             BoxShadow(
-                              // ignore: deprecated_member_use
                               color: Colors.black.withOpacity(0.03),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
@@ -770,7 +735,6 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                // ignore: deprecated_member_use
                                 color: const Color(0xFF007AFF).withOpacity(0.1),
                                 shape: BoxShape.circle,
                               ),
@@ -808,7 +772,6 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Content field
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,
@@ -837,7 +800,6 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Visibility selector
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                         decoration: BoxDecoration(
@@ -884,13 +846,10 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                               ),
                             ),
                           ],
-                          onChanged: _isLoading
-                              ? null
-                              : (value) => setState(() => _visibility = value!),
+                          onChanged: _isLoading ? null : (value) => setState(() => _visibility = value!),
                         ),
                       ),
                       const SizedBox(height: 20),
-                      // Add photo button
                       Container(
                         decoration: BoxDecoration(
                           color: Colors.white,

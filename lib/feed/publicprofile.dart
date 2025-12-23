@@ -22,6 +22,11 @@ class PublicProfilePage extends StatefulWidget {
 
 class _PublicProfilePageState extends State<PublicProfilePage>
     with TickerProviderStateMixin {
+        int? _toInt(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    return int.tryParse(value.toString());
+  }
   Map<String, dynamic>? userInfo;
   List<dynamic> posts = [];
   bool isLoading = true;
@@ -465,14 +470,17 @@ class _PublicProfilePageState extends State<PublicProfilePage>
       return false;
     }
   }
+  
 
   Future<void> _updateFollowStatuses() async {
     if (_userId == null || posts.isEmpty) return;
     try {
       final uniqueFollowedIds = posts
-          .where((p) => (p['user_id'] as int?) != _userId)
-          .map((p) => p['user_id'] as int)
-          .toSet();
+    .map((p) => _toInt(p['user_id']))
+    .where((id) => id != null && id != _userId)
+    .cast<int>()
+    .toSet();
+
       if (uniqueFollowedIds.isEmpty) return;
       final futures = uniqueFollowedIds.map((id) => _getIsFollowing(id));
       final results = await Future.wait(futures);
@@ -1022,7 +1030,8 @@ class _PublicProfilePageState extends State<PublicProfilePage>
 
   bool _isOwnPost(int postId, int index) {
     if (_userId == null || _userId == 0) return false;
-    return posts[index]['user_id'] == _userId;
+return _toInt(posts[index]['user_id']) == _userId;
+
   }
 
   Future<List<dynamic>> _fetchFollowersList() async {
@@ -1693,8 +1702,12 @@ class _PublicProfilePageState extends State<PublicProfilePage>
         likeAnimationControllers[postId] ?? const AlwaysStoppedAnimation(1.0);
     final overlayAnimation =
         heartOverlayControllers[postId] ?? const AlwaysStoppedAnimation(0.0);
-    final isFollowingUser =
-        isFollowingMap[post['user_id']] ?? (post['is_following'] ?? false);
+    final postUserId = _toInt(post['user_id']);
+final isFollowingUser =
+    postUserId != null
+        ? (isFollowingMap[postUserId] ?? (post['is_following'] ?? false))
+        : false;
+
     final isProcessing = isProcessingFollow[post['user_id']] ?? false;
     const double aspectRatio = 1.0;
     final screenWidth = MediaQuery.of(context).size.width - 40;

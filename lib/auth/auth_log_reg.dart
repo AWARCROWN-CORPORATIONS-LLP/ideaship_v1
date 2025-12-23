@@ -166,6 +166,11 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+  Future<void> _forceRestoreAndLogin() async {
+
+  await _login();
+}
+
 
   Future<void> _checkConnectivity() async {
     final connectivityResult = await Connectivity().checkConnectivity();
@@ -280,6 +285,45 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
       },
     );
   }
+  void _showRestoreAccountDialog(String message) {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (context) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Row(
+        children: [
+          Icon(Icons.restore, color: Colors.orange),
+          SizedBox(width: 10),
+          Expanded(child: Text("Restore Account")),
+        ],
+      ),
+      content: Text(
+        "$message\n\n"
+        "If you continue logging in, your account will be fully restored.",
+        style: const TextStyle(height: 1.5),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+          ),
+          onPressed: () {
+            Navigator.pop(context);
+            _forceRestoreAndLogin();
+          },
+          child: const Text("Restore & Login"),
+        ),
+      ],
+    ),
+  );
+}
+
 
   void _showSuccessDialog(
     String title,
@@ -509,7 +553,7 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
         } else {
           final message = data['message'] ?? "Unknown refresh error.";
           _showErrorDialog("Token Refresh Failed", message);
-          // Clear invalid tokens
+          
           await prefs.remove('token');
           await prefs.remove('refresh_token');
           return false;
@@ -757,159 +801,204 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _login() async {
-    bool hasError = false;
-    setState(() {
-      _loginUserError = _loginUserController.text.trim().isEmpty
-          ? "Please enter username or email"
-          : null;
-      _loginPassError = _loginPassController.text.trim().isEmpty
-          ? "Please enter password"
-          : null;
-      if (_loginUserError != null || _loginPassError != null) hasError = true;
-    });
+ Future<void> _login() async {
+  bool hasError = false;
 
-    if (hasError) return;
+  setState(() {
+    _loginUserError = _loginUserController.text.trim().isEmpty
+        ? "Please enter username or email"
+        : null;
+    _loginPassError = _loginPassController.text.trim().isEmpty
+        ? "Please enter password"
+        : null;
+    hasError = _loginUserError != null || _loginPassError != null;
+  });
 
-    if (!_isConnected) {
-      _showErrorDialog(
-        "No Network",
-        "Cannot login without a network connection.",
-      );
-      return;
-    }
+  if (hasError) return;
 
-    setState(() => _isLoading = true);
-
-    try {
-      final url = Uri.parse(
-        "https://server.awarcrown.com/auth/api?action=login",
-      );
-      final response = await http
-          .post(
-            url,
-            body: {
-              "username": _loginUserController.text.trim(),
-              "password": _loginPassController.text.trim(),
-            },
-            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-          )
-          .timeout(const Duration(seconds: 30));
-
-      
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data['success'] == true) {
-          final userData = data['user'] as Map<String, dynamic>? ?? {};
-          final accessToken = data['access_token'] as String?;
-          final refreshToken = data['refresh_token'] as String?;
-
-          if (accessToken == null || accessToken.isEmpty) {
-            _showErrorDialog(
-              "Login Failed",
-              "Access token missing from server response. Please try again.",
-            );
-            return;
-          }
-
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString('id', userData['id']?.toString() ?? '');
-          await prefs.setString(
-            'username',
-            userData['username'] as String? ?? '',
-          );
-          await prefs.setString('email', userData['email'] as String? ?? '');
-          await prefs.setString(
-            'token',
-            accessToken,
-          ); // Store as 'token' for compatibility
-          if (refreshToken != null && refreshToken.isNotEmpty) {
-            await prefs.setString('refresh_token', refreshToken);
-          } else {
-            debugPrint("Warning: No refresh token received.");
-          }
-
-          setState(() {
-            _loginUserController.clear();
-            _loginPassController.clear();
-          });
-
-          // Check profile completion
-          final profileCompleted = prefs.getBool('profileCompleted') ?? false;
-          final nextPage = profileCompleted
-              ? const DashboardPage()
-              : const RoleSelectionPage();
-
-          Navigator.pushReplacement(
-            // ignore: use_build_context_synchronously
-            context,
-            PageRouteBuilder(
-              pageBuilder: (context, animation, secondaryAnimation) => nextPage,
-              transitionsBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
-              transitionDuration: const Duration(milliseconds: 500),
-            ),
-          );
-        } else {
-          final message =
-              data['message'] ??
-              "Invalid credentials. Please check your username/email and password.";
-          if (message.contains("username") || message.contains("email")) {
-            setState(() => _loginUserError = message);
-          } else if (message.contains("password")) {
-            setState(() => _loginPassError = message);
-          } else {
-            _showErrorDialog("Login Failed", message);
-          }
-        }
-      } else if (response.statusCode == 400) {
-        final data = json.decode(response.body);
-        final message =
-            data['message'] ??
-            "Invalid login request. Please check your input.";
-        if (message.contains("username") || message.contains("email")) {
-          setState(() => _loginUserError = message);
-        } else if (message.contains("password")) {
-          setState(() => _loginPassError = message);
-        } else {
-          _showErrorDialog("Login Failed", message);
-        }
-      } else if (response.statusCode == 401) {
-        final data = json.decode(response.body);
-        final message =
-            data['message'] ??
-            "Invalid credentials. Please check your username/email and password.";
-        _showErrorDialog("Login Failed", message);
-      } else if (response.statusCode == 403) {
-        final data = json.decode(response.body);
-        final message =
-            data['message'] ??
-            "Account not verified. Please check your email for verification link.";
-        _showErrorDialog("Login Failed", message);
-      } else if (response.statusCode == 500) {
-        _showErrorDialog(
-          "Server Error",
-          "Internal server error (500). Please try again later or contact support.",
-        );
-      } else {
-        _showErrorDialog(
-          "Server Error",
-          "Unexpected error (HTTP ${response.statusCode}). Please try again.",
-        );
-      }
-    } catch (e) {
-      
-      final errorMsg = e.toString().contains('TimeoutException')
-          ? "Request timed out. Check your connection."
-          : "Failed to connect to server: ${e.toString()}. Check your internet.";
-      _showErrorDialog("Connection Error", errorMsg);
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  if (!_isConnected) {
+    _showErrorDialog(
+      "No Network",
+      "Cannot login without a network connection.",
+    );
+    return;
   }
+
+  setState(() => _isLoading = true);
+
+  try {
+    final url = Uri.parse(
+      "https://server.awarcrown.com/auth/api?action=login",
+    );
+
+    final response = await http
+        .post(
+          url,
+          body: {
+            "username": _loginUserController.text.trim(),
+            "password": _loginPassController.text.trim(),
+          },
+          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        )
+        .timeout(const Duration(seconds: 30));
+
+    // ---------------- SUCCESS RESPONSE ----------------
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
+
+      // ================= LOGIN SUCCESS =================
+      if (data['success'] == true) {
+        final userData = data['user'] as Map<String, dynamic>? ?? {};
+        final accessToken = data['access_token'] as String?;
+        final refreshToken = data['refresh_token'] as String?;
+
+
+        if (accessToken == null || accessToken.isEmpty) {
+          _showErrorDialog(
+            "Login Failed",
+            "Access token missing from server response.",
+          );
+          return;
+        }
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('id', userData['id']?.toString() ?? '');
+        await prefs.setString('username', userData['username'] ?? '');
+        await prefs.setString('email', userData['email'] ?? '');
+        await prefs.setString('token', accessToken);
+
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          await prefs.setString('refresh_token', refreshToken);
+        }
+        await prefs.setBool(
+  'deletion_pending',
+  userData['deletion_pending'] ?? false,
+);
+
+await prefs.setInt(
+  'deletion_days_left',
+  userData['deletion_days_left'] ?? 0,
+);
+
+        setState(() {
+          _loginUserController.clear();
+          _loginPassController.clear();
+        });
+
+        final profileCompleted =
+            prefs.getBool('profileCompleted') ?? false;
+
+        final nextPage = profileCompleted
+            ? const DashboardPage()
+            : const RoleSelectionPage();
+
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (_, animation, __) => nextPage,
+            transitionsBuilder: (_, animation, __, child) =>
+                FadeTransition(opacity: animation, child: child),
+            transitionDuration: const Duration(milliseconds: 500),
+          ),
+        );
+
+        return;
+      }
+
+      // ================= ACCOUNT IN DELETION QUEUE =================
+      final String code = data['code'] ?? '';
+      final String message =
+          data['message'] ?? "Unable to login. Please try again.";
+
+      if (code == "ACCOUNT_PENDING_DELETION") {
+        if (!mounted) return;
+
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.restore, color: Colors.orange),
+                SizedBox(width: 12),
+                Expanded(child: Text("Account Scheduled for Deletion")),
+              ],
+            ),
+            content: Text(
+              "$message\n\n"
+              "You can restore your account instantly by logging in again.",
+              style: const TextStyle(height: 1.5),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancel"),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  _login(); // retry → backend restores
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.green,
+                ),
+                child: const Text("Restore & Login"),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      // ================= VALIDATION ERRORS =================
+      if (message.toLowerCase().contains("username") ||
+          message.toLowerCase().contains("email")) {
+        setState(() => _loginUserError = message);
+      } else if (message.toLowerCase().contains("password")) {
+        setState(() => _loginPassError = message);
+      } else {
+        _showErrorDialog("Login Failed", message);
+      }
+
+    // ---------------- OTHER STATUS CODES ----------------
+    } else if (response.statusCode == 401) {
+      _showErrorDialog(
+        "Login Failed",
+        "Invalid credentials. Please check and try again.",
+      );
+    } else if (response.statusCode == 403) {
+      _showErrorDialog(
+        "Account Not Verified",
+        "Please verify your email before logging in.",
+      );
+    } else if (response.statusCode == 500) {
+      _showErrorDialog(
+        "Server Error",
+        "Internal server error. Please try again later.",
+      );
+    } else {
+      _showErrorDialog(
+        "Server Error",
+        "Unexpected error (HTTP ${response.statusCode}).",
+      );
+    }
+
+  } catch (e) {
+    final errorMsg = e.toString().contains('TimeoutException')
+        ? "Request timed out. Check your internet connection."
+        : "Failed to connect to server. Please try again.";
+
+    _showErrorDialog("Connection Error", errorMsg);
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
+  }
+}
+
 
   Future<void> _openLink(String url) async {
     if (url.isEmpty) {

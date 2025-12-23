@@ -10,7 +10,6 @@ import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'encrypt.dart';
 
-
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -24,8 +23,8 @@ class _SettingsPageState extends State<SettingsPage> {
   String _appVersion = '';
   bool _notificationsEnabled = true;
   String _selectedLanguage = 'English';
-  late String encryptedName;
-  late String encryptedEmail;
+  bool _deletionPending = false;
+  int _deletionDaysLeft = 0;
 
   @override
   void initState() {
@@ -37,12 +36,9 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _loadAppVersion() async {
     try {
       final info = await PackageInfo.fromPlatform();
-
       if (!mounted) return;
-
       setState(() {
-       _appVersion = "v${info.version} (Build ${info.buildNumber})";
-
+        _appVersion = "v${info.version} (Build ${info.buildNumber})";
       });
     } catch (e) {
       // fallback version if error occurs
@@ -52,8 +48,6 @@ class _SettingsPageState extends State<SettingsPage> {
       });
     }
   }
-
-
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
@@ -65,7 +59,8 @@ class _SettingsPageState extends State<SettingsPage> {
       _email = prefs.getString('email') ?? '';
       _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
       _selectedLanguage = prefs.getString('selected_language') ?? 'English';
-     
+      _deletionPending = prefs.getBool('deletion_pending') ?? false;
+      _deletionDaysLeft = prefs.getInt('deletion_days_left') ?? 0;
     });
   }
 
@@ -74,7 +69,7 @@ class _SettingsPageState extends State<SettingsPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? const Color.fromARGB(255, 26, 25, 25) : const Color.fromARGB(255, 0, 0, 0),
+        backgroundColor: isError ? Colors.red.shade700 : const Color(0xFF007AFF),
         behavior: SnackBarBehavior.floating,
         duration: Duration(seconds: isError ? 3 : 2),
       ),
@@ -87,7 +82,6 @@ class _SettingsPageState extends State<SettingsPage> {
       MaterialPageRoute(builder: (context) => const UserProfile()),
     );
   }
-
 
   void _showSwitchAccountConfirmation() {
     showDialog(
@@ -130,7 +124,6 @@ class _SettingsPageState extends State<SettingsPage> {
     if (!mounted) return;
 
     _showSnackBar('Switching account...');
-    
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const AuthLogReg()),
@@ -181,7 +174,6 @@ class _SettingsPageState extends State<SettingsPage> {
     if (!mounted) return;
 
     _showSnackBar('Logged out successfully.');
-
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (context) => const AuthLogReg()),
@@ -204,10 +196,11 @@ class _SettingsPageState extends State<SettingsPage> {
           ],
         ),
         content: const Text(
-          'Are you sure you want to delete your account?\n'
-          'This action is permanent and cannot be undone. All your data will be permanently deleted.',
+          'Are you sure you want to delete your account?\n\n'
+          'Your account will be scheduled for deletion and placed in a 30-day recovery period. '
+          'During this time, you can log in anytime to restore your account.\n\n'
+          'If you do not log in within 30 days, your account and all associated data will be permanently deleted.',
           style: TextStyle(height: 1.5),
-          
         ),
         actions: [
           TextButton(
@@ -227,39 +220,48 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
- Future<void> _deleteAccount() async {
-  try {
-    _showSnackBar("Processing account deletion...");
+  Future<void> _deleteAccount() async {
+    try {
+      _showSnackBar("Scheduling account deletion...");
 
-    final prefs = await SharedPreferences.getInstance();
-    final username = prefs.getString("username") ?? "";
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString("username") ?? "";
 
-    final response = await http.post(
-      Uri.parse("https://server.awarcrown.com/accountclear/delete_account"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({"username": username}),
-    );
+      if (username.isEmpty) {
+        _showSnackBar("User not found", isError: true);
+        return;
+      }
 
-    if (response.statusCode == 200) {
-      _showSnackBar("Your account has been permanently deleted.");
-      await prefs.clear();
-
-      if (!mounted) return;
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const AuthLogReg()),
+      final response = await http.post(
+        Uri.parse("https://server.awarcrown.com/accountclear/delete_account"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({"username": username}),
       );
-    } else {
-      _showSnackBar("Unable to delete account. Please try again.");
+
+      if (response.statusCode == 200) {
+        // IMPORTANT: soft delete, not permanent
+        _showSnackBar("Account scheduled for deletion. You can restore it within 30 days.");
+
+        // Clear local session (logout)
+        await prefs.clear();
+
+        if (!mounted) return;
+
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const AuthLogReg()),
+          (route) => false,
+        );
+      } else {
+        _showSnackBar(
+          "Unable to process deletion request. Please try again.",
+          isError: true,
+        );
+      }
+    } catch (e) {
+      _showSnackBar("Network error. Please try again. ${e.toString()}", isError: true);
     }
-  } catch (e) {
-    _showSnackBar("Network error: $e");
   }
-}
-
-
-
 
   Future<void> _openLink(String url) async {
     final uri = Uri.parse(url);
@@ -267,7 +269,6 @@ class _SettingsPageState extends State<SettingsPage> {
       _showSnackBar("Failed to open link.");
     }
   }
-
 
   Future<void> _clearCache() async {
     final confirmed = await showDialog<bool>(
@@ -294,229 +295,214 @@ class _SettingsPageState extends State<SettingsPage> {
     if (confirmed == true) {
       try {
         final prefs = await SharedPreferences.getInstance();
-      
+
         await prefs.remove('cached_posts');
         await prefs.remove('cache_timestamp');
         await prefs.remove('like_queue');
-        
+
         _showSnackBar('Cache cleared successfully');
       } catch (e) {
-        _showSnackBar('Error clearing cache: $e', isError: true);
+        _showSnackBar('Error clearing cache: ${e.toString()}', isError: true);
       }
     }
   }
-
-  
 
   Future<void> _exportData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final username = prefs.getString('username') ?? 'user';
       final email = prefs.getString('email') ?? '';
-      
+
       final exportData = {
         'username': username,
         'email': email,
         'exported_at': DateTime.now().toIso8601String(),
         'app_version': _appVersion,
       };
-      
+
       final jsonData = jsonEncode(exportData);
       await Clipboard.setData(ClipboardData(text: jsonData));
-      
+
       _showSnackBar('Data copied to clipboard');
     } catch (e) {
-      _showSnackBar('Error exporting data: $e', isError: true);
+      _showSnackBar('Error exporting data: ${e.toString()}', isError: true);
     }
   }
 
   // ---------------- ABOUT DIALOG -----------------
 
- void _showAbout() {
-  showDialog(
-    context: context,
-    builder: (context) => Dialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-
-            /// HEADER
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF007AFF).withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(16),
+  void _showAbout() {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              /// HEADER
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF007AFF).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.psychology_alt_rounded,
+                        color: Color(0xFF007AFF), size: 34),
                   ),
-                  child: const Icon(Icons.psychology_alt_rounded,
-                      color: Color(0xFF007AFF), size: 34),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Ideaship",
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.4,
-                          color: Color(0xFF1A1A1A),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Ideaship",
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -0.4,
+                            color: Color(0xFF1A1A1A),
+                          ),
                         ),
-                      ),
-                      Text(
-                        "Version $_appVersion",
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
+                        Text(
+                          "Version $_appVersion",
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-            Divider(color: Colors.grey.shade300, thickness: 1),
-            const SizedBox(height: 16),
-
-            /// TAGLINE
-            const Text(
-              "Developed by Awarcrown Elite Team",
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
+                ],
               ),
-            ),
-            const SizedBox(height: 6),
+              const SizedBox(height: 20),
+              Divider(color: Colors.grey.shade300, thickness: 1),
+              const SizedBox(height: 16),
 
-            Text(
-              "Building the next generation of innovation — "
-              "where ideas meet opportunity.",
-              style: TextStyle(
-                fontSize: 14,
-                height: 1.5,
-                color: Colors.grey.shade700,
-              ),
-            ),
-
-            const SizedBox(height: 22),
-
-            /// LINKS SECTION
-            _buildAboutRow(
-              Icons.language_rounded,
-              "Website",
-              "https://awarcrown.com",
-              () => _openLink("https://awarcrown.com"),
-            ),
-
-            const SizedBox(height: 12),
-
-            _buildAboutRow(
-              Icons.email_outlined,
-              "Support Email",
-              "support@awarcrown.com",
-              () => _openLink("mailto:support@awarcrown.com"),
-            ),
-
-            const SizedBox(height: 12),
-
-           
-
-           
-
-            const SizedBox(height: 22),
-            Divider(color: Colors.grey.shade300, thickness: 1),
-            const SizedBox(height: 12),
-
-            /// COPYRIGHT
-            Center(
-              child: Text(
-                "© ${DateTime.now().year} Awarcrown Corporations LLP\nAll rights reserved.",
-                textAlign: TextAlign.center,
+              /// TAGLINE
+              const Text(
+                "Developed by Awarcrown Elite Team",
                 style: TextStyle(
-                  fontSize: 13,
-                  height: 1.4,
-                  color: Colors.grey.shade600,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
-
-            const SizedBox(height: 16),
-
-            /// CLOSE BUTTON
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => Navigator.pop(context),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF007AFF),
-                ),
-                child: const Text(
-                  "Close",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              const SizedBox(height: 6),
+              Text(
+                "Building the next generation of innovation — "
+                "where ideas meet opportunity.",
+                style: TextStyle(
+                  fontSize: 14,
+                  height: 1.5,
+                  color: Colors.grey.shade700,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 22),
+
+              /// LINKS SECTION
+              _buildAboutRow(
+                Icons.language_rounded,
+                "Website",
+                "https://awarcrown.com",
+                () => _openLink("https://awarcrown.com"),
+              ),
+
+              const SizedBox(height: 12),
+
+              _buildAboutRow(
+                Icons.email_outlined,
+                "Support Email",
+                "support@awarcrown.com",
+                () => _openLink("mailto:support@awarcrown.com"),
+              ),
+
+              const SizedBox(height: 22),
+              Divider(color: Colors.grey.shade300, thickness: 1),
+              const SizedBox(height: 12),
+
+              /// COPYRIGHT
+              Center(
+                child: Text(
+                  "© ${DateTime.now().year} Awarcrown Corporations LLP\nAll rights reserved.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.4,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              /// CLOSE BUTTON
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF007AFF),
+                  ),
+                  child: const Text(
+                    "Close",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
-Widget _buildFooter() {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 16),
-    child: Center(
-      child: RichText(
-        text: TextSpan(
-          style: const TextStyle(fontSize: 23),
-         children: [
-  TextSpan(
-    text: 'Built with ',
-    style: TextStyle(
-       fontFamily: 'DMSans',
-      color: Colors.grey.shade500,
-      fontSize: 16,
-      fontWeight: FontWeight.w600,
-      
-    ),
-  ),
-  const TextSpan(
-    text: '❤️\n',
-    style: TextStyle(
-      fontSize: 16,
-      fontWeight: FontWeight.bold,
-    ),
-  ),
-  const TextSpan(
-    text: 'For Startups',
-    style: TextStyle(
-        fontFamily: 'PlayfairDisplay',
-      color: Colors.black,
-      fontSize: 26,
-      fontWeight: FontWeight.w700,
-      letterSpacing: 0.4,
-    ),
-  ),
-],
+    );
+  }
 
+  Widget _buildFooter() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Center(
+        child: RichText(
+          text: TextSpan(
+            style: const TextStyle(fontSize: 23),
+            children: [
+              TextSpan(
+                text: 'Built with ',
+                style: TextStyle(
+                  fontFamily: 'DMSans',
+                  color: Colors.grey.shade500,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const TextSpan(
+                text: '❤️\n',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const TextSpan(
+                text: 'For Startups',
+                style: TextStyle(
+                  fontFamily: 'PlayfairDisplay',
+                  color: Colors.black,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
-
-
+    );
+  }
 
   Widget _buildAboutRow(IconData icon, String label, String value, VoidCallback onTap) {
     return InkWell(
@@ -657,6 +643,50 @@ Widget _buildFooter() {
             ],
           ),
 
+          if (_deletionPending)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                // ignore: deprecated_member_use
+                color: Colors.orange.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(14),
+                // ignore: deprecated_member_use
+                border: Border.all(color: Colors.orange.withOpacity(0.4)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.timer, color: Colors.orange),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Account scheduled for deletion",
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          "Your account will be permanently deleted in "
+                          "$_deletionDaysLeft days.\n"
+                          "Logging in will instantly restore it.",
+                          style: TextStyle(
+                            color: Colors.grey.shade700,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           const SizedBox(height: 8),
 
           // Privacy & Security Section
@@ -672,11 +702,18 @@ Widget _buildFooter() {
               _buildDivider(),
               _buildSettingTile(
                 icon: Icons.delete_forever_outlined,
-                iconColor: Colors.red,
+                iconColor: _deletionPending ? Colors.grey : Colors.red,
                 title: 'Delete Account',
-                subtitle: 'Permanently delete your account',
-                onTap: _showDeleteAccountConfirmation,
+                subtitle: _deletionPending ? 'Deletion already scheduled' : 'Permanently delete your account',
                 isDestructive: true,
+                onTap: _deletionPending
+                    ? () {
+                        _showSnackBar(
+                          "Account deletion already scheduled. Login again to restore your account.",
+                          isError: true,
+                        );
+                      }
+                    : _showDeleteAccountConfirmation,
               ),
             ],
           ),
@@ -692,12 +729,20 @@ Widget _buildFooter() {
                 iconColor: const Color(0xFF007AFF),
                 title: 'Contact Us',
                 subtitle: 'Feedback or support',
-                onTap: () {
-      final n = Uri.encodeComponent(CryptoHelper.encryptText(_username));
-      final e = Uri.encodeComponent(CryptoHelper.encryptText(_email));
-
-      _openLink("https://server.awarcrown.com/support/?n=$n&e=$e");
-    },
+                onTap: () async {
+                  try {
+                    final nEnc = CryptoHelper.encryptText(_username);
+                    final eEnc = CryptoHelper.encryptText(_email);
+                    final n = Uri.encodeComponent(nEnc);
+                    final e = Uri.encodeComponent(eEnc);
+                    await _openLink("https://server.awarcrown.com/support/?n=$n&e=$e");
+                  } catch (err) {
+                    // If encryption fails for any reason, fallback to plain values (encoded).
+                    final n = Uri.encodeComponent(_username);
+                    final e = Uri.encodeComponent(_email);
+                    await _openLink("https://server.awarcrown.com/support/?n=$n&e=$e");
+                  }
+                },
               ),
               _buildDivider(),
               _buildSettingTile(
@@ -724,11 +769,9 @@ Widget _buildFooter() {
             ],
           ),
 
-         
           const SizedBox(height: 5),
-_buildFooter(),
-const SizedBox(height: 10),
-
+          _buildFooter(),
+          const SizedBox(height: 10),
         ],
       ),
     );

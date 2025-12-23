@@ -1,4 +1,5 @@
 {
   "java.configuration.updateBuildConfiguration": "automatic",
-  "cmake.sourceDirectory": "C:/Users/fixme/Downloads/ideaship_ui/linux"
+  "cmake.sourceDirectory": "C:/Users/fixme/Downloads/ideaship_ui/linux",
+  "livePreview.defaultPreviewPath": "/lib/Market/index.html"
 }

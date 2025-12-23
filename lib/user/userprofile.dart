@@ -738,7 +738,6 @@ void _initializeControllers() {
                         ),
                         child: Text(
                           'Builder at Ideaship',
-
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.purple.shade700,
