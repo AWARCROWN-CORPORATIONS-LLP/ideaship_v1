@@ -2,6 +2,7 @@
 // ignore_for_file: unused_local_variable
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:ideaship/auth/auth_log_reg.dart';
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
@@ -10,6 +11,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import 'publicprofile.dart';
+import 'package:ideaship/auth/auth_utils.dart';
 class ExpandedText extends StatefulWidget {
   final String text;
   final TextStyle style;
@@ -24,7 +26,7 @@ class ExpandedText extends StatefulWidget {
   State<ExpandedText> createState() => _ExpandedTextState();
 }
 
-//read more or less code 
+
 
 class _ExpandedTextState extends State<ExpandedText> {
   bool _isExpanded = false;
@@ -74,7 +76,7 @@ class _ExpandedTextState extends State<ExpandedText> {
     );
   }
 }
-//class for skeleton loading effect
+
 class Skeleton extends StatefulWidget {
   final double height;
   final double width;
@@ -88,7 +90,7 @@ class Skeleton extends StatefulWidget {
   @override
   State<Skeleton> createState() => _SkeletonState();
 }
-//skeleton loading effect state
+
 class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> gradientPosition;
@@ -132,7 +134,7 @@ class _SkeletonState extends State<Skeleton> with SingleTickerProviderStateMixin
     );
   }
 }
-  //post skeleton widget
+
 class PostSkeleton extends StatelessWidget {
   const PostSkeleton({super.key});
   @override
@@ -206,7 +208,7 @@ class PostSkeleton extends StatelessWidget {
     );
   }
 }
-//class for comment skeleton loading effect
+
 class CommentSkeleton extends StatelessWidget {
   const CommentSkeleton({super.key});
   @override
@@ -248,7 +250,7 @@ class CommentSkeleton extends StatelessWidget {
     );
   }
 }
-//comment item widget
+
 class CommentItem extends StatelessWidget {
   final dynamic comment;
   final int depth;
@@ -399,7 +401,6 @@ class CommentItem extends StatelessWidget {
   }
 }
 
-//comments page widget
 class CommentsPage extends StatefulWidget {
   final dynamic post;
   final List<dynamic> comments;
@@ -415,7 +416,7 @@ class CommentsPage extends StatefulWidget {
   @override
   State<CommentsPage> createState() => _CommentsPageState();
 }
-//comments page state
+
 class _CommentsPageState extends State<CommentsPage> {
   late dynamic post;
   late String _username;
@@ -964,13 +965,15 @@ class _CommentsPageState extends State<CommentsPage> {
     );
   }
 }
-//posts page widget
+
 class PostsPage extends StatefulWidget {
   const PostsPage({super.key});
   @override
   State<PostsPage> createState() => _PostsPageState();
 }
-//posts page state
+
+
+
 class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, WidgetsBindingObserver {
   List<dynamic> posts = [];
   bool isLoading = false;
@@ -995,6 +998,8 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
   final Map<int, bool> isReportingMap = {};
   bool _isInitialized = false;
   DateTime? _lastRefreshTime;
+  bool _isLoggingOut = false;
+  final Set<int> _followStatusLoaded = {};
   
   @override
   void initState() {
@@ -1025,7 +1030,35 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
       }
     }
   }
+  /*
+Future<void> forceLogout(BuildContext context, {String? reason}) async {
+  if (_isLoggingOut || !mounted) return;
+  _isLoggingOut = true;
+
+  final prefs = await SharedPreferences.getInstance();
+
+  await prefs.remove('username');
+  await prefs.remove('user_id');
+  await prefs.remove('token'); // if exists
+
+  ScaffoldMessenger.of(context).clearSnackBars();
+
+  if (reason != null) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(reason),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(builder: (_) => const AuthLogReg()),
+    (route) => false,
+  );
+}
+  */
   /// Public method to manually refresh posts (can be called from parent widget)
   Future<void> refreshPosts() async {
     await _refreshOnResume();
@@ -1258,35 +1291,55 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
     return false;
   }
   Future<void> _updateFollowStatuses() async {
-    if (_userId == null || posts.isEmpty) return;
-    final uniqueFollowedIds = posts
-        .where((p) => _parseInt(p['user_id']) != _userId)
-        .map((p) => _parseInt(p['user_id'])!)
-        .where((id) => id > 0)
-        .toSet();
-    if (uniqueFollowedIds.isEmpty) return;
-    final futures = uniqueFollowedIds.map((id) => _getIsFollowing(id));
-    final results = await Future.wait(futures);
-    int idx = 0;
-    bool hasChanges = false;
-    for (final id in uniqueFollowedIds) {
-      final isFollow = results[idx++];
-      final current = isFollowingMap[id] ?? false;
-      if (current != isFollow) {
-        hasChanges = true;
-        isFollowingMap[id] = isFollow;
-        for (var post in posts) {
-          final postId = _parseInt(post['user_id']);
-          if (postId == id) {
-            post['is_following'] = isFollow;
-          }
+  if (_userId == null || posts.isEmpty) return;
+
+  final userIds = posts
+      .map((p) => _parseInt(p['user_id']))
+      .whereType<int>()
+      .where((id) => id > 0 && id != _userId)
+      .toSet();
+
+  if (userIds.isEmpty) return;
+
+  bool hasChanges = false;
+
+  final results = await Future.wait(
+    userIds.map((id) async {
+      try {
+        final isFollow = await _getIsFollowing(id);
+        return MapEntry(id, isFollow);
+      } catch (_) {
+        return MapEntry(id, null);
+      }
+    }),
+  );
+
+  for (final entry in results) {
+    final userId = entry.key;
+    final isFollow = entry.value;
+
+    if (isFollow == null) continue;
+
+    _followStatusLoaded.add(userId);
+
+    if (isFollowingMap[userId] != isFollow) {
+      isFollowingMap[userId] = isFollow;
+      hasChanges = true;
+
+      for (final post in posts) {
+        if (_parseInt(post['user_id']) == userId) {
+          post['is_following'] = isFollow;
         }
       }
     }
-    if (hasChanges && mounted) {
-      setState(() {});
-    }
   }
+
+  if (hasChanges && mounted) {
+    setState(() {});
+  }
+}
+
+  
   String _getErrorMessage(dynamic e) {
     if (e is SocketException) {
       return 'No internet connection. Please check your connection and try again.';
@@ -1298,17 +1351,48 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
       return 'An unexpected error occurred. Please try again.';
     }
   }
-  void _showError(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.error,
-        duration: const Duration(seconds: 3),
-        behavior: SnackBarBehavior.floating,
+ void _showError(String message) {
+  if (!mounted) return;
+
+  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      duration: const Duration(milliseconds: 1200),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.black.withOpacity(0.9),
+      margin: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        bottom: MediaQuery.of(context).padding.bottom + 70,
       ),
-    );
-  }
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+      ),
+      content: Row(
+        children: [
+          const Icon(
+            Icons.info_outline,
+            size: 18,
+            color: Colors.white70,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13.5,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
   void _showSuccess(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1492,51 +1576,68 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
       await _fetchPosts(cursorId: nextCursorId);
     }
   }
-  Future<void> _refreshPosts() async {
-    await _processLikeQueue();
-    if (_username.isEmpty) return;
-    setState(() {
-      networkError = false;
-      nextCursorId = null;
-    });
-    if (posts.isEmpty) {
-      await _fetchPosts();
-      return;
-    }
-    final oldFirstId = _parseInt(posts[0]['post_id']) ?? 0;
-    try {
-      final data = await _fetchPostsData();
-      if (data == null || !mounted) return;
-      setState(() => networkError = false);
-      final newPosts = data['posts'] ?? [];
-      final newOnes = newPosts.where((p) {
-        final pId = _parseInt(p['post_id']) ?? 0;
-        return pId > oldFirstId;
-      }).toList();
-      if (newOnes.isNotEmpty && mounted) {
-        setState(() {
-          posts.insertAll(0, newOnes);
-          for (var post in newOnes) {
-            final postId = _parseInt(post['post_id']);
-            if (postId != null && _savedPosts.contains(postId)) {
-              post['is_saved'] = true;
-            }
-          }
-        });
-        
-        await _applyLikeStatesToPosts();
-        await _savePostsToCache();
-        await _updateFollowStatuses();
-        _showSuccess('${newOnes.length} new post${newOnes.length > 1 ? 's' : ''} loaded');
-        _refreshNotifier.value = !_refreshNotifier.value;
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => networkError = true);
-        _showError(_getErrorMessage(e));
-      }
-    }
+ Future<void> _refreshPosts() async {
+  if (_username.isEmpty || !mounted) return;
+
+  // 1️⃣ Instant visual feedback (no spinner / no clearing list)
+  _refreshNotifier.value = !_refreshNotifier.value;
+
+  // 2️⃣ Process offline actions silently
+  unawaited(_processLikeQueue());
+
+  // If list is empty → do normal fetch
+  if (posts.isEmpty) {
+    await _fetchPosts();
+    return;
   }
+
+  final oldFirstId = _parseInt(posts.first['post_id']) ?? 0;
+
+  try {
+    // 3️⃣ Background fetch (no UI blocking)
+    final data = await _fetchPostsData();
+    if (data == null || !mounted) return;
+
+    final List<dynamic> fetchedPosts = data['posts'] ?? [];
+
+    // 4️⃣ Only take NEW posts
+    final newOnes = fetchedPosts.where((p) {
+      final id = _parseInt(p['post_id']) ?? 0;
+      return id > oldFirstId;
+    }).toList();
+
+    if (newOnes.isEmpty) return;
+
+    // 5️⃣ Insert smoothly (no list reset)
+    setState(() {
+      posts.insertAll(0, newOnes);
+
+      for (final post in newOnes) {
+        final id = _parseInt(post['post_id']);
+        if (id != null && _savedPosts.contains(id)) {
+          post['is_saved'] = true;
+        }
+      }
+    });
+
+    // 6️⃣ Sync local states (async polish)
+    unawaited(_applyLikeStatesToPosts());
+    unawaited(_updateFollowStatuses());
+    unawaited(_savePostsToCache());
+
+    // 7️⃣ Soft success feedback
+    _showSuccess(
+      '${newOnes.length} new post${newOnes.length > 1 ? 's' : ''} loaded',
+    );
+
+    _refreshNotifier.value = !_refreshNotifier.value;
+
+  } catch (e) {
+    if (!mounted) return;
+    setState(() => networkError = true);
+    _showError(_getErrorMessage(e));
+  }
+}
 
   Future<void> _toggleLike(int postId, int index) async {
     
@@ -1544,11 +1645,11 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
     if (_userId == null || _userId == 0) {
       await _fetchUserId();
       if (!mounted || _userId == null || _userId == 0) {
-        _showError('User not authenticated. Please log in again.');
-        //go to login page
-       
-
-        return;
+       await forceLogout(
+        context,
+    reason: 'Session expired. Please log in again.',
+  );
+  return;
       }
     }
     if (isLikingMap[postId] ?? false) return;
@@ -1688,8 +1789,12 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
     if (_userId == null || _userId == 0) {
       await _fetchUserId();
       if (!mounted || _userId == null || _userId == 0) {
-        _showError('User not authenticated. Please log in again.');
-        return;
+       
+       await forceLogout(
+        context,
+    reason: 'Session expired. Please log in again.',
+  );
+  return;
       }
     }
     if (isProcessingFollow[followedUserId] ?? false) return;
@@ -1970,8 +2075,12 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
     if (_userId == null || _userId == 0) {
       await _fetchUserId();
       if (!mounted || _userId == null || _userId == 0) {
-        _showError('User not authenticated. Please log in again.');
-        return;
+         await forceLogout(
+          context,
+    reason: 'Session expired. Please log in again.',
+  );
+  return;
+     
       }
     }
     if (isSavingMap[postId] ?? false) return;
@@ -2307,6 +2416,13 @@ Text(
     final isProcessing = isProcessingFollow[userId] ?? false;
     final aspectRatio = _getAspectRatio(post);
     final screenWidth = MediaQuery.of(context).size.width;
+    final bool isFollowKnown = _followStatusLoaded.contains(userId);
+
+final bool shouldShowFollowButton =
+    !_isOwnPost(postId, index) &&
+    isFollowKnown &&
+    !isFollowing;
+
     return RepaintBoundary(
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
@@ -2382,39 +2498,40 @@ Text(
                       ],
                     ),
                   ),
-                  if (!_isOwnPost(postId, index) && !isFollowing)
-                    Container(
-                      margin: const EdgeInsets.only(right: 4),
-                      child: ElevatedButton(
-                        onPressed: isProcessing ? null : () => _toggleFollow(userId, index),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF4A90E2),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          minimumSize: const Size(85, 36),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          elevation: 0,
-                        ),
-                        child: isProcessing
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Text(
-                                'Follow',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                      ),
-                    ),
+                 if (shouldShowFollowButton)
+  Container(
+    margin: const EdgeInsets.only(right: 4),
+    child: ElevatedButton(
+      onPressed: isProcessing ? null : () => _toggleFollow(userId, index),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF4A90E2),
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        minimumSize: const Size(85, 36),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+        ),
+        elevation: 0,
+      ),
+      child: isProcessing
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+              ),
+            )
+          : const Text(
+              'Follow',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+    ),
+  ),
+
                   if (!_isOwnPost(postId, index))
                     Material(
                       color: Colors.transparent,
@@ -2868,7 +2985,7 @@ class PostCardWrapper extends StatelessWidget {
     return Builder(
       builder: (context) {
         try {
-          // reuse existing class by attaching it into PostsPage logic
+          
           return PostsPageStateHelper.buildSinglePost(context, post);
         } catch (_) {
           return const SizedBox();
@@ -2885,7 +3002,7 @@ class PostsPageStateHelper {
       return const SizedBox();
     }
 
-    // Inject temporary list with one item
+    
     final idx = state.posts.indexWhere(
       (p) => p['post_id'].toString() == post['post_id'].toString(),
     );

@@ -9,7 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:shimmer/shimmer.dart';
-
+import '../auth/auth_utils.dart';
 enum SortOption { none, mostLiked, mostFollowed, newest }
 
 class StartupsPage extends StatefulWidget {

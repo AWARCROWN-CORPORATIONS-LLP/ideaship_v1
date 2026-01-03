@@ -98,7 +98,6 @@ class _UserProfileState extends State<UserProfile> with TickerProviderStateMixin
       setState(() => _isLoading = true);
       final prefs = await SharedPreferences.getInstance();
       final username = prefs.getString('username');
-      
       if (username == null || username.isEmpty) {
         if (mounted) {
           setState(() => _isLoading = false);
@@ -627,158 +626,213 @@ void _initializeControllers() {
   }
 
   Widget _buildProfileHeader() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              GestureDetector(
-                onTap: _showProfileImage,
-                child: Hero(
-                  tag: 'profile_image_$_profilePicture',
-                  child: Container(
-                    width: 90,
-                    height: 90,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.grey.shade200, width: 2),
-                      boxShadow: [
-                        BoxShadow(
-                          // ignore: deprecated_member_use
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: CircleAvatar(
-                      radius: 43,
-                      backgroundImage: _selectedImage != null
-                          ? FileImage(File(_selectedImage!.path))
-                          : _profilePicture != null
-                              ? CachedNetworkImageProvider(_profilePicture!)
-                              : null,
-                      backgroundColor: Colors.grey.shade100,
-                      child: _profilePicture == null && _selectedImage == null
-                          ? Icon(Icons.person, size: 45, color: Colors.grey.shade400)
-                          : null,
-                    ),
+  return Container(
+    color: Colors.white,
+    padding: const EdgeInsets.fromLTRB(20, 24, 20, 20),
+    child: Column(
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: _showProfileImage,
+              child: Hero(
+                tag: 'profile_image_$_profilePicture',
+                child: Container(
+                  width: 90,
+                  height: 90,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.grey.shade200, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    radius: 43,
+                    backgroundImage: _selectedImage != null
+                        ? FileImage(File(_selectedImage!.path))
+                        : _profilePicture != null
+                            ? CachedNetworkImageProvider(_profilePicture!)
+                            : null,
+                    backgroundColor: Colors.grey.shade100,
+                    child: _profilePicture == null && _selectedImage == null
+                        ? Icon(Icons.person, size: 45, color: Colors.grey.shade400)
+                        : null,
                   ),
                 ),
               ),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        if (_username != null && _username!.isNotEmpty) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => PublicProfilePage(targetUsername: _username!),
-                            ),
-                          );
-                        }
-                      },
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      if (_username != null && _username!.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                PublicProfilePage(targetUsername: _username!),
+                          ),
+                        );
+                      }
+                    },
+                    child: Row(
+                      children: [
+                        Text(
+                          _username ?? 'User',
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF1A1A1A),
+                            letterSpacing: -0.5,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.open_in_new,
+                            size: 16, color: Colors.grey.shade600),
+                      ],
+                    ),
+                  ),
+                  if (_email != null && _email!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      _email!,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+
+                  
+                  if (_role == 'student')
+                    Container(
+  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+  decoration: BoxDecoration(
+    gradient: LinearGradient(
+      colors: [
+        Color(0xFFE3F2FD), 
+        Color(0xFFBBDEFB),
+      ],
+    ),
+    borderRadius: BorderRadius.circular(14),
+    border: Border.all(
+      color: Colors.blue.shade200,
+      width: 0.8,
+    ),
+  ),
+  child: Row(
+    mainAxisSize: MainAxisSize.min,
+    children: const [
+      Icon(
+        Icons.explore,
+        size: 13,
+        color: Color(0xFF1565C0),
+      ),
+      SizedBox(width: 5),
+      Text(
+        'Explorer',
+        style: TextStyle(
+          fontSize: 12,
+          color: Color(0xFF1565C0),
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0.3,
+        ),
+      ),
+    ],
+  ),
+)
+
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 6),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            Color(0xFF5E2B97), // Royal Purple
+                            Color(0xFFF4C430), // Gold
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.18),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
                       child: Row(
-                        children: [
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(
+                            Icons.workspace_premium,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                          SizedBox(width: 6),
                           Text(
-                            _username ?? 'User',
-                            style: const TextStyle(
-                              fontSize: 22,
+                            'Crowned Founder',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.white,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF1A1A1A),
-                              letterSpacing: -0.5,
+                              letterSpacing: 0.4,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Icon(Icons.open_in_new, size: 16, color: Colors.grey.shade600),
                         ],
                       ),
                     ),
-                    if (_email != null && _email!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        _email!,
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: Colors.grey.shade600,
-                          fontWeight: FontWeight.w400,
-                        ),
+
+                  if (_profileData?['bio'] != null &&
+                      _profileData!['bio'].toString().isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      _profileData!['bio'],
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey.shade700,
+                        height: 1.5,
                       ),
-                    ],
+                    ),
+                  ],
+                  if (_profileData?['website'] != null &&
+                      _profileData!['website'].toString().isNotEmpty) ...[
                     const SizedBox(height: 8),
-                    if (_role == 'student')
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'Explorer',
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.link,
+                            size: 14, color: Colors.blue.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          _profileData!['website'],
                           style: TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF1B5E20),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      )
-                    else if (_role == 'Company/HR')
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.purple.shade50,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Builder at Ideaship',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.purple.shade700,
+                            fontSize: 13,
+                            color: Colors.blue.shade600,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                      ),
-                    if (_profileData?['bio'] != null && _profileData!['bio'].toString().isNotEmpty) ...[
-                      const SizedBox(height: 12),
-                      Text(
-                        _profileData!['bio'],
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade700,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                    if (_profileData?['website'] != null && _profileData!['website'].toString().isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.link, size: 14, color: Colors.blue.shade600),
-                          const SizedBox(width: 4),
-                          Text(
-                            _profileData!['website'],
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.blue.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ],
-                ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
+        ),
+
           const SizedBox(height: 24),
           Row(
             children: [

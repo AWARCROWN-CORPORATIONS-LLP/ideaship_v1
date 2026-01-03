@@ -800,6 +800,48 @@ class _AuthLogRegState extends State<AuthLogReg> with TickerProviderStateMixin {
       },
     );
   }
+  Future<void> _restoreAccount() async {
+  if (!_isConnected) {
+    _showErrorDialog("No Network", "Internet required to restore account.");
+    return;
+  }
+
+  setState(() => _isLoading = true);
+
+  try {
+    final url = Uri.parse(
+      "https://server.awarcrown.com/auth/api?action=restore-account",
+    );
+
+    final response = await http.post(
+      url,
+      body: {
+        "username": _loginUserController.text.trim(),
+      },
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    );
+
+    final data = json.decode(response.body);
+
+    if (response.statusCode == 200 && data['success'] == true) {
+     
+      await _login();
+    } else {
+      _showErrorDialog(
+        "Restore Failed",
+        data['message'] ?? "Unable to restore account.",
+      );
+    }
+  } catch (e) {
+    _showErrorDialog(
+      "Restore Error",
+      "Failed to restore account. Please try again.",
+    );
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
+  }
+}
+
 
  Future<void> _login() async {
   bool hasError = false;
@@ -940,10 +982,10 @@ await prefs.setInt(
                 child: const Text("Cancel"),
               ),
               TextButton(
-                onPressed: () {
-                  Navigator.pop(context);
-                  _login(); // retry → backend restores
-                },
+               onPressed: () async {
+  Navigator.pop(context);
+  await _restoreAccount();
+},
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.green,
                 ),
@@ -1618,7 +1660,7 @@ await prefs.setInt(
                             autofillHints: const [AutofillHints.email],
                             helperText: _showInlineHints
                                 ? "We will send a confirmation email"
-                                : null,
+                              : null,
                             onChanged: (_) => setState(() {}),
                             semanticsLabel: 'Email field',
                           ),
@@ -1702,7 +1744,7 @@ await prefs.setInt(
                                     children: [
                                       const TextSpan(text: "I agree to the "),
 
-                                      // TERMS OF SERVICE LINK
+                                     
                                       TextSpan(
                                         text: "Terms of Service",
                                         style: const TextStyle(
@@ -1713,7 +1755,7 @@ await prefs.setInt(
                                         recognizer: TapGestureRecognizer()
                                           ..onTap = () async {
                                             await _openLink(
-                                              "https://server.awarcrown.com/terms",
+                                              "https://server.awarcrown.com/terms-services",
                                             );
                                           },
                                       ),

@@ -1,5 +1,3 @@
-// Created/updated: 2025-12-23
-// Replace your original CreatePostPage implementation with this file.
 
 import 'dart:convert';
 import 'dart:io';
@@ -12,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:in_app_review/in_app_review.dart';
+import '../auth/auth_utils.dart';
 
 class CreatePostPage extends StatefulWidget {
   const CreatePostPage({super.key});
@@ -31,13 +30,13 @@ class ProgressMultipartRequest extends http.MultipartRequest {
 
   @override
   http.ByteStream finalize() {
-    // super.finalize() sets up the byte stream and the contentLength
+
     final byteStream = super.finalize();
-    final totalBytes = contentLength ?? 0;
+    final totalBytes = contentLength;
 
     int sentBytes = 0;
 
-    // Use List<int> generics to match the ByteStream internal list type
+    
     final stream = byteStream.transform(
       StreamTransformer<List<int>, List<int>>.fromHandlers(
         handleData: (data, sink) {
@@ -70,7 +69,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
 
-  // HTTP client used for the upload. Closing this client cancels the request.
+
   http.Client? _uploadClient;
 
   @override
@@ -90,14 +89,14 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
 
   @override
   void dispose() {
-    // Ensure the upload client is closed (cancels ongoing upload)
+    
     _uploadClient?.close();
     _animationController.dispose();
     _contentController.dispose();
     super.dispose();
   }
 
-  // Load username from SharedPreferences
+ 
   Future<void> _loadUsername() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
@@ -112,7 +111,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isError ? Colors.red : Colors.green,
+        backgroundColor: isError ? const Color.fromARGB(255, 0, 0, 0) : Colors.green,
         behavior: SnackBarBehavior.floating,
         duration: Duration(seconds: isError ? 4 : 2),
         action: isError
@@ -182,7 +181,7 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
                 }
                 Navigator.pop(context, true);
               },
-              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              style: TextButton.styleFrom(foregroundColor: const Color.fromARGB(255, 254, 1, 1)),
               child: const Text('Leave Anyway'),
             ),
           ],
@@ -390,7 +389,10 @@ class _CreatePostPageState extends State<CreatePostPage> with TickerProviderStat
       final email = prefs.getString('email') ?? '';
 
       if (username.isEmpty || email.isEmpty) {
-        throw Exception('User not logged in');
+         await forceLogout(
+        context,
+    reason: 'Session expired. Please log in again.',
+  );
       }
 
       final request = ProgressMultipartRequest(

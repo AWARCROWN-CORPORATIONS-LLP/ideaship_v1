@@ -28,6 +28,69 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   debugPrint('Message data: ${message.data}');
   await _showLocalNotification(message);
 }
+Future<void> registerFcmTokenToServer() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('user_id');
+
+    if (userId == null || userId == 0) {
+      debugPrint("FCM: user_id not available yet");
+      return;
+    }
+
+    // Request permission (Android 13+ safe)
+    await FirebaseMessaging.instance.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    final fcmToken = await FirebaseMessaging.instance.getToken();
+    if (fcmToken == null) {
+      debugPrint("FCM: token is null");
+      return;
+    }
+
+    debugPrint("FCM TOKEN => $fcmToken");
+
+    await http.post(
+      Uri.parse(
+        "https://server.awarcrown.com/notifications/register_device",
+      ),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "user_id": userId,
+        "fcm_token": fcmToken,
+        "platform": Platform.operatingSystem,
+      }),
+    );
+  } catch (e) {
+    debugPrint("FCM register error: $e");
+  }
+}
+void listenForFcmTokenRefresh() {
+  FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+    debugPrint("FCM TOKEN REFRESHED => $newToken");
+
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('user_id');
+    if (userId == null || userId == 0) return;
+
+    await http.post(
+      Uri.parse(
+        "https://server.awarcrown.com/notifications/register_device",
+      ),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "user_id": userId,
+        "fcm_token": newToken,
+        "platform": Platform.operatingSystem,
+      }),
+    );
+  });
+}
+
+
 
 Future<void> _initializeLocalNotifications() async {
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -164,6 +227,7 @@ Future<void> main() async {
       FirebaseMessaging.onBackgroundMessage(
         _firebaseMessagingBackgroundHandler,
       );
+      listenForFcmTokenRefresh();
       await _initializeLocalNotifications();
       runApp(const MyApp());
     },
@@ -193,6 +257,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     globalInstance = this;
     WidgetsBinding.instance.addObserver(this);
     _checkLoginStatus();
+    Future.delayed(const Duration(seconds: 2), registerFcmTokenToServer);
+
     // Removed initDeepLinks() call
   }
 

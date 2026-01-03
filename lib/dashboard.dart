@@ -1,4 +1,3 @@
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -8,21 +7,17 @@ import 'package:ideaship/feed/createpost.dart';
 import 'package:ideaship/feed/posts.dart';
 import 'package:ideaship/feed/startups.dart';
 import 'package:ideaship/settings/usersettings.dart';
-import 'package:ideaship/thr_project/thread_details.dart';
 import 'package:ideaship/user/userprofile.dart';
 import 'package:ideaship/thr_project/threads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ideaship/notify/notifications.dart';
 import 'package:http/http.dart' as http;
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:ideaship/feed/publicprofile.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:url_launcher/url_launcher.dart' show launchUrl, LaunchMode;
-
-final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-    FlutterLocalNotificationsPlugin();
+import 'package:ideaship/Market/marketplace.dart';
+import 'package:flutter/services.dart';
+import 'package:in_app_update/in_app_update.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -34,16 +29,16 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage>
     with TickerProviderStateMixin {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+ 
+
   int _selectedIndex = 0;
   late TabController _tabController;
   String? _username;
   String? _email;
   String? _role;
-  String? _major;
   bool _isLoading = true;
-
   bool _isDarkMode = false;
-  int _unreadCount = 0;
+  bool _isButtonLocked = false;
 
   @override
   void initState() {
@@ -52,10 +47,8 @@ class _DashboardPageState extends State<DashboardPage>
     _tabController.addListener(_handleTabChange);
     _loadUserData();
     _loadThemePreference();
-    _setupLocalNotifications();
-    _setupFCM();
-    _loadUnreadCount();
-     _checkForUpdate();
+    _checkForUpdate();
+     _checkForGooglePlayUpdate();
   }
 
   @override
@@ -70,117 +63,216 @@ class _DashboardPageState extends State<DashboardPage>
       setState(() {});
     }
   }
+
   Future<void> _checkForUpdate() async {
-  try {
-    final res = await http
-        .get(Uri.parse("https://server.awarcrown.com/update/update_check"))
-        .timeout(const Duration(seconds: 8));
+    try {
+      final res = await http
+          .get(Uri.parse("https://server.awarcrown.com/update/update_check"))
+          .timeout(const Duration(seconds: 8));
 
-    if (res.statusCode == 200) {
-      final data = json.decode(res.body);
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
 
-      if (data['update_available'] == 1) {
-        _showUpdateDialog(
-          data['message'] ?? "A new version is available!",
-          data['update_url'] ?? "https://play.google.com/store/apps/details?id=com.awarcrown.ideaship",
-        );
+        if (data['update_available'] == 1) {
+          _showUpdateDialog(
+            data['message'] ?? "A new version is available!",
+            data['update_url'] ??
+                "https://play.google.com/store/apps/details?id=com.awarcrown.ideaship",
+          );
+        }
       }
+    } catch (e) {
+      debugPrint("Update check error: $e");
     }
+  }
+
+  void _showUpdateDialog(String message, String updateUrl) {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 25),
+          child: Padding(
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.blue.withOpacity(0.12),
+                  ),
+                  child: const Icon(
+                    Icons.system_update_rounded,
+                    size: 42,
+                    color: Colors.blue,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  "Update Required",
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  message,
+                  style: const TextStyle(fontSize: 15, color: Colors.black87),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 25),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 3,
+                      backgroundColor: Colors.blue,
+                    ),
+                    onPressed: () {
+                      launchUrl(
+                        Uri.parse(updateUrl),
+                        mode: LaunchMode.externalApplication,
+                      );
+                    },
+                    child: const Text(
+                      "Update Now",
+                      style: TextStyle(
+                        fontSize: 17,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+  Future<void> _forceImmediateUpdate() async {
+  try {
+    await InAppUpdate.performImmediateUpdate();
   } catch (e) {
-    debugPrint("Update check error: $e");
+    debugPrint('Immediate update failed: $e');
   }
 }
-void _showUpdateDialog(String message, String updateUrl) {
-  if (!mounted) return;
 
+  Future<void> _checkForGooglePlayUpdate() async {
+   try {
+    final info = await InAppUpdate.checkForUpdate();
+
+    if (!mounted) return;
+
+    if (info.updateAvailability == UpdateAvailability.updateAvailable &&
+        info.immediateUpdateAllowed) {
+      await _forceImmediateUpdate();
+    }
+  } catch (e) {
+    debugPrint('Google Play update check failed: $e');
+  }
+}
+Future<void> _startFlexibleUpdate() async {
+  try {
+    await InAppUpdate.startFlexibleUpdate();
+    await InAppUpdate.completeFlexibleUpdate();
+  } catch (e) {
+    debugPrint('Flexible update failed: $e');
+  }
+}void _showForceUpdateDialog() {
   showDialog(
     context: context,
-    barrierDismissible: false, 
-    builder: (_) {
-      return Dialog(
+    barrierDismissible: false,
+    builder: (_) => WillPopScope(
+      onWillPop: () async => false,
+      child: AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        insetPadding: const EdgeInsets.symmetric(horizontal: 25),
-        child: Padding(
-          padding: const EdgeInsets.all(22),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Icon
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                 // ignore: deprecated_member_use
-                  color: Colors.blue.withOpacity(0.12),
-                ),
-                child: const Icon(
-                  Icons.system_update_rounded,
-                  size: 42,
-                  color: Colors.blue,
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              const Text(
-                "Update Required",
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 12),
-
-              Text(
-                message,
-                style: const TextStyle(
-                  fontSize: 15,
-                  color: Colors.black87,
-                ),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 25),
-
-              
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      vertical: 14,
-                    ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 3,
-                    backgroundColor: Colors.blue,
-                  ),
-                  onPressed: () {
-                    launchUrl(
-                      Uri.parse(updateUrl),
-                      mode: LaunchMode.externalApplication,
-                    );
-                  },
-                  child: const Text(
-                    "Update Now",
-                    style: TextStyle(
-                      fontSize: 17,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+        title: const Text('Update Required'),
+        content: const Text(
+          'A new version is available. Please update to continue using Ideaship.',
         ),
-      );
-    },
+        actions: [
+          ElevatedButton(
+            onPressed: _forceImmediateUpdate,
+            child: const Text('Update Now'),
+          ),
+        ],
+      ),
+    ),
   );
 }
+
+
+
+
+  Future<void> _coolDownAction(
+    Future<void> Function() action, {
+    int delayMs = 600,
+  }) async {
+    if (_isButtonLocked) {
+      _showCooldownHint();
+      return;
+    }
+
+    _isButtonLocked = true;
+
+    try {
+      await action();
+    } finally {
+      Future.delayed(Duration(milliseconds: delayMs), () {
+        _isButtonLocked = false;
+      });
+    }
+  }
+
+void _showCooldownHint() {
+  if (!mounted) return;
+
+  HapticFeedback.lightImpact(); 
+
+  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      duration: const Duration(milliseconds: 900),
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Colors.black.withOpacity(0.88),
+      margin: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        bottom: MediaQuery.of(context).padding.bottom + 50,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      content: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: const [
+          Icon(Icons.hourglass_top_rounded, size: 16, color: Colors.white70),
+          SizedBox(width: 8),
+          Text(
+            "Cooling down…",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 
   Future<void> _loadThemePreference() async {
     try {
@@ -215,490 +307,52 @@ void _showUpdateDialog(String message, String updateUrl) {
           _username = prefs.getString('username') ?? '';
           _email = prefs.getString('email') ?? '';
           _role = prefs.getString('role') ?? '';
-         
           _isLoading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         _showErrorBanner('Failed to load user data: ${e.toString()}');
-       
-       
       }
     }
-  }
-
-  Future<void> _setupLocalNotifications() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-
-    const DarwinInitializationSettings initializationSettingsIOS =
-        DarwinInitializationSettings(
-          requestAlertPermission: true,
-          requestBadgePermission: true,
-          requestSoundPermission: true,
-        );
-
-    const InitializationSettings initializationSettings =
-        InitializationSettings(
-          android: initializationSettingsAndroid,
-          iOS: initializationSettingsIOS,
-        );
-
-    await flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: (NotificationResponse response) {
-        final data = response.payload != null
-            ? json.decode(response.payload!) as Map<String, dynamic>
-            : <String, dynamic>{};
-        _handleNotificationTap(data); 
-      },
-    );
-
-    
-    const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'high_importance_channel',
-      'High Importance Notifications',
-      description: 'Your app notifications',
-      importance: Importance.max,
-      playSound: true,
-    );
-
-    if (Platform.isAndroid) {
-      await flutterLocalNotificationsPlugin
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >()
-          ?.createNotificationChannel(channel);
-    }
-  }
-
- 
-  Future<void> _setupFCM() async {
-    final fcm = FirebaseMessaging.instance;
-
-    NotificationSettings settings = await fcm.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
-    debugPrint('User granted permission: ${settings.authorizationStatus}');
-
-    String? token = await fcm.getToken();
-    if (_username != null) {
-      await http.post(
-        Uri.parse('https://server.awarcrown.com/threads/update_token'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'username': _username, 'token': token}),
-      );
-    }
-
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint('Foreground message: ${message.notification?.title}');
-      _showLocalNotification(message);
-      _storeNotification(message);
-    });
-
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      _storeNotification(message);
-      _handleNotificationNavigation(message.data);
-      _markAllRead();
-    });
-
-    RemoteMessage? initialMessage = await fcm.getInitialMessage();
-    if (initialMessage != null) {
-      await _storeNotification(initialMessage);
-      _handleNotificationNavigation(initialMessage.data);
-    }
-  }
-
-  Future<void> _storeNotification(RemoteMessage message) async {
-    final prefs = await SharedPreferences.getInstance();
-    final notifData = {
-      'id':
-          message.messageId ?? DateTime.now().millisecondsSinceEpoch.toString(),
-      'title': message.notification?.title ?? message.data['title'] ?? '',
-      'body': message.notification?.body ?? message.data['body'] ?? '',
-      'data': message.data,
-      'read': false,
-      'timestamp': DateTime.now().toIso8601String(),
-    };
-    final notificationsJson = prefs.getStringList('notifications') ?? [];
-    notificationsJson.insert(0, json.encode(notifData));
-    await prefs.setStringList('notifications', notificationsJson);
-    await _loadUnreadCount();
-  }
-
-  Future<void> _loadUnreadCount() async {
-    final prefs = await SharedPreferences.getInstance();
-    final notificationsJson = prefs.getStringList('notifications') ?? [];
-    final unread = notificationsJson.where((jsonStr) {
-      final data = json.decode(jsonStr);
-      return !(data['read'] ?? false);
-    }).length;
-    if (mounted) setState(() => _unreadCount = unread);
-  }
-
-  void _setUnreadCount(int count) {
-    if (mounted) setState(() => _unreadCount = count);
-  }
-
-  Future<void> _markAllRead() async {
-    final prefs = await SharedPreferences.getInstance();
-    final notificationsJson = prefs.getStringList('notifications') ?? [];
-    bool updated = false;
-    for (int i = 0; i < notificationsJson.length; i++) {
-      final data = json.decode(notificationsJson[i]);
-      if (!(data['read'] ?? false)) {
-        data['read'] = true;
-        notificationsJson[i] = json.encode(data);
-        updated = true;
-      }
-    }
-    if (updated) {
-      await prefs.setStringList('notifications', notificationsJson);
-      await _loadUnreadCount();
-    }
-  }
-
-  
-  Future<void> _markAsReadById(String id) async {
-    if (id.isEmpty) return;
-    final prefs = await SharedPreferences.getInstance();
-    final notificationsJson = prefs.getStringList('notifications') ?? [];
-    bool updated = false;
-    for (int i = 0; i < notificationsJson.length; i++) {
-      final notifData = json.decode(notificationsJson[i]);
-      if (notifData['id'] == id && !(notifData['read'] ?? false)) {
-        notifData['read'] = true;
-        notificationsJson[i] = json.encode(notifData);
-        updated = true;
-        break;
-      }
-    }
-    if (updated) {
-      await prefs.setStringList('notifications', notificationsJson);
-      await _loadUnreadCount();
-    }
-  }
-
-  
-  Future<void> _clearAllNotifications() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('notifications');
-    await _loadUnreadCount(); // Set count to 0
-  }
-
-  // Updated: Handle navigation (store first, then nav)
-  Future<void> _handleNotificationNavigation(Map<String, dynamic> data) async {
-    if (data['type'] == 'new_comment' ||
-        data['type'] == 'inspired' ||
-        data['type'] == 'collab_request') {
-      final threadId = int.tryParse(data['thread_id'] ?? '');
-      if (threadId != null) {
-        await _fetchAndNavigateToThread(threadId);
-        await _markAsReadById(data['id'] ?? '');
-        return;
-      }
-    } else if (data['type'] == 'new_post_comment') {
-      // Corrected type for post comments
-      final postId = int.tryParse(data['post_id'] ?? '');
-      if (postId != null) {
-        await _fetchAndNavigateToPost(postId);
-        await _markAsReadById(data['id'] ?? '');
-        return;
-      }
-    }
-    // Default: Nav to notifications page
-    if (mounted) {
-      Navigator.pushNamed(
-        context,
-        '/notifications',
-      ); // Or push to NotificationsPage
-    }
-  }
-
-  Future<void> _fetchAndNavigateToPost(int postId) async {
-    if (_username == null || _username!.isEmpty) return;
-
-    try {
-      final response = await http
-          .get(
-            Uri.parse(
-              'https://server.awarcrown.com/feed/fetch_single_post?post_id=$postId&username=${Uri.encodeComponent(_username!)}',
-            ),
-          )
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final post = data['post'] ?? {};
-        if (post.isNotEmpty) {
-          final commentsResponse = await http
-              .get(
-                Uri.parse(
-                  'https://server.awarcrown.com/feed/fetch_comments?post_id=$postId&username=${Uri.encodeComponent(_username!)}',
-                ),
-              )
-              .timeout(const Duration(seconds: 10));
-
-          List<dynamic> comments = [];
-          if (commentsResponse.statusCode == 200) {
-            final commentsData = json.decode(commentsResponse.body);
-            comments = commentsData['comments'] ?? [];
-          }
-
-          final prefs = await SharedPreferences.getInstance();
-          final userId = prefs.getInt('user_id');
-
-          if (mounted) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text('Opening post...')));
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CommentsPage(
-                  post: post,
-                  comments: comments,
-                  username: _username!,
-                  userId: userId,
-                ),
-              ),
-            );
-          }
-        } else {
-          _showErrorBanner('Post not found');
-        }
-      } else {
-        _showErrorBanner('Failed to load post');
-      }
-    } catch (e) {
-      debugPrint('Error fetching post: $e');
-      _showErrorBanner('Error loading post: $e');
-    }
-  }
-
-  Future<void> _fetchAndNavigateToThread(int threadId) async {
-    if (_username == null || _username!.isEmpty) {
-      _showErrorBanner('Please log in to view threads');
-      return;
-    }
-
-    try {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Row(
-              children: [
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                ),
-                SizedBox(width: 12),
-                Text('Loading thread...'),
-              ],
-            ),
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-
-      // Use the same endpoint format as the app uses
-      final response = await http
-          .get(Uri.parse('https://server.awarcrown.com/threads/$threadId'))
-          .timeout(const Duration(seconds: 15));
-
-      if (response.statusCode == 404) {
-        _showErrorBanner('Thread not found');
-        return;
-      }
-
-      if (response.statusCode != 200) {
-        _showErrorBanner('Failed to load thread. Please try again.');
-        return;
-      }
-
-      final data = json.decode(response.body);
-
-      
-      if (data['error'] != null) {
-        _showErrorBanner(data['error']);
-        return;
-      }
-
-      final threadData = data is Map<String, dynamic>
-          ? data
-          : <String, dynamic>{};
-
-    
-      if (threadData['thread_id'] == null && threadData['id'] != null) {
-        threadData['thread_id'] = threadData['id'];
-      }
-      if (threadData['category_name'] == null &&
-          threadData['category'] != null) {
-        threadData['category_name'] = threadData['category'];
-      }
-      if (threadData['creator_username'] == null &&
-          threadData['creator'] != null) {
-        threadData['creator_username'] = threadData['creator'];
-      }
-      if (threadData['creator_role'] == null && threadData['role'] != null) {
-        threadData['creator_role'] = threadData['role'];
-      }
-      if (threadData['inspired_count'] == null) {
-        threadData['inspired_count'] = 0;
-      }
-      if (threadData['comment_count'] == null) {
-        threadData['comment_count'] = threadData['comments'] != null
-            ? (threadData['comments'] as List).length
-            : 0;
-      }
-      if (threadData['tags'] == null) {
-        threadData['tags'] = [];
-      }
-      if (threadData['user_has_inspired'] == null) {
-        threadData['user_has_inspired'] = false;
-      }
-      if (threadData['visibility'] == null) {
-        threadData['visibility'] = 'public';
-      }
-
-      final thread = Thread.fromJson(threadData, isFromCache: false);
-
-      if (thread.id == 0) {
-        _showErrorBanner('Invalid thread data received');
-        return;
-      }
-
-      final prefs = await SharedPreferences.getInstance();
-      final userId = prefs.getInt('user_id') ?? 0;
-
-      if (mounted) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ThreadDetailScreen(
-              thread: thread,
-              username: _username!,
-              userId: userId,
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error fetching thread: $e');
-      if (mounted) {
-        _showErrorBanner('Error loading thread: ${e.toString()}');
-      }
-    }
-  }
-
-  // Updated: _showLocalNotification (now with payload for tap)
-  Future<void> _showLocalNotification(RemoteMessage message) async {
-    const AndroidNotificationDetails androidDetails =
-        AndroidNotificationDetails(
-          'high_importance_channel',
-          'High Importance Notifications',
-          channelDescription: 'Your app notifications',
-          importance: Importance.max,
-          priority: Priority.high,
-          showWhen: false,
-        );
-
-    const DarwinNotificationDetails iOSDetails = DarwinNotificationDetails(
-      presentAlert: true,
-      presentBadge: true,
-      presentSound: true,
-    );
-
-    const NotificationDetails details = NotificationDetails(
-      android: androidDetails,
-      iOS: iOSDetails,
-    );
-
-    final title =
-        message.notification?.title ?? message.data['title'] ?? 'Notification';
-    final body = message.notification?.body ?? message.data['body'] ?? '';
-
-    final payloadData = {
-      ...message.data,
-      'id':
-          message.messageId ??
-          DateTime.now().millisecondsSinceEpoch
-              .toString(), // Include ID for marking
-    };
-
-    await flutterLocalNotificationsPlugin.show(
-      DateTime.now().millisecondsSinceEpoch.remainder(100000), // Unique ID
-      title,
-      body,
-      details,
-      payload: json.encode(payloadData), // Enhanced payload with ID
-    );
   }
 
   void _showErrorBanner(String message) {
     if (!mounted) return;
+
     final colorScheme = _buildColorScheme();
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+        backgroundColor: Colors.white.withOpacity(0.96),
+        elevation: 6,
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(
+          left: 16,
+          right: 16,
+          bottom: MediaQuery.of(context).padding.bottom + 80,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        duration: const Duration(seconds: 3),
         content: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, color: colorScheme.onError, size: 20),
-            const SizedBox(width: 8),
+            const Icon(Icons.info_outline, size: 18, color: Colors.black54),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 message,
-                style: TextStyle(
-                  color: colorScheme.onError,
-                  fontSize: 14,
+                style: const TextStyle(
+                  color: Colors.black87,
+                  fontSize: 14.5,
                   fontWeight: FontWeight.w500,
                 ),
               ),
             ),
           ],
         ),
-        backgroundColor: colorScheme.error,
-        duration: const Duration(seconds: 5),
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        margin: EdgeInsets.only(
-          bottom: MediaQuery.of(context).padding.bottom + 80,
-          left: 20,
-          right: 20,
-        ),
-        elevation: 8,
       ),
     );
-  }
-
-  // New: Handle notification tap (moved from main.dart)
-  void _handleNotificationTap(Map<String, dynamic> data) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final threadId = int.tryParse(data['thread_id'] ?? '');
-      final postId = int.tryParse(data['post_id'] ?? '');
-      final notifId = data['id'] ?? '';
-      if (threadId != null) {
-        _fetchAndNavigateToThread(threadId);
-        _markAsReadById(notifId); // Now with ID
-      } else if (postId != null) {
-        _fetchAndNavigateToPost(postId);
-        _markAsReadById(notifId); // Now with ID
-      } else if (mounted) {
-        Navigator.pushNamed(context, '/notifications');
-      }
-    });
-  }
-
-
-
-  void _handleNotificationPress() {
-    setState(() => _selectedIndex = 3);
   }
 
   void _handleSearchPress() {
@@ -743,10 +397,22 @@ void _showUpdateDialog(String message, String updateUrl) {
         icon: Icon(Icons.search, color: colorScheme.onSurface),
       ),
       IconButton(
-        onPressed: _handleNotificationPress,
-        icon: Icon(Icons.notifications_outlined, color: colorScheme.onSurface),
-      ),
+        onPressed: () {
+          _coolDownAction(() async {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => NotificationsPage(onUnreadChanged: (_) {}),
+              ),
+            );
+          });
+        },
 
+        icon: Icon(
+          Icons.notifications_outlined,
+          color: _isButtonLocked ? Colors.grey : colorScheme.onSurface,
+        ),
+      ),
       IconButton(
         onPressed: () {
           Navigator.push(
@@ -774,7 +440,6 @@ void _showUpdateDialog(String message, String updateUrl) {
               Shadow(
                 offset: const Offset(1, 1),
                 blurRadius: 5,
-                // ignore: deprecated_member_use
                 color: colorScheme.primary.withOpacity(0.5),
               ),
             ],
@@ -796,12 +461,12 @@ void _showUpdateDialog(String message, String updateUrl) {
       String title;
       switch (_selectedIndex) {
         case 1:
-          title = 'RoundTable';
+          title = 'Marketplace';
+          break;
+        case 2:
+          title = 'Round Table';
           break;
         case 3:
-          title = 'Alerts';
-          break;
-        case 4:
           title = 'Settings';
           break;
         default:
@@ -820,24 +485,18 @@ void _showUpdateDialog(String message, String updateUrl) {
   Widget _buildBody(ColorScheme colorScheme) {
     switch (_selectedIndex) {
       case 0:
-        return Stack(
-          children: [
-            TabBarView(
-              controller: _tabController,
-              children: const [PostsPage(), StartupsPage()],
-            ),
-           
-              
-          ],
+        return TabBarView(
+          controller: _tabController,
+          children: const [PostsPage(), StartupsPage()],
         );
-        
-          
       case 1:
+        return const MarketplacePage();
+
+      case 2:
         return ThreadsScreen();
       case 3:
-        return NotificationsPage(onUnreadChanged: _setUnreadCount);
-      case 4:
-        return const SizedBox();
+        return const SettingsPage();
+
       default:
         return const SizedBox();
     }
@@ -854,59 +513,77 @@ void _showUpdateDialog(String message, String updateUrl) {
 
     return Theme(
       data: themeData,
-      child: Builder(
-        builder: (context) {
-          return Scaffold(
-            key: _scaffoldKey,
-           
-           
-            appBar: _buildAppBar(colorScheme),
-            body: _buildBody(colorScheme),
-            floatingActionButtonLocation:
-                FloatingActionButtonLocation.centerDocked,
-            floatingActionButton: FloatingActionButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const CreatePostPage(),
-                  ),
-                );
-              },
-              backgroundColor: themeData.colorScheme.primary,
-              child: const Icon(Icons.add, size: 28, color: Colors.white),
+      child: Scaffold(
+        key: _scaffoldKey,
+        appBar: _buildAppBar(colorScheme),
+
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 280),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            final slide = Tween<Offset>(
+              begin: const Offset(0.08, 0),
+              end: Offset.zero,
+            ).animate(animation);
+
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(position: slide, child: child),
+            );
+          },
+          child: KeyedSubtree(
+            key: ValueKey<int>(_selectedIndex),
+            child: _buildBody(colorScheme),
+          ),
+        ),
+
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+
+        floatingActionButton: Opacity(
+          opacity: _selectedIndex == 0 ? 1.0 : 0.4,
+          child: FloatingActionButton(
+            onPressed: _selectedIndex == 0
+                ? () {
+                    _coolDownAction(() async {
+                      await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const CreatePostPage(),
+                        ),
+                      );
+                    });
+                  }
+                : () {
+                    _showCooldownHint();
+                  },
+
+            backgroundColor: themeData.colorScheme.primary,
+            child: const Icon(Icons.add, size: 28, color: Colors.white),
+          ),
+        ),
+
+        bottomNavigationBar: BottomAppBar(
+          color: themeData.colorScheme.surface,
+          elevation: 8,
+          shape: const CircularNotchedRectangle(),
+          notchMargin: 6,
+          child: SizedBox(
+            height: 70,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _navButton(Icons.home_rounded, "Home", 0, colorScheme),
+                _navButton(Icons.storefront_outlined, "Market", 1, colorScheme),
+
+                const SizedBox(width: 60),
+
+                _navButton(Icons.article, "Round", 2, colorScheme),
+                _navButton(Icons.settings_outlined, "Settings", 3, colorScheme),
+              ],
             ),
-            bottomNavigationBar: BottomAppBar(
-              color: themeData.colorScheme.surface,
-              elevation: 8,
-              shape: const CircularNotchedRectangle(),
-              notchMargin: 6,
-              child: SizedBox(
-                height: 70,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _navButton(Icons.home_rounded, "Home", 0, colorScheme),
-                    _navButton(Icons.article, "Round ", 1, colorScheme),
-                    const SizedBox(width: 60),
-                    _navButton(
-                      Icons.notifications_outlined,
-                      "Alerts",
-                      3,
-                      colorScheme,
-                    ),
-                    _navButton(
-                      Icons.settings_outlined,
-                      "Settings",
-                      4,
-                      colorScheme,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -918,25 +595,21 @@ void _showUpdateDialog(String message, String updateUrl) {
     ColorScheme colorScheme,
   ) {
     bool active = _selectedIndex == index;
-    Widget button = MaterialButton(
+    return MaterialButton(
       minWidth: 70,
       onPressed: () {
-        if (index == 4) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const SettingsPage()),
-          ).then((_) {
-            _loadThemePreference();
-          });
-        } else {
-          setState(() {
-            _selectedIndex = index;
-            if (index == 0) {
-              _tabController.animateTo(_tabController.index);
-            }
-          });
-        }
+        _coolDownAction(() async {
+          if (index == 3) {
+            await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const SettingsPage()),
+            );
+          } else {
+            setState(() => _selectedIndex = index);
+          }
+        });
       },
+
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -957,32 +630,6 @@ void _showUpdateDialog(String message, String updateUrl) {
         ],
       ),
     );
-    if (index == 3 && _unreadCount > 0) {
-      // Alerts index
-      return Stack(
-        children: [
-          button,
-          Positioned(
-            right: 8,
-            top: 8,
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Colors.red,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              constraints: const BoxConstraints(minWidth: 12, minHeight: 12),
-              child: Text(
-                '$_unreadCount',
-                style: const TextStyle(color: Colors.white, fontSize: 8),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-    return button;
   }
 }
 
@@ -993,7 +640,6 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
 
   List<String> _recentSearches = [];
 
-  
   PostSearchDelegate() {
     _loadHistory();
   }
@@ -1004,7 +650,6 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
     notifyListeners();
   }
 
-  
   Future<void> _saveHistory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList("search_history", _recentSearches);
@@ -1022,7 +667,6 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
     notifyListeners();
   }
 
-  
   Future<void> _clearHistory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove("search_history");
@@ -1030,7 +674,6 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
     notifyListeners();
   }
 
-  
   void _onQueryChanged(String query, BuildContext context) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
 
@@ -1038,7 +681,6 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
       _fetchResults(query, context);
     });
   }
-
 
   Future<void> _fetchResults(String query, BuildContext context) async {
     final trimmed = query.trim();
@@ -1094,7 +736,6 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
     return _buildResultsList(context);
   }
 
- 
   Widget _shimmerLoader() {
     return ListView.builder(
       itemCount: 6,
@@ -1116,7 +757,6 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
     );
   }
 
-
   Widget _recentSearchList(BuildContext context) {
     if (_recentSearches.isEmpty) {
       return _emptyState("Search students or companies");
@@ -1134,10 +774,7 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),
-            TextButton(
-              onPressed: _clearHistory,
-              child: const Text("Clear"),
-            )
+            TextButton(onPressed: _clearHistory, child: const Text("Clear")),
           ],
         ),
         ..._recentSearches.map(
@@ -1155,7 +792,6 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
       ],
     );
   }
-
 
   Widget _buildResultsList(BuildContext context) {
     if (_results.isEmpty) {
@@ -1186,7 +822,6 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
     );
   }
 
-  
   Widget _resultTile(BuildContext context, dynamic user) {
     final username = user["username"];
     final profilePic = user["profile_picture"];
@@ -1235,15 +870,17 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
               ),
             ),
 
-            Icon(Icons.arrow_forward_ios_rounded,
-                size: 18, color: Colors.grey.shade400),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 18,
+              color: Colors.grey.shade400,
+            ),
           ],
         ),
       ),
     );
   }
 
- 
   List<TextSpan> _highlightMatch(String username) {
     if (query.isEmpty) {
       return [TextSpan(text: "@$username")];
@@ -1277,7 +914,7 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
           Text(
             text,
             style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
-          )
+          ),
         ],
       ),
     );

@@ -107,9 +107,19 @@ class _PublicProfilePageState extends State<PublicProfilePage>
         return;
       }
 
-      _userId = prefs.getInt('user_id');
+      final rawUserId = prefs.get('user_id');
+
+if (rawUserId is int) {
+  _userId = rawUserId;
+} else if (rawUserId is String) {
+  _userId = int.tryParse(rawUserId);
+} else {
+  _userId = null;
+}
+
       if (_userId == null || _userId == 0) {
         await _fetchUserId();
+        await prefs.setInt('user_id', _userId!);
       }
 
       await _fetchUserInfo();
