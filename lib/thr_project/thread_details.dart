@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -15,7 +17,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:share_plus/share_plus.dart';
 import 'threads.dart';
 
-// Resolve image paths that might already be absolute.
 String _resolveThreadImageUrl(String? path) {
   if (path == null || path.isEmpty) return '';
   if (path.startsWith('http')) return path;
@@ -1343,7 +1344,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
                 ),
               ),
               Text(
-                '${widget.thread.creatorRole.isNotEmpty ? '${widget.thread.creatorRole} Ã¢â‚¬Â¢ ' : ''}${widget.thread.createdAt.toString().split(' ')[0]}',
+                '${widget.thread.creatorRole.isNotEmpty ? '${widget.thread.creatorRole} at' : ''}${widget.thread.createdAt.toString().split(' ')[0]}',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.8),
                   fontSize: 13,
@@ -1389,6 +1390,8 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
                   vertical: 5,
                 ),
                 decoration: BoxDecoration(
+                
+                 
                   color: Colors.white.withOpacity(0.25),
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -1437,6 +1440,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(8),
+             
               color: Colors.orange.withOpacity(0.1),
               child: const Text(
                 'Data from cache. Pull to refresh for latest.',
@@ -1493,6 +1497,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
                             Text(
                               widget.thread.body,
                               style: TextStyle(
+                               
                                 color: Colors.white.withOpacity(0.9),
                                 fontSize: 15,
                                 height: 1.6,
@@ -1504,12 +1509,14 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
                                 Icon(
                                   Icons.access_time,
                                   size: 14,
+                                 
                                   color: Colors.white.withOpacity(0.7),
                                 ),
                                 const SizedBox(width: 4),
                                 Text(
                                   _getReadingTime(widget.thread.body),
                                   style: TextStyle(
+                                    
                                     color: Colors.white.withOpacity(0.7),
                                     fontSize: 12,
                                   ),
@@ -1521,6 +1528,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen>
                             Container(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               decoration: BoxDecoration(
+                               
                                 color: Colors.black.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),

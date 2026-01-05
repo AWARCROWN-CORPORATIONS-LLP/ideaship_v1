@@ -984,6 +984,7 @@ class _StartupRolePageState extends State<StartupRolePage> with TickerProviderSt
 
           if (_isLoading)
             Container(
+              // ignore: deprecated_member_use
               color: Colors.black.withOpacity(0.3),
               child: const Center(child: CircularProgressIndicator()),
             ),

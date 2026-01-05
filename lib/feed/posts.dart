@@ -416,7 +416,6 @@ class CommentsPage extends StatefulWidget {
   @override
   State<CommentsPage> createState() => _CommentsPageState();
 }
-
 class _CommentsPageState extends State<CommentsPage> {
   late dynamic post;
   late String _username;
@@ -445,11 +444,11 @@ class _CommentsPageState extends State<CommentsPage> {
   List<dynamic> _parseComments(List<dynamic> rawComments) {
     return rawComments.map((c) {
       final comment = Map<String, dynamic>.from(c);
-      // Parse key numeric fields to int; fallback to 0 if invalid
+      
       comment['comment_id'] = int.tryParse(comment['comment_id'].toString()) ?? 0;
       comment['like_count'] = int.tryParse(comment['like_count'].toString()) ?? 0;
       comment['user_id'] = int.tryParse(comment['user_id'].toString()) ?? 0;
-      // Add more fields if needed (e.g., 'parent_comment_id')
+      
       comment['parent_comment_id'] = int.tryParse(comment['parent_comment_id'].toString());
       return comment;
     }).toList();
@@ -605,7 +604,7 @@ class _CommentsPageState extends State<CommentsPage> {
         final data = json.decode(response.body);
         if (data is Map<String, dynamic> && mounted) {
           setState(() => comments = _parseComments(data['comments'] ?? []));
-          _refreshNotifier.value = !_refreshNotifier.value; // Trigger rebuild for nested lists
+          _refreshNotifier.value = !_refreshNotifier.value; 
         }
       } else {
         throw http.ClientException('Server error: ${response.statusCode}');
@@ -998,7 +997,7 @@ class _PostsPageState extends State<PostsPage> with TickerProviderStateMixin, Wi
   final Map<int, bool> isReportingMap = {};
   bool _isInitialized = false;
   DateTime? _lastRefreshTime;
-  bool _isLoggingOut = false;
+  final bool _isLoggingOut = false;
   final Set<int> _followStatusLoaded = {};
   
   @override

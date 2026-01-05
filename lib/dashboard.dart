@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -320,10 +322,11 @@ void _showCooldownHint() {
   void _showErrorBanner(String message) {
     if (!mounted) return;
 
-    final colorScheme = _buildColorScheme();
+    _buildColorScheme();
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
+      
         backgroundColor: Colors.white.withOpacity(0.96),
         elevation: 6,
         behavior: SnackBarBehavior.floating,
@@ -440,6 +443,7 @@ void _showCooldownHint() {
               Shadow(
                 offset: const Offset(1, 1),
                 blurRadius: 5,
+                
                 color: colorScheme.primary.withOpacity(0.5),
               ),
             ],
@@ -759,7 +763,7 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
 
   Widget _recentSearchList(BuildContext context) {
     if (_recentSearches.isEmpty) {
-      return _emptyState("Search students or companies");
+      return _emptyState("Search for users and startups...,");
     }
 
     return ListView(
@@ -845,7 +849,7 @@ class PostSearchDelegate extends SearchDelegate with ChangeNotifier {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              // ignore: deprecated_member_use
+             
               color: Colors.black.withOpacity(0.06),
               blurRadius: 8,
               offset: const Offset(0, 2),

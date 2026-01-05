@@ -364,29 +364,6 @@ void _initializeControllers() {
     _controllers['instagram'] = TextEditingController(text: getVal('instagram'));
     _controllers['facebook'] = TextEditingController(text: getVal('facebook'));
 
-    // Business fields
-    _controllers['founding_date'] = TextEditingController(text: getVal('founding_date'));
-    _controllers['stage'] = TextEditingController(text: getVal('stage'));
-    _controllers['business_reg_type'] = TextEditingController(text: getVal('business_reg_type'));
-    _controllers['business_registration'] = TextEditingController(text: getVal('business_registration'));
-
-    // Government info
-    _controllers['founder_id'] = TextEditingController(text: getVal('founder_id'));
-    _controllers['gov_id_type'] = TextEditingController(text: getVal('gov_id_type'));
-
-    // Additional info
-    _controllers['highlights'] = TextEditingController(text: getVal('highlights'));
-    _controllers['funding_goals'] = TextEditingController(text: getVal('funding_goals'));
-    _controllers['mentorship_needs'] = TextEditingController(text: getVal('mentorship_needs'));
-    _controllers['business_vision'] = TextEditingController(text: getVal('business_vision'));
-
-    // Contact Email
-    _controllers['reference'] = TextEditingController(text: getVal('reference'));
-
-    // Docs
-    _controllers['additional_docs'] = TextEditingController(text: getVal('additional_docs'));
-    _controllers['supporting_docs'] = TextEditingController(text: getVal('supporting_docs'));
-
     // Verification
     _controllers['email_verification'] = TextEditingController(text: getVal('email_verification'));
   }
@@ -1002,7 +979,7 @@ _buildInfoSection(
               _buildInfoField('Founders Name', 'founders_names',alwaysReadOnly: true),
               _buildInfoField('Startup Name', 'startup_name',alwaysReadOnly: true),
               _buildInfoField('Phone', 'phone',alwaysReadOnly: true),
-              _buildInfoField('Contact Email', 'reference', alwaysReadOnly: true),
+              _buildInfoField('Email', 'email',alwaysReadOnly: true),
               _buildInfoField('Industry', 'industry'),
               _buildInfoField('Team Size', 'team_size', isNumeric: true),
               _buildInfoField('Founding Date', 'founding_date', alwaysReadOnly: true),
@@ -1021,44 +998,11 @@ _buildInfoSection(
             ],
           ),
 
-          const SizedBox(height: 16),
+         
 
-          _buildInfoSection(
-            'Business Details',
-            Icons.domain,
-            [
-              _buildInfoField('Business Registration Type', 'business_reg_type'),
-              _buildInfoField('Registration Number', 'business_registration',alwaysReadOnly: true),
-              _buildInfoField('Government ID Type', 'gov_id_type',alwaysReadOnly: true),
-              _buildInfoField('Founder Govt ID Number', 'founder_id',alwaysReadOnly: true),
-            ],
-          ),
+         
 
-          const SizedBox(height: 16),
-
-          _buildInfoSection(
-            'Vision & Goals',
-            Icons.flag_outlined,
-            [
-              _buildInfoField('Highlights / Achievements', 'highlights', isMultiline: true),
-              _buildInfoField('Funding Goals', 'funding_goals', isMultiline: true),
-              _buildInfoField('Mentorship Needs', 'mentorship_needs', isMultiline: true),
-              _buildInfoField('Business Vision', 'business_vision', isMultiline: true),
-            ],
-          ),
-
-          const SizedBox(height: 16),
-
-          _buildInfoSection(
-            'Documents & Verification',
-            Icons.verified_outlined,
-            [
-              _buildInfoField('Email Verification Status', 'email_verification',
-                  alwaysReadOnly: true),
-              _buildInfoField('Supporting Docs', 'supporting_docs', isMultiline: true),
-              _buildInfoField('Additional Docs', 'additional_docs', isMultiline: true),
-            ],
-          ),
+          
         ],
 
         if (_isEditing) ...[

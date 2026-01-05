@@ -1754,35 +1754,10 @@ class _StartupDetailsPageState extends State<StartupDetailsPage> {
 
                   const SizedBox(height: 18),
 
-                  _buildSectionCard(
-                    context,
-                    Icons.visibility,
-                    'Business Vision',
-                    startup['business_vision'] ?? 'No vision provided',
-                    colorScheme.secondary,
-                  ),
+                 
 
-                  const SizedBox(height: 18),
-
-                  _buildSectionCard(
-                    context,
-                    Icons.attach_money,
-                    'Funding Goals',
-                    startup['funding_goals'] ?? 'Not specified',
-                    Colors.green,
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  _buildSectionCard(
-                    context,
-                    Icons.school,
-                    'Mentorship Needs',
-                    startup['mentorship_needs'] ??
-                        'No mentorship needs provided',
-                    Colors.orange,
-                  ),
-
+               
+                 
                   const SizedBox(height: 26),
 
                   if ((startup['linkedin']?.isNotEmpty ?? false) ||

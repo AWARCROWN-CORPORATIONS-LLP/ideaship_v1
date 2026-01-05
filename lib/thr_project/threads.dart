@@ -569,7 +569,10 @@ class _ThreadsScreenState extends State<ThreadsScreen>
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _isOnline = false;
   final Set<int> _deletingThreadIds = <int>{};
+  final Map<int, DateTime> _deleteLocks = {};
   final Set<int> _bookmarkedThreadIds = <int>{}; // Local bookmarks
+  static const Duration deleteHardLimit = Duration(seconds: 30);
+  static const Duration deleteApiTimeout = Duration(seconds: 15);
 
   @override
   void initState() {
@@ -1829,80 +1832,128 @@ Future<void> _joinPrivateThread(String code) async {
       }
     }
   }
+ Future<bool> _deleteThread(int threadId) async {
+  if (_deleteLocks.containsKey(threadId)) return false;
+  _deleteLocks[threadId] = DateTime.now();
 
-  Future<bool> _deleteThread(int threadId) async {
-    if (_deletingThreadIds.contains(threadId)) {
-      return false; // Already deleting, avoid multiple calls
+  bool completed = false;
+
+  // 🔥 Cache backup
+  Thread? cachedThreadBackup = _threadCache[threadId];
+
+  List<Thread> backupDiscover = [];
+  List<Thread> backupMy = [];
+  List<Thread> backupSearch = [];
+
+  Timer? hardTimeout;
+  hardTimeout = Timer(deleteHardLimit, () {
+    if (!completed && mounted) {
+      _restoreCacheIfNeeded(threadId, cachedThreadBackup);
+      _restoreThreads(backupDiscover, backupMy, backupSearch);
+      _showError('Failed to delete. Please try again.');
+      _deleteLocks.remove(threadId);
     }
-    final bool online = await _isDeviceOnline();
-    if (!online) {
-      _showError('Please connect to internet to delete the roundtable.');
-      return false;
-    }
-    if (userId == null ||
-        userId == 0 ||
-        username == null ||
-        username!.isEmpty) {
-      _showError('User authentication required to delete.');
-      return false;
-    }
-    try {
-      final bodyData = json.encode({
-        'thread_id': threadId,
-        'user_id': userId,
-        'username': username,
-      });
-      final response = await http
-          .post(
-            Uri.parse('https://server.awarcrown.com/threads/delete'),
-            headers: {'Content-Type': 'application/json'},
-            body: bodyData,
-          )
-          .timeout(const Duration(seconds: 10));
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        if (data is Map<String, dynamic> && data['success'] == true) {
-          // Remove from local lists
-          if (mounted) {
-            setState(() {
-              discoverThreads.removeWhere((t) => t.id == threadId);
-              myThreads.removeWhere((t) => t.id == threadId);
-              searchResults.removeWhere((t) => t.id == threadId);
-              _deletingThreadIds.remove(threadId);
-            });
-          }
-          // Remove from cache
-          _threadCache.remove(threadId);
-          // Clear local prefs if any
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.remove('inspired_$threadId');
-          await prefs.remove('code_$threadId');
-          _showSuccess(data['message'] ?? 'Roundtable deleted successfully.');
-          return true;
-        } else {
-          final errorMsg = data['error'] ?? 'Invalid response from server';
-          _showError('Failed to delete roundtable: $errorMsg');
-          if (mounted) {
-            setState(() {
-              _deletingThreadIds.remove(threadId);
-            });
-          }
-          return false;
-        }
-      } else {
-        throw Exception('Failed to delete roundtable: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('Delete thread error: $e');
-      _showError('Failed to delete roundtable: ${_getErrorMessage(e)}');
-      if (mounted) {
-        setState(() {
-          _deletingThreadIds.remove(threadId);
-        });
-      }
-      return false;
-    }
+  });
+
+  if (!await _isDeviceOnline()) {
+    hardTimeout.cancel();
+    _deleteLocks.remove(threadId);
+    _showError('No internet connection.');
+    return false;
   }
+
+  if (userId == null || userId == 0) {
+    hardTimeout.cancel();
+    _deleteLocks.remove(threadId);
+    _showError('User authentication required.');
+    return false;
+  }
+
+  // ===== OPTIMISTIC UI =====
+  backupDiscover = List.of(discoverThreads);
+  backupMy = List.of(myThreads);
+  backupSearch = List.of(searchResults);
+
+  setState(() {
+    discoverThreads.removeWhere((t) => t.id == threadId);
+    myThreads.removeWhere((t) => t.id == threadId);
+    searchResults.removeWhere((t) => t.id == threadId);
+  });
+
+  _threadCache.remove(threadId); // 🔥 immediate cache removal
+
+  try {
+    final response = await http
+        .post(
+          Uri.parse('https://server.awarcrown.com/threads/delete'),
+          headers: const {'Content-Type': 'application/json'},
+          body: json.encode({'thread_id': threadId, 'user_id': userId}),
+        )
+        .timeout(deleteApiTimeout);
+
+    completed = true;
+    hardTimeout.cancel();
+
+    final data = json.decode(response.body);
+
+    if (response.statusCode == 200 && data['success'] == true) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('inspired_$threadId');
+      await prefs.remove('code_$threadId');
+
+      _showSuccess(data['message'] ?? 'Roundtable deleted');
+      return true;
+    }
+
+    _restoreCacheIfNeeded(threadId, cachedThreadBackup);
+    _restoreThreads(backupDiscover, backupMy, backupSearch);
+    _showError(_mapDeleteError(data));
+    return false;
+  } catch (e) {
+    completed = true;
+    hardTimeout.cancel();
+
+    _restoreCacheIfNeeded(threadId, cachedThreadBackup);
+    _restoreThreads(backupDiscover, backupMy, backupSearch);
+    _showError('Failed to delete. Please try again.');
+    debugPrint('Delete error: $e');
+    return false;
+  } finally {
+    _deleteLocks.remove(threadId);
+  }
+}
+  void _restoreCacheIfNeeded(int threadId, Thread? backup) {
+  if (backup != null) {
+    _threadCache[threadId] = backup;
+  }
+}
+
+
+void _restoreThreads(
+  List<Thread> discover,
+  List<Thread> my,
+  List<Thread> search,
+) {
+  if (!mounted) return;
+  setState(() {
+    discoverThreads = discover;
+    myThreads = my;
+    searchResults = search;
+  });
+}
+
+String _mapDeleteError(dynamic data) {
+  switch (data['code']) {
+    case 'NOT_OWNER':
+      return 'You are not allowed to delete this roundtable.';
+    case 'NOT_FOUND':
+      return 'Roundtable already removed.';
+    case 'ALREADY_DELETED':
+      return 'Roundtable already deleted.';
+    default:
+      return data['error'] ?? 'Unable to delete roundtable.';
+  }
+}
 
   void _showDeleteConfirmation(int threadId, String title) {
     showDialog(
